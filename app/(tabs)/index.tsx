@@ -205,7 +205,7 @@ function PostCard({ post, isFirestore, onHide, isVisible = true }: { post: Dummy
             style={[styles.postAvatar, { backgroundColor: colors.card }]}
           />
           <View style={styles.postAuthorInfo}>
-            <NameWithBadge name={authorName} nameStyle={[styles.postAuthorName, { color: colors.text }]} />
+            <NameWithBadge name={authorName} uid={authorUid} nameStyle={[styles.postAuthorName, { color: colors.text }]} />
             <Text style={[styles.postMeta, { color: colors.textSecondary }]}>{postMeta}</Text>
           </View>
         </TouchableOpacity>
