@@ -1,0 +1,176 @@
+import {
+  doc,
+  setDoc,
+  collection,
+  query,
+  where,
+  orderBy,
+  addDoc,
+  updateDoc,
+  onSnapshot,
+  arrayUnion,
+  Unsubscribe,
+  getDocs,
+  writeBatch,
+} from 'firebase/firestore';
+import { db } from '../config/firebase';
+import { ChatRoom, ChatMessage } from '../types/auth';
+
+/** 채팅방 ID 생성 (두 UID를 정렬하여 고유 ID 생성) */
+export function getChatRoomId(uid1: string, uid2: string): string {
+  return [uid1, uid2].sort().join('_');
+}
+
+/** 채팅방 생성 또는 기존 방 반환 */
+export async function getOrCreateChatRoom(
+  myUid: string,
+  myName: string,
+  myAvatar: number,
+  otherUid: string,
+  otherName: string,
+  otherAvatar: number,
+  myPhotoURL?: string | null,
+  otherPhotoURL?: string | null,
+): Promise<string> {
+  const roomId = getChatRoomId(myUid, otherUid);
+  const roomRef = doc(db, 'chatRooms', roomId);
+
+  // 이미 존재하는지 확인하지 않고 merge로 안전하게 생성
+  await setDoc(
+    roomRef,
+    {
+      participants: [myUid, otherUid].sort(),
+      participantNames: { [myUid]: myName, [otherUid]: otherName },
+      participantAvatars: { [myUid]: myAvatar, [otherUid]: otherAvatar },
+      participantPhotos: { [myUid]: myPhotoURL ?? null, [otherUid]: otherPhotoURL ?? null },
+      createdAt: Date.now(),
+    },
+    { merge: true },
+  );
+
+  return roomId;
+}
+
+/** 메시지 전송 */
+export async function sendMessage(
+  roomId: string,
+  senderUid: string,
+  text: string,
+  imageUrl?: string,
+  mediaType?: 'image' | 'video',
+): Promise<void> {
+  const now = Date.now();
+
+  // 메시지 추가
+  const messagesRef = collection(db, 'chatRooms', roomId, 'messages');
+  await addDoc(messagesRef, {
+    senderUid,
+    text,
+    imageUrl: imageUrl ?? null,
+    mediaType: mediaType ?? null,
+    createdAt: now,
+    read: false,
+    readBy: [senderUid],
+  });
+
+  // 채팅방 lastMessage 업데이트
+  const roomRef = doc(db, 'chatRooms', roomId);
+  const roomSnap = await getDocs(
+    query(collection(db, 'chatRooms'), where('__name__', '==', roomId)),
+  );
+
+  // 상대방 unread 카운트 증가
+  let unreadCount: { [uid: string]: number } = {};
+  roomSnap.forEach((d) => {
+    const data = d.data() as ChatRoom;
+    unreadCount = { ...data.unreadCount };
+    data.participants.forEach((uid) => {
+      if (uid !== senderUid) {
+        unreadCount[uid] = (unreadCount[uid] ?? 0) + 1;
+      }
+    });
+  });
+
+  const lastMessage = imageUrl
+    ? mediaType === 'video' ? '동영상을 보냈습니다' : '사진을 보냈습니다'
+    : text;
+
+  await updateDoc(roomRef, {
+    lastMessage,
+    lastMessageAt: now,
+    lastSenderUid: senderUid,
+    unreadCount,
+  });
+}
+
+/** 메시지 실시간 구독 */
+export function subscribeMessages(
+  roomId: string,
+  callback: (messages: ChatMessage[]) => void,
+): Unsubscribe {
+  const messagesRef = collection(db, 'chatRooms', roomId, 'messages');
+  const q = query(messagesRef, orderBy('createdAt', 'asc'));
+
+  return onSnapshot(q, (snapshot) => {
+    const messages: ChatMessage[] = [];
+    snapshot.forEach((docSnap) => {
+      messages.push({ id: docSnap.id, ...docSnap.data() } as ChatMessage);
+    });
+    callback(messages);
+  });
+}
+
+/** 내 채팅방 목록 실시간 구독 */
+export function subscribeChatRooms(
+  myUid: string,
+  callback: (rooms: ChatRoom[]) => void,
+): Unsubscribe {
+  const roomsRef = collection(db, 'chatRooms');
+  const q = query(
+    roomsRef,
+    where('participants', 'array-contains', myUid),
+  );
+
+  return onSnapshot(q, (snapshot) => {
+    const rooms: ChatRoom[] = [];
+    snapshot.forEach((docSnap) => {
+      rooms.push({ id: docSnap.id, ...docSnap.data() } as ChatRoom);
+    });
+    // 최신 메시지 순 정렬
+    rooms.sort((a, b) => (b.lastMessageAt ?? 0) - (a.lastMessageAt ?? 0));
+    callback(rooms);
+  });
+}
+
+/** 읽음 처리 (해당 방의 내 unread를 0으로) */
+export async function markAsRead(
+  roomId: string,
+  myUid: string,
+): Promise<void> {
+  const roomRef = doc(db, 'chatRooms', roomId);
+  await updateDoc(roomRef, {
+    [`unreadCount.${myUid}`]: 0,
+  });
+
+  // 해당 방의 안 읽은 메시지도 read: true로 업데이트
+  const messagesRef = collection(db, 'chatRooms', roomId, 'messages');
+  const q = query(
+    messagesRef,
+    where('read', '==', false),
+    where('senderUid', '!=', myUid),
+  );
+  const snapshot = await getDocs(q);
+
+  if (snapshot.empty) return;
+
+  const batch = writeBatch(db);
+  snapshot.forEach((docSnap) => {
+    batch.update(docSnap.ref, { read: true, readBy: arrayUnion(myUid) });
+  });
+  await batch.commit();
+}
+
+/** 전체 안 읽은 메시지 수 계산 */
+export function getTotalUnread(rooms: ChatRoom[], myUid: string): number {
+  return rooms.reduce((sum, room) => sum + (room.unreadCount?.[myUid] ?? 0), 0);
+}

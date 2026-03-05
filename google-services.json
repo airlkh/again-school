@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "414642537109",
+    "project_id": "again-school-bfea8",
+    "storage_bucket": "again-school-bfea8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:414642537109:android:a423daf6e0c7082c23d19c",
+        "android_client_info": {
+          "package_name": "com.again.school"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCEZSTbUfz0Ca1W2cOKPwR2e4p4qTXXPIQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:414642537109:android:a7e404f7cb6b804b23d19c",
+        "android_client_info": {
+          "package_name": "com.againschool.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCEZSTbUfz0Ca1W2cOKPwR2e4p4qTXXPIQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

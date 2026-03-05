@@ -1,0 +1,73 @@
+{
+  "expo": {
+    "name": "Again School",
+    "slug": "again-school",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "again-school",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#e8313a"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.againschool.app",
+      "usesAppleSignIn": true
+    },
+    "android": {
+      "package": "com.againschool.app",
+      "versionCode": 1,
+      "softwareKeyboardLayoutMode": "adjustResize",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#e8313a"
+      },
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-web-browser",
+      "expo-apple-authentication",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "프로필 사진을 설정하기 위해 사진 접근 권한이 필요합니다."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#e8313a"
+        }
+      ],
+      "expo-sharing",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "갤러리에서 사진과 동영상을 선택하기 위해 접근 권한이 필요합니다.",
+          "savePhotosPermission": "미디어를 저장하기 위해 접근 권한이 필요합니다."
+        }
+      ],
+      "@react-native-community/datetimepicker"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a94752ec-dd06-4929-a080-1e0ef40face1"
+      }
+    }
+  }
+}
