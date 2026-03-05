@@ -94,9 +94,6 @@ export default function UploadScreen() {
     }));
 
     setMediaList(items);
-    if (items.length > 0) {
-      setSelectedMedia([items[0]]);
-    }
   };
 
   // 미디어 선택/해제
@@ -432,209 +429,189 @@ export default function UploadScreen() {
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 2단계: 편집
+  // 2단계: 편집 (인스타그램 스타일)
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   if (step === 'edit') {
     const currentMedia = selectedMedia[0];
     const isVideo = currentMedia?.type === 'video';
+    const editImageH = Math.min(imageHeight, SH - insets.top - 160);
 
     return (
       <View style={{ flex: 1, backgroundColor: '#000' }}>
-        {/* 헤더 */}
+        {/* ── 상단 헤더 (이미지 위 오버레이) ── */}
         <View
           style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 20,
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
             paddingTop: insets.top + 8,
             paddingHorizontal: 16,
-            paddingBottom: 12,
+            paddingBottom: 10,
           }}
         >
-          <TouchableOpacity onPress={() => setStep('gallery')}>
-            <Text style={{ color: '#fff', fontSize: 22 }}>←</Text>
-          </TouchableOpacity>
-          <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>
-            편집
-          </Text>
           <TouchableOpacity
-            onPress={() => setStep('share')}
-            style={{
-              backgroundColor: '#e8313a',
-              borderRadius: 8,
-              paddingHorizontal: 14,
-              paddingVertical: 6,
-            }}
+            onPress={() => setStep('gallery')}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>
-              다음
-            </Text>
+            <Text style={{ color: '#fff', fontSize: 26 }}>✕</Text>
           </TouchableOpacity>
+
+          {/* 우측 도구 아이콘들 */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18 }}>
+            <TouchableOpacity onPress={() => setShowTextInput(!showTextInput)}>
+              <Text style={{ color: '#fff', fontSize: 22, fontWeight: '700' }}>Aa</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => Alert.alert('준비 중', '스티커 기능 준비 중')}>
+              <Text style={{ fontSize: 22 }}>😊</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => Alert.alert('준비 중', '효과 기능 준비 중')}>
+              <Text style={{ fontSize: 22 }}>✨</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* ViewShot: 이미지+텍스트 합성 영역 */}
-        <ViewShot
-          ref={viewShotRef}
-          options={{ format: 'jpg', quality: 0.95 }}
-          style={{
-            width: SW,
-            height: imageHeight,
-            backgroundColor: '#000',
-          }}
-        >
-          {!isVideo ? (
-            <Image
-              source={{ uri: currentMedia?.uri }}
-              style={{ width: SW, height: imageHeight }}
-              resizeMode="contain"
-              onLoad={(e) => {
-                const { width, height } = e.nativeEvent.source;
-                const ratio = height / width;
-                setImageHeight(
-                  Math.min(Math.max(SW * ratio, 300), SH * 0.6),
-                );
-              }}
-            />
-          ) : (
-            <View
-              style={{
-                width: SW,
-                height: 300,
-                backgroundColor: '#111',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Text style={{ color: '#fff', fontSize: 48 }}>▶</Text>
-              <Text style={{ color: '#aaa', fontSize: 13, marginTop: 8 }}>
-                동영상
-              </Text>
-            </View>
-          )}
-
-          {/* 텍스트 오버레이 — ViewShot 안에 있어야 합성됨 */}
-          {overlayText.trim().length > 0 && (
-            <View
-              style={{
-                position: 'absolute',
-                left: textX * SW - 60,
-                top: textY * imageHeight - textSize / 2,
-                maxWidth: SW * 0.85,
-                zIndex: 10,
-              }}
-              {...textPanResponder.panHandlers}
-            >
-              <View
-                style={{
-                  backgroundColor: getTextBg(),
-                  borderRadius: 6,
-                  paddingHorizontal: bgStyle !== 'none' ? 10 : 0,
-                  paddingVertical: bgStyle !== 'none' ? 4 : 0,
-                }}
-              >
-                <Text
-                  style={{
-                    color: textColor,
-                    fontSize: textSize,
-                    fontWeight: '700',
-                    textAlign: 'center',
-                    textShadowColor: 'rgba(0,0,0,0.6)',
-                    textShadowOffset: { width: 1, height: 1 },
-                    textShadowRadius: 3,
-                  }}
-                >
-                  {overlayText}
-                </Text>
-              </View>
-            </View>
-          )}
-        </ViewShot>
-
-        {/* 편집 도구 */}
-        <ScrollView style={{ flex: 1 }}>
-          {/* Aa 텍스트 입력 */}
-          <TouchableOpacity
-            onPress={() => setShowTextInput(!showTextInput)}
+        {/* ── 중앙: 이미지/동영상 + 텍스트 오버레이 ── */}
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ViewShot
+            ref={viewShotRef}
+            options={{ format: 'jpg', quality: 0.95 }}
             style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 8,
-              padding: 14,
-              borderBottomWidth: 0.5,
-              borderBottomColor: '#333',
+              width: SW,
+              height: editImageH,
+              backgroundColor: '#000',
             }}
           >
-            <Text style={{ color: '#fff', fontSize: 20 }}>Aa</Text>
-            <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>
-              텍스트 추가
-            </Text>
+            {!isVideo ? (
+              <Image
+                source={{ uri: currentMedia?.uri }}
+                style={{ width: SW, height: editImageH }}
+                resizeMode="contain"
+                onLoad={(e) => {
+                  const { width, height } = e.nativeEvent.source;
+                  const ratio = height / width;
+                  setImageHeight(Math.min(Math.max(SW * ratio, 300), SH * 0.7));
+                }}
+              />
+            ) : (
+              <View
+                style={{
+                  width: SW,
+                  height: editImageH,
+                  backgroundColor: '#111',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Text style={{ color: '#fff', fontSize: 56 }}>▶</Text>
+                <Text style={{ color: '#aaa', fontSize: 14, marginTop: 10 }}>
+                  동영상
+                </Text>
+              </View>
+            )}
+
+            {/* 텍스트 오버레이 (ViewShot 안 — 합성됨) */}
             {overlayText.trim().length > 0 && (
               <View
                 style={{
-                  backgroundColor: '#e8313a',
-                  borderRadius: 10,
-                  paddingHorizontal: 8,
-                  paddingVertical: 2,
+                  position: 'absolute',
+                  left: textX * SW - 60,
+                  top: textY * editImageH - textSize / 2,
+                  maxWidth: SW * 0.85,
+                  zIndex: 10,
                 }}
+                {...textPanResponder.panHandlers}
               >
-                <Text style={{ color: '#fff', fontSize: 11 }}>입력됨</Text>
+                <View
+                  style={{
+                    backgroundColor: getTextBg(),
+                    borderRadius: 6,
+                    paddingHorizontal: bgStyle !== 'none' ? 10 : 0,
+                    paddingVertical: bgStyle !== 'none' ? 4 : 0,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: textColor,
+                      fontSize: textSize,
+                      fontWeight: '700',
+                      textAlign: 'center',
+                      textShadowColor: 'rgba(0,0,0,0.6)',
+                      textShadowOffset: { width: 1, height: 1 },
+                      textShadowRadius: 3,
+                    }}
+                  >
+                    {overlayText}
+                  </Text>
+                </View>
               </View>
             )}
-          </TouchableOpacity>
+          </ViewShot>
+        </View>
 
-          {showTextInput && (
-            <View style={{ padding: 14, gap: 12, backgroundColor: '#111' }}>
-              {/* 텍스트 입력 */}
-              <TextInput
-                value={overlayText}
-                onChangeText={setOverlayText}
-                placeholder="이미지 위 텍스트 입력..."
-                placeholderTextColor="#555"
-                style={{
-                  backgroundColor: '#222',
-                  borderRadius: 10,
-                  padding: 12,
-                  fontSize: 15,
-                  color: '#fff',
-                  borderWidth: 1,
-                  borderColor: '#444',
-                }}
-                maxLength={50}
-                returnKeyType="done"
-              />
+        {/* ── 텍스트 입력 패널 (Aa 탭 시 열림) ── */}
+        {showTextInput && (
+          <View
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              zIndex: 30,
+              backgroundColor: '#111',
+              borderTopLeftRadius: 16,
+              borderTopRightRadius: 16,
+              padding: 16,
+              paddingBottom: Math.max(insets.bottom, 16),
+              gap: 12,
+            }}
+          >
+            {/* 입력 필드 */}
+            <TextInput
+              value={overlayText}
+              onChangeText={setOverlayText}
+              placeholder="텍스트 입력..."
+              placeholderTextColor="#555"
+              autoFocus
+              style={{
+                backgroundColor: '#222',
+                borderRadius: 12,
+                padding: 12,
+                fontSize: 16,
+                color: '#fff',
+                borderWidth: 1,
+                borderColor: '#333',
+              }}
+              maxLength={50}
+              returnKeyType="done"
+              onSubmitEditing={() => setShowTextInput(false)}
+            />
 
-              {/* 색상 */}
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  {[
-                    '#ffffff',
-                    '#000000',
-                    '#e8313a',
-                    '#FFD700',
-                    '#00C851',
-                    '#2196F3',
-                    '#FF69B4',
-                    '#FF8C00',
-                  ].map((c) => (
-                    <TouchableOpacity
-                      key={c}
-                      onPress={() => setTextColor(c)}
-                      style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 16,
-                        backgroundColor: c,
-                        borderWidth: textColor === c ? 3 : 1,
-                        borderColor:
-                          textColor === c ? '#e8313a' : 'rgba(255,255,255,0.3)',
-                      }}
-                    />
-                  ))}
-                </View>
-              </ScrollView>
-
-              {/* 배경 스타일 */}
-              <View style={{ flexDirection: 'row', gap: 8 }}>
+            {/* 도구 바: 색상 + 배경 + 크기 */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                {[
+                  '#ffffff', '#000000', '#e8313a', '#FFD700',
+                  '#00C851', '#2196F3', '#FF69B4', '#FF8C00',
+                ].map((c) => (
+                  <TouchableOpacity
+                    key={c}
+                    onPress={() => setTextColor(c)}
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 14,
+                      backgroundColor: c,
+                      borderWidth: textColor === c ? 3 : 1,
+                      borderColor: textColor === c ? '#fff' : 'rgba(255,255,255,0.2)',
+                    }}
+                  />
+                ))}
+                <View style={{ width: 1, height: 20, backgroundColor: '#333', marginHorizontal: 4 }} />
                 {(
                   [
                     { key: 'none', label: '없음' },
@@ -646,106 +623,187 @@ export default function UploadScreen() {
                     key={b.key}
                     onPress={() => setBgStyle(b.key)}
                     style={{
-                      paddingHorizontal: 14,
-                      paddingVertical: 8,
-                      borderRadius: 8,
-                      backgroundColor: bgStyle === b.key ? '#e8313a' : '#333',
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                      borderRadius: 14,
+                      backgroundColor: bgStyle === b.key ? '#fff' : '#333',
                     }}
                   >
                     <Text
-                      style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}
+                      style={{
+                        color: bgStyle === b.key ? '#000' : '#fff',
+                        fontSize: 12,
+                        fontWeight: '600',
+                      }}
                     >
                       {b.label}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
+            </ScrollView>
 
-              {/* 크기 슬라이더 */}
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 10,
-                }}
-              >
-                <Text style={{ color: '#aaa', fontSize: 12 }}>A</Text>
-                <View
-                  style={{ flex: 1, height: 36, justifyContent: 'center' }}
-                >
+            {/* 크기 슬라이더 */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={{ color: '#666', fontSize: 12 }}>A</Text>
+              <View style={{ flex: 1, height: 28, justifyContent: 'center' }}>
+                <View style={{ height: 3, backgroundColor: '#333', borderRadius: 2 }}>
                   <View
                     style={{
-                      height: 4,
-                      backgroundColor: '#444',
+                      height: '100%',
+                      width: `${((textSize - 14) / 36) * 100}%`,
+                      backgroundColor: '#fff',
                       borderRadius: 2,
                     }}
-                  >
-                    <View
-                      style={{
-                        height: '100%',
-                        width: `${((textSize - 14) / 36) * 100}%`,
-                        backgroundColor: '#e8313a',
-                        borderRadius: 2,
-                      }}
-                    />
-                  </View>
-                  <View
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                    }}
-                    {...PanResponder.create({
-                      onStartShouldSetPanResponder: () => true,
-                      onMoveShouldSetPanResponder: () => true,
-                      onPanResponderGrant: (e) => {
-                        const pct = e.nativeEvent.locationX / (SW - 80);
-                        setTextSize(
-                          Math.round(Math.min(50, Math.max(14, 14 + pct * 36))),
-                        );
-                      },
-                      onPanResponderMove: (e) => {
-                        const pct = e.nativeEvent.locationX / (SW - 80);
-                        setTextSize(
-                          Math.round(Math.min(50, Math.max(14, 14 + pct * 36))),
-                        );
-                      },
-                    }).panHandlers}
                   />
                 </View>
-                <Text
-                  style={{ color: '#aaa', fontSize: 18, fontWeight: '700' }}
-                >
-                  A
-                </Text>
-                <Text
-                  style={{
-                    color: '#e8313a',
-                    fontSize: 13,
-                    fontWeight: '700',
-                    width: 36,
-                  }}
-                >
-                  {textSize}px
-                </Text>
+                <View
+                  style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                  {...PanResponder.create({
+                    onStartShouldSetPanResponder: () => true,
+                    onMoveShouldSetPanResponder: () => true,
+                    onPanResponderGrant: (e) => {
+                      const pct = e.nativeEvent.locationX / (SW - 80);
+                      setTextSize(Math.round(Math.min(50, Math.max(14, 14 + pct * 36))));
+                    },
+                    onPanResponderMove: (e) => {
+                      const pct = e.nativeEvent.locationX / (SW - 80);
+                      setTextSize(Math.round(Math.min(50, Math.max(14, 14 + pct * 36))));
+                    },
+                  }).panHandlers}
+                />
               </View>
+              <Text style={{ color: '#666', fontSize: 20, fontWeight: '700' }}>A</Text>
+              <Text style={{ color: '#fff', fontSize: 12, width: 32 }}>{textSize}</Text>
+            </View>
 
-              {overlayText.trim().length > 0 && (
-                <Text
+            {/* 완료 버튼 */}
+            <TouchableOpacity
+              onPress={() => setShowTextInput(false)}
+              style={{
+                alignSelf: 'center',
+                backgroundColor: '#0095f6',
+                borderRadius: 20,
+                paddingHorizontal: 24,
+                paddingVertical: 8,
+              }}
+            >
+              <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>완료</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* ── 하단 바 ── */}
+        {!showTextInput && (
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: isVideo ? 'space-between' : 'space-between',
+              paddingHorizontal: 16,
+              paddingTop: 12,
+              paddingBottom: Math.max(insets.bottom, 16),
+              backgroundColor: '#000',
+            }}
+          >
+            {isVideo ? (
+              <>
+                <TouchableOpacity
                   style={{
-                    color: '#888',
-                    fontSize: 12,
-                    textAlign: 'center',
+                    backgroundColor: '#222',
+                    borderRadius: 20,
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
                   }}
                 >
-                  위 이미지에서 텍스트를 드래그해서 위치 변경 가능
-                </Text>
-              )}
-            </View>
-          )}
-        </ScrollView>
+                  <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>
+                    동영상 수정
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setStep('share')}
+                  style={{
+                    backgroundColor: '#0095f6',
+                    borderRadius: 20,
+                    paddingHorizontal: 20,
+                    paddingVertical: 10,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>다음</Text>
+                  <Text style={{ color: '#fff', fontSize: 14 }}>→</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <TouchableOpacity
+                    onPress={() => setShowTextInput(true)}
+                    style={{
+                      backgroundColor: '#222',
+                      borderRadius: 20,
+                      paddingHorizontal: 14,
+                      paddingVertical: 8,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>Aa</Text>
+                    <Text style={{ color: '#ccc', fontSize: 12 }}>텍스트</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => Alert.alert('준비 중', '스티커 기능 준비 중')}
+                    style={{
+                      backgroundColor: '#222',
+                      borderRadius: 20,
+                      paddingHorizontal: 14,
+                      paddingVertical: 8,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    <Text style={{ fontSize: 14 }}>😊</Text>
+                    <Text style={{ color: '#ccc', fontSize: 12 }}>스티커</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => Alert.alert('준비 중', '효과 기능 준비 중')}
+                    style={{
+                      backgroundColor: '#222',
+                      borderRadius: 20,
+                      paddingHorizontal: 14,
+                      paddingVertical: 8,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    <Text style={{ fontSize: 14 }}>✨</Text>
+                    <Text style={{ color: '#ccc', fontSize: 12 }}>효과</Text>
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setStep('share')}
+                  style={{
+                    backgroundColor: '#0095f6',
+                    borderRadius: 20,
+                    paddingHorizontal: 20,
+                    paddingVertical: 10,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>다음</Text>
+                  <Text style={{ color: '#fff', fontSize: 14 }}>→</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        )}
       </View>
     );
   }

@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
+  ScrollView,
   Alert,
   Platform,
   Image,
@@ -199,9 +200,28 @@ export default function MeetupCreateScreen() {
             </TouchableOpacity>
           )}
 
-          {/* 이미지 미리보기 (원본 비율) */}
+          {/* 이미지 미리보기 — 인스타그램 다크 스타일 */}
           {imageUri && (
-            <View style={styles.imagePreviewWrap}>
+            <View style={styles.darkEditorWrap}>
+              {/* 상단 오버레이 바 */}
+              <View style={styles.darkEditorTopBar}>
+                <TouchableOpacity onPress={() => { setImageUri(null); setImageText(''); setShowTextInput(false); }}>
+                  <Text style={{ color: '#fff', fontSize: 22 }}>✕</Text>
+                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18 }}>
+                  <TouchableOpacity onPress={() => setShowTextInput(!showTextInput)}>
+                    <Text style={{ color: '#fff', fontSize: 20, fontWeight: '700' }}>Aa</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => Alert.alert('준비 중', '스티커 기능 준비 중')}>
+                    <Text style={{ fontSize: 20 }}>😊</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => Alert.alert('준비 중', '효과 기능 준비 중')}>
+                    <Text style={{ fontSize: 20 }}>✨</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* 이미지 + 텍스트 오버레이 */}
               <ViewShot
                 ref={viewShotRef}
                 options={{ format: 'jpg', quality: 0.9 }}
@@ -218,8 +238,6 @@ export default function MeetupCreateScreen() {
                     setImageHeight(Math.min(Math.max(screenW * ratio, 150), 400));
                   }}
                 />
-
-                {/* 드래그 가능한 텍스트 오버레이 */}
                 {imageText.trim().length > 0 && (
                   <DraggableText
                     text={imageText}
@@ -233,136 +251,120 @@ export default function MeetupCreateScreen() {
                 )}
               </ViewShot>
 
-              {/* 삭제 버튼 */}
-              <TouchableOpacity
-                onPress={() => { setImageUri(null); setImageText(''); setShowTextInput(false); }}
-                style={styles.imageDeleteBtn}
-              >
-                <Ionicons name="close" size={16} color="#fff" />
-              </TouchableOpacity>
+              {/* 하단 도구 바 */}
+              <View style={styles.darkEditorBottomBar}>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <TouchableOpacity onPress={() => setShowTextInput(true)} style={styles.darkPill}>
+                    <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>Aa</Text>
+                    <Text style={{ color: '#ccc', fontSize: 11 }}>텍스트</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => Alert.alert('준비 중', '스티커 기능 준비 중')} style={styles.darkPill}>
+                    <Text style={{ fontSize: 13 }}>😊</Text>
+                    <Text style={{ color: '#ccc', fontSize: 11 }}>스티커</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => Alert.alert('준비 중', '효과 기능 준비 중')} style={styles.darkPill}>
+                    <Text style={{ fontSize: 13 }}>✨</Text>
+                    <Text style={{ color: '#ccc', fontSize: 11 }}>효과</Text>
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity onPress={pickImage} style={styles.darkChangeBtn}>
+                  <Ionicons name="image-outline" size={16} color="#fff" />
+                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>변경</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
 
-          {/* 이미지 위 텍스트 입력 패널 */}
-          {imageUri && (
-            <View style={{ marginTop: 10, marginBottom: 14 }}>
+          {/* 텍스트 입력 패널 — 다크 스타일 */}
+          {imageUri && showTextInput && (
+            <View style={styles.darkTextPanel}>
+              <TextInput
+                value={imageText}
+                onChangeText={setImageText}
+                placeholder="텍스트 입력..."
+                placeholderTextColor="#555"
+                autoFocus
+                style={styles.darkTextInput}
+                maxLength={50}
+                returnKeyType="done"
+                onSubmitEditing={() => setShowTextInput(false)}
+              />
+
+              {/* 색상 + 배경 스타일 */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  {['#ffffff', '#000000', '#e8313a', '#FFD700', '#00C851', '#2196F3', '#FF69B4', '#FF8C00'].map((c) => (
+                    <TouchableOpacity
+                      key={c}
+                      onPress={() => setTextColor(c)}
+                      style={{
+                        width: 28, height: 28, borderRadius: 14, backgroundColor: c,
+                        borderWidth: textColor === c ? 3 : 1,
+                        borderColor: textColor === c ? '#fff' : 'rgba(255,255,255,0.2)',
+                      }}
+                    />
+                  ))}
+                  <View style={{ width: 1, height: 20, backgroundColor: '#333', marginHorizontal: 4 }} />
+                  {([
+                    { key: 'none' as const, label: '없음' },
+                    { key: 'translucent' as const, label: '반투명' },
+                    { key: 'solid' as const, label: '채우기' },
+                  ]).map((b) => (
+                    <TouchableOpacity
+                      key={b.key}
+                      onPress={() => setTextBgStyle(b.key)}
+                      style={{
+                        paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14,
+                        backgroundColor: textBgStyle === b.key ? '#fff' : '#333',
+                      }}
+                    >
+                      <Text style={{ color: textBgStyle === b.key ? '#000' : '#fff', fontSize: 12, fontWeight: '600' }}>
+                        {b.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+
+              {/* 글꼴 선택 */}
               <TouchableOpacity
-                onPress={() => setShowTextInput(!showTextInput)}
-                style={[styles.textAddBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={() => setShowFontPicker(true)}
+                style={styles.darkFontBtn}
               >
-                <Text style={{ fontSize: 16 }}>Aa</Text>
-                <Text style={[styles.textAddLabel, { color: colors.text }]}>
-                  {showTextInput ? '텍스트 닫기' : '이미지에 텍스트 추가'}
+                <Text style={{ fontSize: 14 }}>🔤</Text>
+                <Text style={{ fontSize: 14, color: '#fff', fontFamily: getFontStyle(fontKey).fontFamily, fontWeight: getFontStyle(fontKey).fontWeight }}>
+                  {(FONTS.find((f) => f.key === fontKey) || FONTS[0]).label}
                 </Text>
               </TouchableOpacity>
 
-              {showTextInput && (
-                <View style={[styles.textPanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <TextInput
-                    value={imageText}
-                    onChangeText={setImageText}
-                    placeholder="이미지 위에 표시할 텍스트"
-                    placeholderTextColor={colors.inactive}
-                    style={[styles.textPanelInput, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
-                    maxLength={50}
-                    returnKeyType="done"
-                  />
-                  <Text style={styles.textPanelCount}>{imageText.length}/50</Text>
-
-                  {/* 색상 선택 */}
-                  <Text style={styles.textPanelLabel}>텍스트 색상</Text>
-                  <View style={styles.colorRow}>
-                    {['#ffffff', '#000000', '#e8313a', '#FFD700', '#00C851', '#2196F3', '#FF69B4', '#FF8C00'].map((c) => (
-                      <TouchableOpacity
-                        key={c}
-                        onPress={() => setTextColor(c)}
-                        style={[
-                          styles.colorCircle,
-                          { backgroundColor: c, borderColor: textColor === c ? '#e8313a' : 'rgba(0,0,0,0.2)', borderWidth: textColor === c ? 3 : 1 },
-                        ]}
-                      />
-                    ))}
+              {/* 글자 크기 슬라이더 */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={{ color: '#666', fontSize: 12 }}>A</Text>
+                <View style={{ flex: 1, height: 28, justifyContent: 'center' }}>
+                  <View style={{ height: 3, backgroundColor: '#333', borderRadius: 2 }}>
+                    <View style={{ height: '100%', width: `${textSizeValue * 100}%`, backgroundColor: '#fff', borderRadius: 2 }} />
                   </View>
-
-                  {/* 배경 스타일 */}
-                  <Text style={styles.textPanelLabel}>텍스트 배경</Text>
-                  <View style={styles.colorRow}>
-                    {([
-                      { key: 'none' as const, label: '없음' },
-                      { key: 'translucent' as const, label: '반투명' },
-                      { key: 'solid' as const, label: '채우기' },
-                    ]).map((b) => (
-                      <TouchableOpacity
-                        key={b.key}
-                        onPress={() => setTextBgStyle(b.key)}
-                        style={{
-                          paddingHorizontal: 12,
-                          paddingVertical: 7,
-                          borderRadius: 8,
-                          backgroundColor: textBgStyle === b.key ? '#e8313a' : colors.background,
-                          borderWidth: 1,
-                          borderColor: textBgStyle === b.key ? '#e8313a' : colors.border,
-                        }}
-                      >
-                        <Text style={{ fontSize: 12, color: textBgStyle === b.key ? '#fff' : colors.text, fontWeight: '600' }}>
-                          {b.label}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-
-                  {/* 글꼴 선택 */}
-                  <Text style={styles.textPanelLabel}>글꼴</Text>
-                  <TouchableOpacity
-                    onPress={() => setShowFontPicker(true)}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 8,
-                      paddingVertical: 10,
-                      paddingHorizontal: 14,
-                      borderRadius: 10,
-                      backgroundColor: colors.background,
-                      borderWidth: 1,
-                      borderColor: colors.border,
-                    }}
-                  >
-                    <Text style={{ fontSize: 14 }}>🔤</Text>
-                    <Text
-                      style={{
-                        fontSize: 15,
-                        color: colors.text,
-                        fontFamily: getFontStyle(fontKey).fontFamily,
-                        fontWeight: getFontStyle(fontKey).fontWeight,
-                      }}
-                    >
-                      {(FONTS.find((f) => f.key === fontKey) || FONTS[0]).label}
-                    </Text>
-                  </TouchableOpacity>
-
-                  {/* 글자 크기 슬라이더 */}
-                  <Text style={styles.textPanelLabel}>글자 크기 — {textFontSize}px</Text>
-                  <View style={styles.sliderRow}>
-                    <Text style={[styles.sliderLabel, { color: colors.inactive }]}>A</Text>
-                    <View style={styles.sliderTrackWrap}>
-                      <View style={[styles.sliderTrack, { backgroundColor: colors.border }]} />
-                      <View style={[styles.sliderTrackFill, { width: `${textSizeValue * 100}%` }]} />
-                      <HorizontalSlider value={textSizeValue} onChange={setTextSizeValue} />
-                    </View>
-                    <Text style={[styles.sliderLabel, { color: colors.inactive, fontSize: 22 }]}>A</Text>
-                  </View>
-
-                  <Text style={styles.textPanelHint}>위 이미지에서 텍스트를 드래그해서 위치를 변경할 수 있어요</Text>
+                  <HorizontalSlider value={textSizeValue} onChange={setTextSizeValue} />
                 </View>
-              )}
-              <FontPickerModal
-                visible={showFontPicker}
-                selected={fontKey}
-                onSelect={setFontKey}
-                onClose={() => setShowFontPicker(false)}
-              />
+                <Text style={{ color: '#666', fontSize: 20, fontWeight: '700' }}>A</Text>
+                <Text style={{ color: '#fff', fontSize: 12, width: 32 }}>{textFontSize}px</Text>
+              </View>
+
+              {/* 완료 버튼 */}
+              <TouchableOpacity
+                onPress={() => setShowTextInput(false)}
+                style={styles.darkDoneBtn}
+              >
+                <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>완료</Text>
+              </TouchableOpacity>
             </View>
           )}
+          <FontPickerModal
+            visible={showFontPicker}
+            selected={fontKey}
+            onSelect={setFontKey}
+            onClose={() => setShowFontPicker(false)}
+          />
 
           {/* 기본 정보 */}
           <Text style={[styles.sectionTitle, { color: colors.text }]}>기본 정보</Text>
@@ -699,42 +701,78 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // Text on image
-  textAddBtn: {
+  // Dark editor styles (Instagram-style)
+  darkEditorWrap: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+    marginBottom: 14,
+  },
+  darkEditorTopBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
     paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    borderWidth: 1,
-    alignSelf: 'flex-start',
   },
-  textAddLabel: { fontSize: 14, fontWeight: '600' },
-  textPanel: {
-    marginTop: 10,
+  darkEditorBottomBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  darkPill: {
+    backgroundColor: '#222',
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  darkChangeBtn: {
+    backgroundColor: '#333',
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  darkTextPanel: {
+    backgroundColor: '#111',
     borderRadius: 12,
     padding: 14,
-    borderWidth: 1,
     gap: 12,
+    marginBottom: 14,
   },
-  textPanelInput: {
-    borderRadius: 8,
+  darkTextInput: {
+    backgroundColor: '#222',
+    borderRadius: 12,
     padding: 12,
     fontSize: 15,
+    color: '#fff',
     borderWidth: 1,
+    borderColor: '#333',
     minHeight: 48,
   },
-  textPanelCount: { fontSize: 11, color: '#999', textAlign: 'right', marginTop: -8 },
-  textPanelLabel: { fontSize: 13, color: '#999', fontWeight: '600', marginBottom: 4 },
-  colorRow: { flexDirection: 'row', gap: 10 },
-  colorCircle: { width: 32, height: 32, borderRadius: 16 },
-  sliderRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  sliderLabel: { fontWeight: '700' },
-  sliderTrackWrap: { flex: 1, height: 40, justifyContent: 'center', position: 'relative' as const },
-  sliderTrack: { position: 'absolute' as const, left: 0, right: 0, height: 4, borderRadius: 2 },
-  sliderTrackFill: { position: 'absolute' as const, left: 0, height: 4, borderRadius: 2, backgroundColor: '#e8313a' },
-  textPanelHint: { fontSize: 12, color: '#999', textAlign: 'center' },
+  darkFontBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: '#222',
+  },
+  darkDoneBtn: {
+    alignSelf: 'center',
+    backgroundColor: '#0095f6',
+    borderRadius: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 8,
+  },
 
   // DateTime picker buttons
   pickerBtn: {
