@@ -1,7 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { View, Text, StyleProp, TextStyle } from 'react-native';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../config/firebase';
 
 // 동창 신뢰 뱃지 (인증 수 기반)
 export const TRUST_BADGE_INFO = {
@@ -21,39 +19,6 @@ export const getTrustBadge = (count: number): TrustBadgeKey => {
   if (count >= 1) return 'newbie';
   return 'none';
 };
-
-// ─── Firestore 뱃지 데이터 캐시 ───────────────────────────────────
-const badgeCache = new Map<string, { trustCount: number; isAdmin: boolean; ts: number }>();
-const CACHE_TTL = 5 * 60 * 1000; // 5분
-
-export function useUserBadge(uid?: string) {
-  const [data, setData] = useState({ trustCount: 0, isAdmin: false });
-
-  useEffect(() => {
-    if (!uid) return;
-
-    // 캐시 확인
-    const cached = badgeCache.get(uid);
-    if (cached && Date.now() - cached.ts < CACHE_TTL) {
-      setData({ trustCount: cached.trustCount, isAdmin: cached.isAdmin });
-      return;
-    }
-
-    getDoc(doc(db, 'users', uid)).then((snap) => {
-      if (snap.exists()) {
-        const d = snap.data();
-        const result = {
-          trustCount: d.trustCount || 0,
-          isAdmin: d.isVerifiedByAdmin || d.verified || false,
-        };
-        badgeCache.set(uid, { ...result, ts: Date.now() });
-        setData(result);
-      }
-    }).catch(() => {});
-  }, [uid]);
-
-  return data;
-}
 
 // 뱃지 컴포넌트 (이름 옆에 붙이는 작은 뱃지)
 interface BadgeProps {
@@ -156,7 +121,6 @@ export const UserBadge = ({
 // 이름 + 뱃지 묶음 컴포넌트
 interface NameWithBadgeProps {
   name: string;
-  uid?: string;
   isAdmin?: boolean;
   trustCount?: number;
   nameStyle?: StyleProp<TextStyle>;
@@ -166,19 +130,12 @@ interface NameWithBadgeProps {
 
 export const NameWithBadge = ({
   name,
-  uid,
-  isAdmin,
-  trustCount,
+  isAdmin = false,
+  trustCount = 0,
   nameStyle,
   size = 'small',
   numberOfLines,
 }: NameWithBadgeProps) => {
-  const badgeData = useUserBadge(uid);
-
-  // uid로 자동 조회된 데이터를 사용하되, 명시적으로 전달된 props 우선
-  const finalAdmin = isAdmin ?? badgeData.isAdmin;
-  const finalTrust = trustCount ?? badgeData.trustCount;
-
   return (
     <View
       style={{
@@ -191,7 +148,7 @@ export const NameWithBadge = ({
       <Text style={nameStyle} numberOfLines={numberOfLines}>
         {name}
       </Text>
-      <UserBadge isAdmin={finalAdmin} trustCount={finalTrust} size={size} />
+      <UserBadge isAdmin={isAdmin} trustCount={trustCount} size={size} />
     </View>
   );
 };

@@ -8,8 +8,6 @@ import {
   TouchableOpacity,
   Image,
   Keyboard,
-  KeyboardAvoidingView,
-  Platform,
   Dimensions,
   ActivityIndicator,
   Alert,
@@ -137,10 +135,6 @@ export function CommentBottomSheet({ visible, postId, onClose }: Props) {
       statusBarTranslucent
       propagateSwipe
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 0 }}
-      >
       <View
         style={[
           styles.sheet,
@@ -176,7 +170,6 @@ export function CommentBottomSheet({ visible, postId, onClose }: Props) {
                 <View style={styles.commentMeta}>
                   <NameWithBadge
                     name={item.name}
-                    uid={item.uid}
                     nameStyle={[styles.commentAuthor, { color: colors.text }]}
                   />
                   <Text style={[styles.commentTime, { color: colors.inactive }]}>
@@ -288,7 +281,6 @@ export function CommentBottomSheet({ visible, postId, onClose }: Props) {
           </View>
         )}
       </View>
-      </KeyboardAvoidingView>
     </RNModal>
   );
 }

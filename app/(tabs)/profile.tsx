@@ -356,7 +356,6 @@ export default function ProfileScreen() {
           </TouchableOpacity>
           <NameWithBadge
             name={displayName}
-            uid={user?.uid}
             nameStyle={[styles.displayName, { color: colors.text }]}
             size="medium"
           />

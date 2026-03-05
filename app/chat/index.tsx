@@ -110,7 +110,6 @@ export default function ChatListScreen() {
           <View style={styles.roomTopRow}>
             <NameWithBadge
               name={item.otherName}
-              uid={item.otherUid}
               nameStyle={[styles.roomName, { color: colors.text }]}
               numberOfLines={1}
             />

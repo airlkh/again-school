@@ -290,7 +290,7 @@ export default function MeetupDetailScreen() {
               style={[styles.hostAvatar, { backgroundColor: colors.card }]}
             />
             <View style={{ flex: 1 }}>
-              <NameWithBadge name={meetup.hostName} uid={meetup.hostUid} nameStyle={[styles.hostName, { color: colors.text }]} />
+              <NameWithBadge name={meetup.hostName} nameStyle={[styles.hostName, { color: colors.text }]} />
               <Text style={[styles.hostLabel, { color: colors.primary }]}>주최자</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.inactive} />
@@ -310,7 +310,7 @@ export default function MeetupDetailScreen() {
                   source={getAvatarSource(a.photoURL)}
                   style={[styles.attendeeAvatar, { backgroundColor: colors.card }]}
                 />
-                <NameWithBadge name={a.displayName} uid={a.uid} nameStyle={[styles.attendeeName, { color: colors.text }]} />
+                <NameWithBadge name={a.displayName} nameStyle={[styles.attendeeName, { color: colors.text }]} />
                 {a.uid === meetup.hostUid && (
                   <View style={[styles.hostTag, { backgroundColor: isDark ? colors.surface2 : '#fef2f2' }]}>
                     <Text style={[styles.hostTagText, { color: colors.primary }]}>주최</Text>
