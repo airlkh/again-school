@@ -26,39 +26,28 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      - name: Install Expo CLI
-        run: npm install -g @expo/cli
-
-      - name: Prebuild Android
+      - name: Expo Prebuild
         run: npx expo prebuild --platform android --no-install
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Fix Gradle wrapper permissions
+      - name: Fix Gradle permissions
         run: chmod +x android/gradlew
-
-      - name: Create JS bundle manually
-        run: |
-          mkdir -p android/app/src/main/assets
-          npx expo export:embed \
-            --platform android \
-            --entry-file node_modules/expo/AppEntry.js \
-            --bundle-output android/app/src/main/assets/index.android.bundle \
-            --assets-dest android/app/src/main/res \
-            --dev false
 
       - name: Build APK
         run: |
           cd android
           ./gradlew assembleRelease \
-            -x createBundleReleaseJsAndAssets \
             --no-daemon \
-            --warning-mode none
+            --warning-mode none \
+            -Dorg.gradle.jvmargs="-Xmx4g"
         env:
-          GRADLE_OPTS: -Xmx4g
+          NODE_OPTIONS: "--max-old-space-size=4096"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: again-school-apk
           path: android/app/build/outputs/apk/release/app-release.apk
+```
+
