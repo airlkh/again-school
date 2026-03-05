@@ -1,32 +1,62 @@
 name: Build Android APK
+
 on:
   push:
     branches: [ master ]
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
           distribution: 'temurin'
+          java-version: '17'
+
       - name: Install dependencies
         run: npm install --legacy-peer-deps
-      - name: Setup Expo
-        uses: expo/expo-github-action@v8
-        with:
-          expo-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
-      - name: Prebuild
+
+      - name: Install Expo CLI
+        run: npm install -g @expo/cli
+
+      - name: Prebuild Android
         run: npx expo prebuild --platform android --no-install
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Fix Gradle wrapper permissions
+        run: chmod +x android/gradlew
+
+      - name: Create JS bundle manually
+        run: |
+          mkdir -p android/app/src/main/assets
+          npx react-native bundle \
+            --platform android \
+            --dev false \
+            --entry-file index.js \
+            --bundle-output android/app/src/main/assets/index.android.bundle \
+            --assets-dest android/app/src/main/res
+
       - name: Build APK
-        run: cd android && chmod +x gradlew && ./gradlew assembleRelease --no-daemon
+        run: |
+          cd android
+          ./gradlew assembleRelease \
+            -x createBundleReleaseJsAndAssets \
+            --no-daemon \
+            --warning-mode none
+        env:
+          GRADLE_OPTS: -Xmx4g
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
