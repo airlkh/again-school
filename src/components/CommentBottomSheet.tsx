@@ -11,8 +11,11 @@ import {
   Dimensions,
   ActivityIndicator,
   Alert,
+  Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import RNModal from 'react-native-modal';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -63,6 +66,7 @@ export function CommentBottomSheet({ visible, postId, onClose }: Props) {
   const [inputText, setInputText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
+  const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
 
   // 댓글 실시간 구독
   useEffect(() => {
@@ -78,6 +82,18 @@ export function CommentBottomSheet({ visible, postId, onClose }: Props) {
       setShowEmoji(false);
     }
   }, [visible]);
+
+  function toggleCommentLike(commentId: string) {
+    setLikedComments((prev) => {
+      const next = new Set(prev);
+      if (next.has(commentId)) {
+        next.delete(commentId);
+      } else {
+        next.add(commentId);
+      }
+      return next;
+    });
+  }
 
   async function handleSubmitComment() {
     const text = inputText.trim();
@@ -130,157 +146,177 @@ export function CommentBottomSheet({ visible, postId, onClose }: Props) {
       onBackButtonPress={handleClose}
       onSwipeComplete={handleClose}
       swipeDirection="down"
-      avoidKeyboard
+      avoidKeyboard={false}
       style={styles.modal}
       statusBarTranslucent
       propagateSwipe
     >
-      <View
-        style={[
-          styles.sheet,
-          {
-            backgroundColor: colors.surface,
-            maxHeight: SCREEN_HEIGHT * 0.75,
-          },
-        ]}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.kavContainer}
       >
-        {/* 핸들 바 */}
-        <View style={[styles.handle, { backgroundColor: colors.border }]} />
-
-        {/* 헤더 */}
-        <View style={[styles.header, { borderBottomColor: colors.border }]}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>댓글</Text>
-        </View>
-
-        {/* 댓글 목록 */}
-        <FlatList
-          data={comments}
-          keyExtractor={(item) => item.id}
-          style={styles.commentList}
-          contentContainerStyle={styles.commentListContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => (
-            <View style={styles.commentRow}>
-              <Image
-                source={getAvatarSource(item.photoURL)}
-                style={[styles.commentAvatar, { backgroundColor: colors.card }]}
-              />
-              <View style={styles.commentBody}>
-                <View style={styles.commentMeta}>
-                  <NameWithBadge
-                    name={item.name}
-                    nameStyle={[styles.commentAuthor, { color: colors.text }]}
-                  />
-                  <Text style={[styles.commentTime, { color: colors.inactive }]}>
-                    {formatTimeAgo(item.createdAt)}
-                  </Text>
-                </View>
-                <Text style={[styles.commentText, { color: colors.text }]}>
-                  {item.text}
-                </Text>
-                <TouchableOpacity style={styles.replyTouchable}>
-                  <Text style={[styles.replyBtn, { color: colors.inactive }]}>
-                    답글 달기
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-          ListEmptyComponent={
-            <View style={styles.emptyWrap}>
-              <Text style={[styles.emptyText, { color: colors.inactive }]}>
-                첫 댓글을 남겨보세요 💬
-              </Text>
-            </View>
-          }
-        />
-
-        {/* 입력창 + 이모지 버튼 */}
         <View
           style={[
-            styles.inputBar,
+            styles.sheet,
             {
-              borderTopColor: colors.border,
               backgroundColor: colors.surface,
-              paddingBottom: inputBarPadBottom,
+              maxHeight: SCREEN_HEIGHT * 0.75,
             },
           ]}
         >
-          <Image
-            source={getAvatarSource(photoURL)}
-            style={[styles.myAvatar, { backgroundColor: colors.card }]}
-          />
+          {/* 핸들 바 */}
+          <View style={[styles.handle, { backgroundColor: colors.border }]} />
 
-          <View
-            style={[
-              styles.inputWrap,
-              { backgroundColor: colors.card, borderColor: colors.border },
-            ]}
-          >
-            <TextInput
-              ref={inputRef}
-              style={[styles.input, { color: colors.text }]}
-              placeholder="댓글을 입력하세요..."
-              placeholderTextColor={colors.inactive}
-              value={inputText}
-              onChangeText={setInputText}
-              multiline
-              blurOnSubmit={false}
-              onFocus={() => setShowEmoji(false)}
-            />
-            <TouchableOpacity
-              onPress={handleEmojiToggle}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Text style={[styles.emojiToggle, { opacity: showEmoji ? 1 : 0.5 }]}>
-                {showEmoji ? '⌨️' : '😊'}
-              </Text>
-            </TouchableOpacity>
+          {/* 헤더 */}
+          <View style={[styles.header, { borderBottomColor: colors.border }]}>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>댓글</Text>
           </View>
 
-          {inputText.trim().length > 0 ? (
-            <TouchableOpacity
-              onPress={handleSubmitComment}
-              disabled={submitting}
-              style={styles.sendBtn}
-            >
-              {submitting ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text style={styles.sendBtnText}>↑</Text>
-              )}
-            </TouchableOpacity>
-          ) : (
-            <View style={{ width: 34 }} />
-          )}
-        </View>
+          {/* 댓글 목록 */}
+          <FlatList
+            data={comments}
+            keyExtractor={(item) => item.id}
+            style={styles.commentList}
+            contentContainerStyle={styles.commentListContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item }) => {
+              const isLiked = likedComments.has(item.id);
+              return (
+                <View style={styles.commentRow}>
+                  <Image
+                    source={getAvatarSource(item.photoURL)}
+                    style={[styles.commentAvatar, { backgroundColor: colors.card }]}
+                  />
+                  <View style={styles.commentBody}>
+                    <View style={styles.commentMeta}>
+                      <NameWithBadge
+                        name={item.name}
+                        uid={item.uid}
+                        nameStyle={[styles.commentAuthor, { color: colors.text }]}
+                      />
+                      <Text style={[styles.commentTime, { color: colors.inactive }]}>
+                        {formatTimeAgo(item.createdAt)}
+                      </Text>
+                    </View>
+                    <Text style={[styles.commentText, { color: colors.text }]}>
+                      {item.text}
+                    </Text>
+                    <TouchableOpacity style={styles.replyTouchable}>
+                      <Text style={[styles.replyBtn, { color: colors.inactive }]}>
+                        답글 달기
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => toggleCommentLike(item.id)}
+                    style={styles.commentLikeBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons
+                      name={isLiked ? 'heart' : 'heart-outline'}
+                      size={14}
+                      color={isLiked ? colors.primary : colors.inactive}
+                    />
+                  </TouchableOpacity>
+                </View>
+              );
+            }}
+            ListEmptyComponent={
+              <View style={styles.emptyWrap}>
+                <Text style={[styles.emptyText, { color: colors.inactive }]}>
+                  첫 댓글을 남겨보세요 💬
+                </Text>
+              </View>
+            }
+          />
 
-        {/* 이모지 그리드 */}
-        {showEmoji && (
+          {/* 입력창 + 이모지 버튼 */}
           <View
             style={[
-              styles.emojiGrid,
+              styles.inputBar,
               {
+                borderTopColor: colors.border,
                 backgroundColor: colors.surface,
-                paddingBottom: Math.max(insets.bottom, 12),
+                paddingBottom: inputBarPadBottom,
               },
             ]}
           >
-            <View style={styles.emojiGridInner}>
-              {EMOJI_LIST.map((emoji) => (
-                <TouchableOpacity
-                  key={emoji}
-                  onPress={() => handleEmojiSelect(emoji)}
-                  style={[styles.emojiItem, { backgroundColor: colors.card }]}
-                >
-                  <Text style={styles.emojiItemText}>{emoji}</Text>
-                </TouchableOpacity>
-              ))}
+            <Image
+              source={getAvatarSource(photoURL)}
+              style={[styles.myAvatar, { backgroundColor: colors.card }]}
+            />
+
+            <View
+              style={[
+                styles.inputWrap,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+            >
+              <TextInput
+                ref={inputRef}
+                style={[styles.input, { color: colors.text }]}
+                placeholder="댓글을 입력하세요..."
+                placeholderTextColor={colors.inactive}
+                value={inputText}
+                onChangeText={setInputText}
+                multiline
+                blurOnSubmit={false}
+                onFocus={() => setShowEmoji(false)}
+              />
+              <TouchableOpacity
+                onPress={handleEmojiToggle}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={[styles.emojiToggle, { opacity: showEmoji ? 1 : 0.5 }]}>
+                  {showEmoji ? '⌨️' : '😊'}
+                </Text>
+              </TouchableOpacity>
             </View>
+
+            {inputText.trim().length > 0 ? (
+              <TouchableOpacity
+                onPress={handleSubmitComment}
+                disabled={submitting}
+                style={styles.sendBtn}
+              >
+                {submitting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.sendBtnText}>↑</Text>
+                )}
+              </TouchableOpacity>
+            ) : (
+              <View style={{ width: 34 }} />
+            )}
           </View>
-        )}
-      </View>
+
+          {/* 이모지 그리드 */}
+          {showEmoji && (
+            <View
+              style={[
+                styles.emojiGrid,
+                {
+                  backgroundColor: colors.surface,
+                  paddingBottom: Math.max(insets.bottom, 12),
+                },
+              ]}
+            >
+              <View style={styles.emojiGridInner}>
+                {EMOJI_LIST.map((emoji) => (
+                  <TouchableOpacity
+                    key={emoji}
+                    onPress={() => handleEmojiSelect(emoji)}
+                    style={[styles.emojiItem, { backgroundColor: colors.card }]}
+                  >
+                    <Text style={styles.emojiItemText}>{emoji}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+        </View>
+      </KeyboardAvoidingView>
     </RNModal>
   );
 }
@@ -289,6 +325,10 @@ const styles = StyleSheet.create({
   modal: {
     justifyContent: 'flex-end',
     margin: 0,
+  },
+  kavContainer: {
+    justifyContent: 'flex-end',
+    flex: 1,
   },
   sheet: {
     borderTopLeftRadius: 20,
@@ -356,6 +396,11 @@ const styles = StyleSheet.create({
   replyBtn: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  commentLikeBtn: {
+    paddingTop: 14,
+    alignItems: 'center',
+    width: 28,
   },
   emptyWrap: {
     alignItems: 'center',

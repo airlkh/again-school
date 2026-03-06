@@ -12,6 +12,8 @@ import {
   ActivityIndicator,
   Platform,
   Switch,
+  ScrollView,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -28,6 +30,7 @@ import {
   acceptConnectionRequest,
 } from '../../src/services/firestoreService';
 import { uploadImage } from '../../src/services/mediaService';
+import { subscribeUserPosts, FirestorePost } from '../../src/services/postService';
 import { UserProfile, SchoolEntry, UserPrivacySettings, ConnectionRequest } from '../../src/types/auth';
 import { useSchoolMemberCounts } from '../../src/hooks/useSchoolMemberCount';
 import { getAvatarSource } from '../../src/utils/avatar';
@@ -65,6 +68,9 @@ export default function ProfileScreen() {
     showSchools: true,
   });
 
+  // 사용자 게시물
+  const [userPosts, setUserPosts] = useState<FirestorePost[]>([]);
+
   // 동창 현황 모달
   const [showConnectionsModal, setShowConnectionsModal] = useState(false);
   const [connectionsTab, setConnectionsTab] = useState<'connected' | 'sent' | 'received'>('connected');
@@ -83,6 +89,12 @@ export default function ProfileScreen() {
   useEffect(() => {
     if (!user) return;
     return subscribeMyConnections(user.uid, setConnections);
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const unsub = subscribeUserPosts(user.uid, setUserPosts);
+    return unsub;
   }, [user]);
 
   const connectedCount = connections.filter((c) => c.status === 'accepted').length;
@@ -337,13 +349,21 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>내 정보</Text>
+      <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{displayName}</Text>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TouchableOpacity onPress={() => router.push('/upload')}>
+            <Ionicons name="add-circle-outline" size={26} color={colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/settings/notifications')}>
+            <Ionicons name="menu-outline" size={26} color={colors.text} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <KeyboardScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* 프로필 섹션 */}
-        <View style={[styles.profileSection, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        {/* 프로필 상단 - Instagram 스타일 */}
+        <View style={styles.profileTopRow}>
           <TouchableOpacity onPress={handleChangePhoto} disabled={uploadingPhoto}>
             <Image source={getAvatarSource(photoUrl)} style={[styles.avatar, { backgroundColor: colors.card }]} />
             <View style={[styles.cameraIcon, { backgroundColor: colors.primary }]}>
@@ -354,85 +374,94 @@ export default function ProfileScreen() {
               )}
             </View>
           </TouchableOpacity>
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={[styles.statNumber, { color: colors.text }]}>{userPosts.length}</Text>
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>게시물</Text>
+            </View>
+            <TouchableOpacity style={styles.statItem} onPress={() => { setConnectionsTab('connected'); setShowConnectionsModal(true); }}>
+              <Text style={[styles.statNumber, { color: colors.text }]}>{connectedCount}</Text>
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>동창</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.statItem} onPress={() => { setConnectionsTab('received'); setShowConnectionsModal(true); }}>
+              <Text style={[styles.statNumber, { color: colors.text }]}>{sentCount + receivedCount}</Text>
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>연결</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* 프로필 정보 */}
+        <View style={styles.profileInfo}>
           <NameWithBadge
             name={displayName}
+            uid={user?.uid}
             nameStyle={[styles.displayName, { color: colors.text }]}
             size="medium"
           />
           {job ? <Text style={[styles.job, { color: colors.textSecondary }]}>{job}</Text> : null}
-          {workplace ? (
-            <View style={styles.regionRow}>
-              <Ionicons name="briefcase-outline" size={14} color={colors.inactive} />
-              <Text style={[styles.regionText, { color: colors.inactive }]}>{workplace}</Text>
-            </View>
-          ) : null}
           {region ? (
             <View style={styles.regionRow}>
               <Ionicons name="location-outline" size={14} color={colors.inactive} />
               <Text style={[styles.regionText, { color: colors.inactive }]}>{region}</Text>
             </View>
           ) : null}
-          <TouchableOpacity
-            style={[styles.editBtn, { backgroundColor: isDark ? colors.surface2 : '#fef2f2', borderColor: colors.primary }]}
-            onPress={() => router.push('/profile/edit')}
-          >
-            <Ionicons name="create-outline" size={16} color={colors.primary} />
-            <Text style={[styles.editBtnText, { color: colors.primary }]}>프로필 편집</Text>
+        </View>
+
+        {/* 프로필 편집 버튼 */}
+        <TouchableOpacity
+          style={[styles.editBtn, { backgroundColor: isDark ? colors.surface2 : '#fef2f2', borderColor: colors.border }]}
+          onPress={() => router.push('/profile/edit')}
+        >
+          <Text style={[styles.editBtnText, { color: colors.text }]}>프로필 편집</Text>
+        </TouchableOpacity>
+
+        {/* 학교 칩 */}
+        {schools.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
+            {schools.map((s, i) => (
+              <TouchableOpacity key={i} onPress={() => handleEditSchool(i)} style={[styles.schoolChip, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={{ fontSize: 12 }}>{s.schoolType === '초등학교' ? '🏫' : s.schoolType === '중학교' ? '🏛️' : '🎓'}</Text>
+                <Text style={[styles.schoolChipText, { color: colors.text }]} numberOfLines={1}>{s.schoolName}</Text>
+                <Text style={[styles.schoolChipYear, { color: colors.textSecondary }]}>{s.graduationYear}</Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity onPress={() => { resetSchoolForm(); setShowSchoolModal(true); }} style={[styles.schoolChip, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Ionicons name="add" size={14} color={colors.primary} />
+              <Text style={[styles.schoolChipText, { color: colors.primary }]}>추가</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        )}
+
+        {/* 그리드 탭 바 */}
+        <View style={[styles.gridTabBar, { borderTopColor: colors.border, borderBottomColor: colors.border }]}>
+          <TouchableOpacity style={[styles.gridTab, { borderBottomColor: colors.text, borderBottomWidth: 1 }]}>
+            <Ionicons name="grid-outline" size={22} color={colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.gridTab} onPress={() => router.push('/bookmarks')}>
+            <Ionicons name="bookmark-outline" size={22} color={colors.inactive} />
           </TouchableOpacity>
         </View>
 
-        {/* 학교 이력 */}
-        <View style={[styles.section, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>내 학교 이력</Text>
-          {schools.length > 0 ? (
-            schools.map((s, i) => (
-              <View key={i} style={[styles.schoolCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Text style={styles.schoolEmoji}>
-                  {s.schoolType === '초등학교' ? '🏫' : s.schoolType === '중학교' ? '🏛️' : '🎓'}
-                </Text>
-                <View style={styles.schoolInfo}>
-                  <View style={styles.schoolNameRow}>
-                    <Text style={[styles.schoolName, { color: colors.text }]}>{s.schoolName}</Text>
-                    <View style={[styles.memberBadge, { backgroundColor: isDark ? '#3f2020' : '#fee2e2' }]}>
-                      <Text style={[styles.memberBadgeText, { color: colors.primary }]}>
-                        동창 {schoolMemberCounts[s.schoolName] ?? 0}명
-                      </Text>
-                    </View>
+        {/* 게시물 그리드 */}
+        {userPosts.length > 0 ? (
+          <View style={styles.postGrid}>
+            {userPosts.map((post) => (
+              <TouchableOpacity key={post.id} style={styles.postGridItem} onPress={() => router.push(`/post/${post.id}`)}>
+                <Image source={{ uri: post.imageUrl }} style={styles.postGridImage} resizeMode="cover" />
+                {post.mediaItems && post.mediaItems.length > 1 && (
+                  <View style={styles.multiImageIcon}>
+                    <Ionicons name="copy-outline" size={14} color="#fff" />
                   </View>
-                  <Text style={[styles.schoolDetail, { color: colors.textSecondary }]}>
-                    {s.schoolType} · {s.graduationYear}년 졸업
-                  </Text>
-                  <Text style={[styles.schoolPublicLabel, { color: (s.isPublic ?? true) ? '#4CAF50' : '#e8313a' }]}>
-                    {(s.isPublic ?? true) ? '🔓 같은 학교 동창에게만 공개' : '🔒 비공개'}
-                  </Text>
-                </View>
-                <View style={styles.schoolActions}>
-                  <TouchableOpacity
-                    style={[styles.schoolActionBtn, { backgroundColor: isDark ? colors.surface2 : '#f0f0f0' }]}
-                    onPress={() => handleEditSchool(i)}
-                  >
-                    <Text style={[styles.schoolActionText, { color: isDark ? colors.text : '#333' }]}>수정</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.schoolActionBtn, { backgroundColor: isDark ? '#3f2020' : '#fee2e2' }]}
-                    onPress={() => handleDeleteSchool(i)}
-                  >
-                    <Text style={[styles.schoolActionText, { color: '#e8313a' }]}>삭제</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))
-          ) : (
-            <Text style={[styles.emptyText, { color: colors.inactive }]}>등록된 학교가 없습니다</Text>
-          )}
-          <TouchableOpacity
-            style={[styles.addSchoolBtn, { borderTopColor: colors.border }]}
-            onPress={() => { resetSchoolForm(); setShowSchoolModal(true); }}
-          >
-            <Ionicons name="add-circle-outline" size={18} color={colors.primary} />
-            <Text style={[styles.addSchoolText, { color: colors.primary }]}>학교 추가</Text>
-          </TouchableOpacity>
-        </View>
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.emptyGrid}>
+            <Ionicons name="camera-outline" size={44} color={colors.inactive} />
+            <Text style={[styles.emptyGridText, { color: colors.inactive }]}>아직 게시물이 없습니다</Text>
+          </View>
+        )}
 
         {/* 직장 정보 */}
         <View style={[styles.section, { backgroundColor: colors.surface }]}>
@@ -508,53 +537,6 @@ export default function ProfileScreen() {
             </Text>
           </View>
         </View>
-
-        {/* 동창 현황 */}
-        <View style={[styles.section, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>동창 현황</Text>
-          <View style={[styles.statsRow, { backgroundColor: colors.card }]}>
-            <TouchableOpacity style={styles.statItem} onPress={() => { setConnectionsTab('connected'); setShowConnectionsModal(true); }}>
-              <Text style={[styles.statNumber, { color: colors.primary }]}>{connectedCount}</Text>
-              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>연결된 동창</Text>
-            </TouchableOpacity>
-            <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
-            <TouchableOpacity style={styles.statItem} onPress={() => { setConnectionsTab('sent'); setShowConnectionsModal(true); }}>
-              <Text style={[styles.statNumber, { color: colors.primary }]}>{sentCount}</Text>
-              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>보낸 요청</Text>
-            </TouchableOpacity>
-            <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
-            <TouchableOpacity style={styles.statItem} onPress={() => { setConnectionsTab('received'); setShowConnectionsModal(true); }}>
-              <Text style={[styles.statNumber, { color: colors.primary }]}>{receivedCount}</Text>
-              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>받은 요청</Text>
-              {receivedCount > 0 && (
-                <View style={styles.receivedBadge}>
-                  <Text style={styles.receivedBadgeText}>{receivedCount}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* 동창 초대하기 */}
-        <TouchableOpacity
-          style={styles.inviteBtn}
-          onPress={() => router.push('/invite')}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.inviteBtnEmoji}>🏫</Text>
-          <Text style={styles.inviteBtnText}>동창 초대하기</Text>
-        </TouchableOpacity>
-
-        {/* 저장된 게시물 */}
-        <TouchableOpacity
-          style={[styles.menuRow, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}
-          onPress={() => router.push('/bookmarks')}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="bookmark-outline" size={22} color={colors.text} />
-          <Text style={[styles.menuRowLabel, { color: colors.text }]}>저장된 게시물</Text>
-          <Ionicons name="chevron-forward" size={18} color={colors.inactive} />
-        </TouchableOpacity>
 
         {/* 프리미엄 배너 */}
         <TouchableOpacity style={styles.premiumBanner} activeOpacity={0.85}>
@@ -846,30 +828,133 @@ function SettingItem({ icon, label, detail, onPress }: {
   );
 }
 
+const GRID_GAP = 1;
+const GRID_ITEM_SIZE = (Dimensions.get('window').width - GRID_GAP * 2) / 3;
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: { backgroundColor: Colors.primary, paddingHorizontal: 20, paddingVertical: 14 },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#fff' },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 0.5,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
   scrollContent: { paddingBottom: 20 },
-  profileSection: {
-    alignItems: 'center', paddingTop: 28, paddingBottom: 24, backgroundColor: '#fff', borderBottomWidth: 1,
+  profileTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 28,
+    paddingHorizontal: 16,
+    paddingTop: 16,
   },
   avatar: {
-    width: 100, height: 100, borderRadius: 50, marginBottom: 14, borderWidth: 3, borderColor: Colors.primary,
+    width: 86, height: 86, borderRadius: 43, borderWidth: 3, borderColor: Colors.primary,
   },
   cameraIcon: {
-    position: 'absolute', bottom: 14, right: 0, width: 32, height: 32, borderRadius: 16,
+    position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, borderRadius: 14,
     justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#fff',
   },
-  displayName: { fontSize: 22, fontWeight: 'bold' },
-  job: { fontSize: 14, marginTop: 4 },
-  regionRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
+  statsRow: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  statLabel: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  profileInfo: {
+    paddingHorizontal: 16,
+    marginTop: 12,
+    gap: 2,
+  },
+  displayName: { fontSize: 16, fontWeight: 'bold' },
+  job: { fontSize: 14, marginTop: 2 },
+  regionRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   regionText: { fontSize: 13 },
   editBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 14,
-    paddingHorizontal: 18, paddingVertical: 9, borderRadius: 20, borderWidth: 1,
+    marginHorizontal: 16,
+    marginTop: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
   },
-  editBtnText: { fontSize: 14, fontWeight: '600' },
+  editBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  // 학교 칩
+  schoolChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  schoolChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  schoolChipYear: {
+    fontSize: 11,
+  },
+  // 그리드 탭 바
+  gridTabBar: {
+    flexDirection: 'row',
+    borderTopWidth: 0.5,
+    borderBottomWidth: 0.5,
+    marginTop: 16,
+  },
+  gridTab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  // 게시물 그리드
+  postGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  postGridItem: {
+    width: GRID_ITEM_SIZE,
+    height: GRID_ITEM_SIZE,
+    padding: GRID_GAP / 2,
+  },
+  postGridImage: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#f0f0f0',
+  },
+  multiImageIcon: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+  },
+  emptyGrid: {
+    alignItems: 'center',
+    paddingVertical: 60,
+    gap: 12,
+  },
+  emptyGridText: {
+    fontSize: 15,
+  },
+  // 기존 섹션 스타일
   section: { backgroundColor: '#fff', marginTop: 10, paddingHorizontal: 20, paddingVertical: 18 },
   sectionTitle: { fontSize: 17, fontWeight: '700', marginBottom: 14 },
   schoolCard: {
@@ -889,10 +974,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10, borderTopWidth: 1, marginTop: 4,
   },
   addSchoolText: { fontSize: 14, fontWeight: '600' },
-  statsRow: { flexDirection: 'row', borderRadius: 14, padding: 16 },
-  statItem: { flex: 1, alignItems: 'center', position: 'relative' },
-  statNumber: { fontSize: 24, fontWeight: 'bold' },
-  statLabel: { fontSize: 12, marginTop: 4 },
   statDivider: { width: 1, height: 40, alignSelf: 'center' },
   receivedBadge: {
     position: 'absolute', top: -6, right: 8, backgroundColor: Colors.primary,
@@ -969,31 +1050,4 @@ const styles = StyleSheet.create({
   connActions: { flexDirection: 'row', gap: 6 },
   connAcceptBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 14 },
   connRejectBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 14, borderWidth: 1 },
-
-  // 초대 버튼
-  inviteBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#e8313a',
-    borderRadius: 12,
-    padding: 14,
-    marginHorizontal: 16,
-    marginTop: 16,
-    gap: 8,
-  },
-  inviteBtnEmoji: { fontSize: 18 },
-  inviteBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-
-  // 메뉴 행 (저장된 게시물 등)
-  menuRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    marginTop: 10,
-    borderBottomWidth: 0.5,
-    gap: 12,
-  },
-  menuRowLabel: { flex: 1, fontSize: 15, fontWeight: '500' },
 });

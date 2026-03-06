@@ -7,6 +7,7 @@ import {
   onSnapshot,
   query,
   orderBy,
+  where,
   increment,
   arrayUnion,
   arrayRemove,
@@ -181,5 +182,20 @@ export function subscribePost(
     } else {
       callback(null);
     }
+  });
+}
+
+export function subscribeUserPosts(
+  uid: string,
+  callback: (posts: FirestorePost[]) => void,
+): Unsubscribe {
+  const colRef = collection(db, 'posts');
+  const q = query(colRef, where('authorUid', '==', uid), orderBy('createdAt', 'desc'));
+  return onSnapshot(q, (snapshot) => {
+    const results: FirestorePost[] = [];
+    snapshot.forEach((docSnap) => {
+      results.push({ id: docSnap.id, ...docSnap.data() } as FirestorePost);
+    });
+    callback(results);
   });
 }

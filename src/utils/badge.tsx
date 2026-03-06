@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleProp, TextStyle } from 'react-native';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../config/firebase';
 
 // 동창 신뢰 뱃지 (인증 수 기반)
 export const TRUST_BADGE_INFO = {
@@ -19,6 +21,21 @@ export const getTrustBadge = (count: number): TrustBadgeKey => {
   if (count >= 1) return 'newbie';
   return 'none';
 };
+
+// uid로 Firestore에서 trustCount 자동 조회
+function useTrustCount(uid?: string): number {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    if (!uid) return;
+    const unsub = onSnapshot(doc(db, 'users', uid), (snap) => {
+      if (snap.exists()) {
+        setCount((snap.data() as any).trustCount || 0);
+      }
+    });
+    return unsub;
+  }, [uid]);
+  return count;
+}
 
 // 뱃지 컴포넌트 (이름 옆에 붙이는 작은 뱃지)
 interface BadgeProps {
@@ -122,20 +139,25 @@ export const UserBadge = ({
 interface NameWithBadgeProps {
   name: string;
   isAdmin?: boolean;
+  uid?: string;
   trustCount?: number;
   nameStyle?: StyleProp<TextStyle>;
   size?: 'small' | 'medium';
   numberOfLines?: number;
 }
 
-export const NameWithBadge = ({
+export function NameWithBadge({
   name,
   isAdmin = false,
-  trustCount = 0,
+  uid,
+  trustCount,
   nameStyle,
   size = 'small',
   numberOfLines,
-}: NameWithBadgeProps) => {
+}: NameWithBadgeProps) {
+  const fetchedCount = useTrustCount(trustCount === undefined ? uid : undefined);
+  const effectiveCount = trustCount ?? fetchedCount;
+
   return (
     <View
       style={{
@@ -148,7 +170,7 @@ export const NameWithBadge = ({
       <Text style={nameStyle} numberOfLines={numberOfLines}>
         {name}
       </Text>
-      <UserBadge isAdmin={isAdmin} trustCount={trustCount} size={size} />
+      <UserBadge isAdmin={isAdmin} trustCount={effectiveCount} size={size} />
     </View>
   );
-};
+}

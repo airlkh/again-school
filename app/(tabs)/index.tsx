@@ -14,6 +14,7 @@ import {
   ActionSheetIOS,
   Platform,
   Modal,
+  Animated,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -165,6 +166,25 @@ function PostCard({ post, isFirestore, onHide, isVisible = true }: { post: Dummy
   // 통합 좋아요 훅 (더미/Firestore 모두 처리)
   const { liked, count: likesCount, toggleLike } = useLike(post.id);
   const { bookmarked, toggleBookmark } = useBookmark(post.id);
+
+  // 더블탭 좋아요 애니메이션
+  const heartScale = useRef(new Animated.Value(0)).current;
+  const heartOpacity = useRef(new Animated.Value(0)).current;
+  const lastTap = useRef(0);
+
+  const handleDoubleTap = useCallback(() => {
+    const now = Date.now();
+    if (now - lastTap.current < 300) {
+      if (!liked) toggleLike();
+      heartScale.setValue(0);
+      heartOpacity.setValue(1);
+      Animated.sequence([
+        Animated.spring(heartScale, { toValue: 1, friction: 3, tension: 40, useNativeDriver: true }),
+        Animated.timing(heartOpacity, { toValue: 0, duration: 400, delay: 200, useNativeDriver: true }),
+      ]).start();
+    }
+    lastTap.current = now;
+  }, [liked, toggleLike, heartScale, heartOpacity]);
   const authorName = post.authorName;
   const authorUid = post.authorUid;
   const authorAvatarImg = post.authorAvatarImg;
@@ -205,7 +225,7 @@ function PostCard({ post, isFirestore, onHide, isVisible = true }: { post: Dummy
             style={[styles.postAvatar, { backgroundColor: colors.card }]}
           />
           <View style={styles.postAuthorInfo}>
-            <NameWithBadge name={authorName} nameStyle={[styles.postAuthorName, { color: colors.text }]} />
+            <NameWithBadge name={authorName} uid={authorUid} nameStyle={[styles.postAuthorName, { color: colors.text }]} />
             <Text style={[styles.postMeta, { color: colors.textSecondary }]}>{postMeta}</Text>
           </View>
         </TouchableOpacity>
@@ -234,92 +254,107 @@ function PostCard({ post, isFirestore, onHide, isVisible = true }: { post: Dummy
 
       {/* Multi-image swipe or single image */}
       {isFirestore && fsPost?.mediaItems && fsPost.mediaItems.length > 1 ? (
-        <View>
-          <FlatList
-            data={fsPost.mediaItems}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            keyExtractor={(_, i) => String(i)}
-            onMomentumScrollEnd={(e) => {
-              const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
-              setImgIndex(idx);
-            }}
-            renderItem={({ item: uri, index: idx }) => (
-              <View style={{ width: SCREEN_WIDTH }}>
-                <Image
-                  source={{ uri }}
-                  style={{ width: SCREEN_WIDTH, height: multiImgHeights[idx] || SCREEN_WIDTH, backgroundColor: colors.card }}
-                  resizeMode="contain"
-                  onLoad={(e) => {
-                    const { width: w, height: h } = e.nativeEvent.source;
-                    const ratio = h / w;
-                    const calculated = Math.min(Math.max(SCREEN_WIDTH * ratio, 300), 600);
-                    setMultiImgHeights((prev) => ({ ...prev, [idx]: calculated }));
-                  }}
-                />
+        <TouchableOpacity activeOpacity={1} onPress={handleDoubleTap}>
+          <View>
+            <FlatList
+              data={fsPost.mediaItems}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={(_, i) => String(i)}
+              onMomentumScrollEnd={(e) => {
+                const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+                setImgIndex(idx);
+              }}
+              renderItem={({ item: uri, index: idx }) => (
+                <View style={{ width: SCREEN_WIDTH }}>
+                  <Image
+                    source={{ uri }}
+                    style={{ width: SCREEN_WIDTH, height: multiImgHeights[idx] || SCREEN_WIDTH, backgroundColor: colors.card }}
+                    resizeMode="cover"
+                    onLoad={(e) => {
+                      const { width: w, height: h } = e.nativeEvent.source;
+                      const ratio = h / w;
+                      const calculated = Math.min(Math.max(SCREEN_WIDTH * ratio, 300), SCREEN_WIDTH * 1.25);
+                      setMultiImgHeights((prev) => ({ ...prev, [idx]: calculated }));
+                    }}
+                  />
+                </View>
+              )}
+            />
+            <View style={styles.feedDotRow}>
+              {fsPost.mediaItems.map((_, i) => (
+                <View key={i} style={[styles.feedDot, { backgroundColor: i === imgIndex ? colors.primary : colors.border }]} />
+              ))}
+            </View>
+            {yearTag && (
+              <View style={styles.yearBadge}>
+                <Text style={styles.yearBadgeText}>{yearTag}년</Text>
+                {memoryTag && <Text style={styles.memoryBadgeText}> · {memoryTag}</Text>}
               </View>
             )}
-          />
-          <View style={styles.feedDotRow}>
-            {fsPost.mediaItems.map((_, i) => (
-              <View key={i} style={[styles.feedDot, { backgroundColor: i === imgIndex ? colors.primary : colors.border }]} />
-            ))}
+            <Animated.View pointerEvents="none" style={[styles.heartOverlay, { opacity: heartOpacity, transform: [{ scale: heartScale }] }]}>
+              <Ionicons name="heart" size={80} color="#fff" style={{ textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 10 }} />
+            </Animated.View>
           </View>
-          {yearTag && (
-            <View style={styles.yearBadge}>
-              <Text style={styles.yearBadgeText}>{yearTag}년</Text>
-              {memoryTag && <Text style={styles.memoryBadgeText}> · {memoryTag}</Text>}
-            </View>
-          )}
-        </View>
+        </TouchableOpacity>
       ) : isVideoMedia(videoUrl || imageUrl, mediaType) && (videoUrl || imageUrl) ? (
-        <View>
-          <Video
-            source={{ uri: (videoUrl || imageUrl)! }}
-            style={[styles.postImage, { backgroundColor: colors.card }]}
-            resizeMode={ResizeMode.COVER}
-            shouldPlay={isVisible}
-            isLooping
-            isMuted={videoMuted}
-          />
-          <TouchableOpacity
-            style={styles.muteBtn}
-            onPress={toggleVideoMute}
-            activeOpacity={0.8}
-          >
-            <Text style={{ fontSize: 18 }}>{videoMuted ? '🔇' : '🔊'}</Text>
-          </TouchableOpacity>
-          <View style={styles.videoBadge}>
-            <Ionicons name="play" size={10} color="#fff" />
-            <Text style={styles.videoBadgeText}>동영상</Text>
+        <TouchableOpacity activeOpacity={1} onPress={handleDoubleTap}>
+          <View>
+            <Video
+              source={{ uri: (videoUrl || imageUrl)! }}
+              style={[styles.postImage, { backgroundColor: colors.card }]}
+              resizeMode={ResizeMode.COVER}
+              shouldPlay={isVisible}
+              isLooping
+              isMuted={videoMuted}
+            />
+            <TouchableOpacity
+              style={styles.muteBtn}
+              onPress={toggleVideoMute}
+              activeOpacity={0.8}
+            >
+              <Text style={{ fontSize: 18 }}>{videoMuted ? '🔇' : '🔊'}</Text>
+            </TouchableOpacity>
+            <View style={styles.videoBadge}>
+              <Ionicons name="play" size={10} color="#fff" />
+              <Text style={styles.videoBadgeText}>동영상</Text>
+            </View>
+            {yearTag && (
+              <View style={styles.yearBadge}>
+                <Text style={styles.yearBadgeText}>{yearTag}년</Text>
+                {memoryTag && <Text style={styles.memoryBadgeText}> · {memoryTag}</Text>}
+              </View>
+            )}
+            <Animated.View pointerEvents="none" style={[styles.heartOverlay, { opacity: heartOpacity, transform: [{ scale: heartScale }] }]}>
+              <Ionicons name="heart" size={80} color="#fff" style={{ textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 10 }} />
+            </Animated.View>
           </View>
-          {yearTag && (
-            <View style={styles.yearBadge}>
-              <Text style={styles.yearBadgeText}>{yearTag}년</Text>
-              {memoryTag && <Text style={styles.memoryBadgeText}> · {memoryTag}</Text>}
-            </View>
-          )}
-        </View>
+        </TouchableOpacity>
       ) : (
-        <View>
-          <Image
-            source={{ uri: imageUrl }}
-            style={{ width: SCREEN_WIDTH, height: imgHeight, backgroundColor: colors.card }}
-            resizeMode="contain"
-            onLoad={(e) => {
-              const { width: w, height: h } = e.nativeEvent.source;
-              const ratio = h / w;
-              setImgHeight(Math.min(Math.max(SCREEN_WIDTH * ratio, 300), 600));
-            }}
-          />
-          {yearTag && (
-            <View style={styles.yearBadge}>
-              <Text style={styles.yearBadgeText}>{yearTag}년</Text>
-              {memoryTag && <Text style={styles.memoryBadgeText}> · {memoryTag}</Text>}
-            </View>
-          )}
-        </View>
+        <TouchableOpacity activeOpacity={1} onPress={handleDoubleTap}>
+          <View>
+            <Image
+              source={{ uri: imageUrl }}
+              style={{ width: SCREEN_WIDTH, height: imgHeight, backgroundColor: colors.card }}
+              resizeMode="cover"
+              onLoad={(e) => {
+                const { width: w, height: h } = e.nativeEvent.source;
+                const ratio = h / w;
+                setImgHeight(Math.min(Math.max(SCREEN_WIDTH * ratio, 300), SCREEN_WIDTH * 1.25));
+              }}
+            />
+            {yearTag && (
+              <View style={styles.yearBadge}>
+                <Text style={styles.yearBadgeText}>{yearTag}년</Text>
+                {memoryTag && <Text style={styles.memoryBadgeText}> · {memoryTag}</Text>}
+              </View>
+            )}
+            <Animated.View pointerEvents="none" style={[styles.heartOverlay, { opacity: heartOpacity, transform: [{ scale: heartScale }] }]}>
+              <Ionicons name="heart" size={80} color="#fff" style={{ textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 10 }} />
+            </Animated.View>
+          </View>
+        </TouchableOpacity>
       )}
 
       {/* 음악 표시 */}
@@ -382,6 +417,12 @@ function PostCard({ post, isFirestore, onHide, isVisible = true }: { post: Dummy
           {commentCount > 0 ? `댓글 ${commentCount}개 모두 보기` : '댓글 달기...'}
         </Text>
       </TouchableOpacity>
+
+      {isFirestore && (
+        <Text style={[styles.postTimeAgo, { color: colors.textSecondary }]}>
+          {timeAgo(fsPost!.createdAt)}
+        </Text>
+      )}
 
       {/* Android 바텀시트 메뉴 */}
       <Modal visible={showMenu} transparent animationType="fade" onRequestClose={() => setShowMenu(false)}>
@@ -628,32 +669,32 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      <View style={styles.header}>
-        <Text style={styles.logo}>Again School</Text>
+      <View style={[styles.header, { backgroundColor: colors.background, borderBottomWidth: 0.5, borderBottomColor: colors.border }]}>
+        <Text style={[styles.logo, { color: colors.text }]}>Again School</Text>
         <View style={styles.headerIcons}>
           <TouchableOpacity
             style={styles.iconButton}
             onPress={() => router.push('/upload')}
           >
-            <Ionicons name="add-circle-outline" size={26} color="#fff" />
+            <Ionicons name="add-circle-outline" size={26} color={colors.text} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.iconButton}
             onPress={() => router.push('/invite')}
           >
-            <Ionicons name="person-add-outline" size={22} color="#fff" />
+            <Ionicons name="person-add-outline" size={22} color={colors.text} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.iconButton}
             onPress={() => router.push('/notifications')}
           >
-            <Ionicons name="notifications-outline" size={24} color="#fff" />
+            <Ionicons name="notifications-outline" size={24} color={colors.text} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.iconButton}
             onPress={() => router.push('/chat')}
           >
-            <Ionicons name="chatbubble-ellipses-outline" size={22} color="#fff" />
+            <Ionicons name="chatbubble-ellipses-outline" size={22} color={colors.text} />
           </TouchableOpacity>
         </View>
       </View>
@@ -684,14 +725,13 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
 
   header: {
-    backgroundColor: Colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  logo: { fontSize: 22, fontWeight: 'bold', color: '#fff', letterSpacing: -0.5 },
+  logo: { fontSize: 22, fontWeight: 'bold', letterSpacing: -0.5 },
   headerIcons: { flexDirection: 'row', gap: 2 },
   iconButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
 
@@ -812,7 +852,17 @@ const styles = StyleSheet.create({
   postLikes: { fontSize: 14, fontWeight: '700', color: Colors.text, paddingHorizontal: 14, marginTop: 6 },
   postCaption: { fontSize: 14, color: Colors.text, lineHeight: 20, paddingHorizontal: 14, marginTop: 4 },
   postCaptionName: { fontWeight: '700' },
-  viewComments: { fontSize: 13, color: Colors.textSecondary, paddingHorizontal: 14, paddingTop: 4, paddingBottom: 12 },
+  viewComments: { fontSize: 13, color: Colors.textSecondary, paddingHorizontal: 14, paddingTop: 4, paddingBottom: 2 },
+  postTimeAgo: { fontSize: 11, paddingHorizontal: 14, paddingBottom: 12, marginTop: 2 },
+  heartOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 
   recommendCard: { backgroundColor: '#fff', paddingVertical: 16, marginBottom: 8 },
   recommendHeader: {

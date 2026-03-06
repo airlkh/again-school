@@ -104,9 +104,6 @@ export default function UploadScreen() {
     }));
 
     setMediaList(items);
-    if (items.length > 0) {
-      setSelectedMedia([items[0]]);
-    }
   };
 
   // 미디어 선택/해제
@@ -325,7 +322,7 @@ export default function UploadScreen() {
           >
             <Text
               style={{
-                color: selectedMedia.length > 0 ? '#e8313a' : '#666',
+                color: selectedMedia.length > 0 ? '#0095f6' : '#666',
                 fontSize: 16,
                 fontWeight: '700',
               }}
@@ -337,32 +334,36 @@ export default function UploadScreen() {
 
         {/* 미리보기 */}
         <View style={{ width: SW, height: SW, backgroundColor: '#111' }}>
-          {selectedMedia[0] &&
-            (selectedMedia[0].type === 'video' ? (
-              <View
-                style={{
-                  width: SW,
-                  height: SW,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Text style={{ color: '#fff', fontSize: 48 }}>▶</Text>
-                <Text style={{ color: '#aaa', fontSize: 13, marginTop: 8 }}>
-                  동영상 선택됨
-                </Text>
-              </View>
-            ) : (
-              <Image
-                source={{ uri: selectedMedia[0].uri }}
-                style={{ width: SW, height: SW }}
-                resizeMode="contain"
-                onLoad={(e) => {
-                  const { width, height } = e.nativeEvent.source;
-                  setImageHeight(Math.min((height / width) * SW, SW));
-                }}
-              />
-            ))}
+          {selectedMedia.length === 0 ? (
+            <View style={{ width: SW, height: SW, alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="image-outline" size={48} color="#555" />
+              <Text style={{ color: '#555', fontSize: 15, marginTop: 12 }}>사진을 선택하세요</Text>
+            </View>
+          ) : selectedMedia[0].type === 'video' ? (
+            <View
+              style={{
+                width: SW,
+                height: SW,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text style={{ color: '#fff', fontSize: 48 }}>▶</Text>
+              <Text style={{ color: '#aaa', fontSize: 13, marginTop: 8 }}>
+                동영상 선택됨
+              </Text>
+            </View>
+          ) : (
+            <Image
+              source={{ uri: selectedMedia[0].uri }}
+              style={{ width: SW, height: SW }}
+              resizeMode="contain"
+              onLoad={(e) => {
+                const { width, height } = e.nativeEvent.source;
+                setImageHeight(Math.min((height / width) * SW, SW));
+              }}
+            />
+          )}
 
           {/* 선택 수 뱃지 */}
           {selectedMedia.length > 1 && (
@@ -371,7 +372,7 @@ export default function UploadScreen() {
                 position: 'absolute',
                 bottom: 8,
                 right: 8,
-                backgroundColor: '#e8313a',
+                backgroundColor: '#0095f6',
                 borderRadius: 12,
                 paddingHorizontal: 10,
                 paddingVertical: 4,
@@ -382,6 +383,28 @@ export default function UploadScreen() {
               </Text>
             </View>
           )}
+
+          {/* 다중선택 토글 */}
+          <TouchableOpacity
+            onPress={() => {
+              if (selectedMedia.length > 1) {
+                setSelectedMedia([selectedMedia[selectedMedia.length - 1]]);
+              }
+            }}
+            style={{
+              position: 'absolute',
+              bottom: 12,
+              left: 12,
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              backgroundColor: selectedMedia.length > 1 ? '#0095f6' : 'rgba(255,255,255,0.2)',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Ionicons name="copy-outline" size={18} color="#fff" />
+          </TouchableOpacity>
         </View>
 
         {/* 갤러리 그리드 */}
