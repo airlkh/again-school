@@ -10,6 +10,7 @@ import {
   Dimensions,
   Alert,
   ActivityIndicator,
+  Animated,
   PanResponder,
   Keyboard,
 } from 'react-native';
@@ -18,6 +19,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as MediaLibrary from 'expo-media-library';
 import ViewShot from 'react-native-view-shot';
+import {
+  GestureHandlerRootView,
+  PanGestureHandler,
+  State,
+} from 'react-native-gesture-handler';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useCurrentUser } from '../../src/hooks/useCurrentUser';
 import { createStory } from '../../src/services/storyService';
@@ -55,10 +61,30 @@ export default function UploadScreen() {
   const [overlayText, setOverlayText] = useState('');
   const [textColor, setTextColor] = useState('#ffffff');
   const [textSize, setTextSize] = useState(24);
-  const [textX, setTextX] = useState(0.5);
-  const [textY, setTextY] = useState(0.5);
   const [showTextInput, setShowTextInput] = useState(false);
   const [bgStyle, setBgStyle] = useState<'none' | 'semi' | 'solid'>('none');
+
+  // 텍스트 드래그 (PanGestureHandler + Animated)
+  const pan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const lastPan = useRef({ x: 0, y: 0 });
+
+  const onTextGestureEvent = Animated.event(
+    [{ nativeEvent: { translationX: pan.x, translationY: pan.y } }],
+    { useNativeDriver: true },
+  ) as any;
+
+  const onTextHandlerStateChange = (e: any) => {
+    if (e.nativeEvent.oldState === State.ACTIVE) {
+      lastPan.current.x += e.nativeEvent.translationX;
+      lastPan.current.y += e.nativeEvent.translationY;
+      pan.x.setOffset(lastPan.current.x);
+      pan.y.setOffset(lastPan.current.y);
+      pan.setValue({ x: 0, y: 0 });
+    }
+  };
+
+  // 합성 이미지 URI (edit → share 전환 시 캡처)
+  const [compositeUri, setCompositeUri] = useState<string | null>(null);
 
   // 공유 설정
   const [caption, setCaption] = useState('');
@@ -120,21 +146,6 @@ export default function UploadScreen() {
     }
   };
 
-  // 텍스트 드래그
-  const textPanResponder = PanResponder.create({
-    onStartShouldSetPanResponder: () => overlayText.trim().length > 0,
-    onMoveShouldSetPanResponder: () => overlayText.trim().length > 0,
-    onPanResponderMove: (e) => {
-      const newX = Math.min(0.95, Math.max(0.05, e.nativeEvent.locationX / SW));
-      const newY = Math.min(
-        0.95,
-        Math.max(0.05, e.nativeEvent.locationY / imageHeight),
-      );
-      setTextX(newX);
-      setTextY(newY);
-    },
-  });
-
   // 텍스트 배경 스타일
   const getTextBg = () => {
     if (bgStyle === 'solid') return 'rgba(0,0,0,0.75)';
@@ -142,12 +153,15 @@ export default function UploadScreen() {
     return 'transparent';
   };
 
-  // ViewShot으로 이미지+텍스트 합성
-  const captureFrame = async (): Promise<string> => {
+  // ViewShot으로 이미지+텍스트 합성 (edit 단계에서 호출)
+  const captureComposite = async (): Promise<string> => {
     if (!overlayText.trim()) {
       return selectedMedia[0]?.uri || '';
     }
     try {
+      // Animated offset을 flatten해서 네이티브에 반영
+      pan.x.flattenOffset();
+      pan.y.flattenOffset();
       const uri = await viewShotRef.current?.capture?.();
       if (uri) {
         console.log('캡처 성공:', uri);
@@ -158,6 +172,13 @@ export default function UploadScreen() {
       console.warn('캡처 실패, 원본 사용:', err);
       return selectedMedia[0]?.uri || '';
     }
+  };
+
+  // edit → share 전환: 먼저 캡처 후 이동
+  const goToShare = async () => {
+    const uri = await captureComposite();
+    setCompositeUri(uri);
+    setStep('share');
   };
 
   // 업로드 함수
@@ -230,9 +251,9 @@ export default function UploadScreen() {
         const media = selectedMedia[i];
         const isVideo = media.type === 'video';
 
-        // 첫 번째 이미지만 텍스트 합성
+        // 첫 번째 이미지: 합성 URI 사용 (텍스트 오버레이 포함)
         const uriToUpload =
-          i === 0 && !isVideo ? await captureFrame() : media.uri;
+          i === 0 && !isVideo && compositeUri ? compositeUri : media.uri;
 
         const url = await uploadMedia(
           uriToUpload,
@@ -474,7 +495,7 @@ export default function UploadScreen() {
     const sizeNorm = (textSize - 16) / 48; // 0~1
 
     return (
-      <View style={{ flex: 1, backgroundColor: '#000' }}>
+      <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#000' }}>
         {/* ── 헤더 (텍스트 입력 모드가 아닐 때) ── */}
         {!showTextInput && (
           <View
@@ -494,7 +515,7 @@ export default function UploadScreen() {
               편집
             </Text>
             <TouchableOpacity
-              onPress={() => setStep('share')}
+              onPress={goToShare}
               style={{
                 backgroundColor: '#e8313a',
                 borderRadius: 8,
@@ -544,41 +565,47 @@ export default function UploadScreen() {
               </View>
             )}
 
-            {/* 텍스트 오버레이 — 드래그 가능 (입력 모드 아닐 때만) */}
+            {/* 텍스트 오버레이 — PanGestureHandler 드래그 (입력 모드 아닐 때만) */}
             {overlayText.trim().length > 0 && !showTextInput && (
-              <View
-                style={{
-                  position: 'absolute',
-                  left: textX * SW - 60,
-                  top: textY * imageHeight - textSize / 2,
-                  maxWidth: SW * 0.85,
-                  zIndex: 10,
-                }}
-                {...textPanResponder.panHandlers}
+              <PanGestureHandler
+                onGestureEvent={onTextGestureEvent}
+                onHandlerStateChange={onTextHandlerStateChange}
               >
-                <View
+                <Animated.View
                   style={{
-                    backgroundColor: getTextBg(),
-                    borderRadius: 6,
-                    paddingHorizontal: bgStyle !== 'none' ? 10 : 0,
-                    paddingVertical: bgStyle !== 'none' ? 4 : 0,
+                    position: 'absolute',
+                    alignSelf: 'center',
+                    left: SW / 2 - 60,
+                    top: imageHeight / 2 - textSize / 2,
+                    maxWidth: SW * 0.85,
+                    zIndex: 10,
+                    transform: pan.getTranslateTransform(),
                   }}
                 >
-                  <Text
+                  <View
                     style={{
-                      color: textColor,
-                      fontSize: textSize,
-                      fontWeight: '700',
-                      textAlign: 'center',
-                      textShadowColor: 'rgba(0,0,0,0.6)',
-                      textShadowOffset: { width: 1, height: 1 },
-                      textShadowRadius: 3,
+                      backgroundColor: getTextBg(),
+                      borderRadius: 6,
+                      paddingHorizontal: bgStyle !== 'none' ? 10 : 0,
+                      paddingVertical: bgStyle !== 'none' ? 4 : 0,
                     }}
                   >
-                    {overlayText}
-                  </Text>
-                </View>
-              </View>
+                    <Text
+                      style={{
+                        color: textColor,
+                        fontSize: textSize,
+                        fontWeight: '700',
+                        textAlign: 'center',
+                        textShadowColor: 'rgba(0,0,0,0.6)',
+                        textShadowOffset: { width: 1, height: 1 },
+                        textShadowRadius: 3,
+                      }}
+                    >
+                      {overlayText}
+                    </Text>
+                  </View>
+                </Animated.View>
+              </PanGestureHandler>
             )}
           </ViewShot>
         </View>
@@ -835,13 +862,15 @@ export default function UploadScreen() {
             </View>
           </>
         )}
-      </View>
+      </GestureHandlerRootView>
     );
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 3단계: 공유 설정
+  // 3단계: 공유 설정 (인스타그램 스타일)
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const shareThumbUri = compositeUri || selectedMedia[0]?.uri;
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* 헤더 */}
@@ -849,120 +878,152 @@ export default function UploadScreen() {
         style={{
           flexDirection: 'row',
           alignItems: 'center',
-          justifyContent: 'space-between',
           paddingTop: insets.top + 8,
           paddingHorizontal: 16,
           paddingBottom: 12,
           borderBottomWidth: 0.5,
           borderBottomColor: colors.border,
+          gap: 12,
         }}
       >
         <TouchableOpacity onPress={() => setStep('edit')}>
           <Text style={{ color: colors.text, fontSize: 22 }}>←</Text>
         </TouchableOpacity>
-        <Text style={{ color: colors.text, fontSize: 16, fontWeight: '700' }}>
-          공유 설정
+        <Text style={{ color: colors.text, fontSize: 16, fontWeight: '700', flex: 1 }}>
+          새 게시물
         </Text>
-        <View style={{ width: 22 }} />
       </View>
 
       <ScrollView style={{ flex: 1 }}>
-        <View style={{ padding: 16, gap: 16 }}>
-          {/* 썸네일 */}
-          <View style={{ alignItems: 'center' }}>
-            <Image
-              source={{ uri: selectedMedia[0]?.uri }}
-              style={{ width: 120, height: 120, borderRadius: 12 }}
-              resizeMode="cover"
-            />
-            {selectedMedia.length > 1 && (
-              <Text style={{ color: '#999', fontSize: 12, marginTop: 6 }}>
-                +{selectedMedia.length - 1}개
-              </Text>
-            )}
-          </View>
-
-          {/* 캡션 */}
+        {/* 썸네일 + 문구 입력 (인스타그램 스타일) */}
+        <View
+          style={{
+            flexDirection: 'row',
+            padding: 16,
+            gap: 12,
+          }}
+        >
+          <Image
+            source={{ uri: shareThumbUri }}
+            style={{ width: 80, height: 80, borderRadius: 8 }}
+            resizeMode="cover"
+          />
           <TextInput
             value={caption}
             onChangeText={setCaption}
-            placeholder="문구를 입력하고 해시태그 추가..."
+            placeholder="문구를 입력하세요..."
             placeholderTextColor="#999"
             style={{
-              backgroundColor: colors.card,
-              borderRadius: 12,
-              padding: 14,
+              flex: 1,
               fontSize: 14,
               color: colors.text,
-              minHeight: 80,
-              borderWidth: 1,
-              borderColor: colors.border,
               textAlignVertical: 'top',
+              padding: 0,
             }}
             multiline
             maxLength={500}
           />
+        </View>
 
-          {/* 업로드 대상 */}
-          <View>
-            <Text
+        {/* 구분선 */}
+        <View style={{ height: 0.5, backgroundColor: colors.border }} />
+
+        {/* 메뉴 항목들 */}
+        <TouchableOpacity
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 16,
+            paddingVertical: 14,
+            borderBottomWidth: 0.5,
+            borderBottomColor: colors.border,
+          }}
+          onPress={() => Alert.alert('준비 중', '사람 태그 기능 준비 중')}
+        >
+          <Ionicons name="person-outline" size={22} color={colors.text} />
+          <Text style={{ flex: 1, marginLeft: 12, fontSize: 15, color: colors.text }}>
+            사람 태그
+          </Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.inactive} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 16,
+            paddingVertical: 14,
+            borderBottomWidth: 0.5,
+            borderBottomColor: colors.border,
+          }}
+          onPress={() => Alert.alert('준비 중', '위치 추가 기능 준비 중')}
+        >
+          <Ionicons name="location-outline" size={22} color={colors.text} />
+          <Text style={{ flex: 1, marginLeft: 12, fontSize: 15, color: colors.text }}>
+            위치 추가
+          </Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.inactive} />
+        </TouchableOpacity>
+
+        {/* 구분선 */}
+        <View style={{ height: 8, backgroundColor: colors.border + '33' }} />
+
+        {/* 업로드 대상 (라디오 스타일) */}
+        {(
+          [
+            { key: 'post' as UploadTarget, label: '게시물로 공유', icon: 'grid-outline' as const },
+            { key: 'story' as UploadTarget, label: '스토리로 공유', icon: 'add-circle-outline' as const },
+            { key: 'both' as UploadTarget, label: '동시업로드', icon: 'copy-outline' as const },
+          ]
+        ).map((t) => (
+          <TouchableOpacity
+            key={t.key}
+            onPress={() => setUploadTarget(t.key)}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingHorizontal: 16,
+              paddingVertical: 14,
+              borderBottomWidth: 0.5,
+              borderBottomColor: colors.border,
+            }}
+          >
+            <Ionicons name={t.icon} size={22} color={colors.text} />
+            <Text style={{ flex: 1, marginLeft: 12, fontSize: 15, color: colors.text }}>
+              {t.label}
+            </Text>
+            <View
               style={{
-                fontSize: 14,
-                fontWeight: '700',
-                color: colors.text,
-                marginBottom: 10,
+                width: 22,
+                height: 22,
+                borderRadius: 11,
+                borderWidth: 2,
+                borderColor: uploadTarget === t.key ? '#e8313a' : colors.inactive,
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
             >
-              업로드 대상
-            </Text>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              {(
-                [
-                  { key: 'post', label: '게시물' },
-                  { key: 'story', label: '스토리' },
-                  { key: 'both', label: '동시업로드' },
-                ] as const
-              ).map((t) => (
-                <TouchableOpacity
-                  key={t.key}
-                  onPress={() => setUploadTarget(t.key)}
+              {uploadTarget === t.key && (
+                <View
                   style={{
-                    flex: 1,
-                    paddingVertical: 12,
-                    borderRadius: 10,
-                    alignItems: 'center',
-                    backgroundColor:
-                      uploadTarget === t.key ? '#e8313a' : colors.card,
-                    borderWidth: 1,
-                    borderColor:
-                      uploadTarget === t.key ? '#e8313a' : colors.border,
+                    width: 12,
+                    height: 12,
+                    borderRadius: 6,
+                    backgroundColor: '#e8313a',
                   }}
-                >
-                  <Text
-                    style={{
-                      color: uploadTarget === t.key ? '#fff' : colors.text,
-                      fontSize: 12,
-                      fontWeight: '700',
-                      textAlign: 'center',
-                    }}
-                  >
-                    {t.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                />
+              )}
             </View>
-          </View>
-        </View>
+          </TouchableOpacity>
+        ))}
       </ScrollView>
 
-      {/* 공유 버튼 */}
+      {/* 공유하기 버튼 */}
       <View
         style={{
           paddingHorizontal: 16,
           paddingTop: 12,
           paddingBottom: Math.max(insets.bottom, 16),
-          borderTopWidth: 0.5,
-          borderTopColor: colors.border,
         }}
       >
         <TouchableOpacity

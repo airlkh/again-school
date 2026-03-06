@@ -26,10 +26,23 @@ export const getTrustBadge = (count: number): TrustBadgeKey => {
 function useTrustCount(uid?: string): number {
   const [count, setCount] = useState(0);
   useEffect(() => {
-    if (!uid) return;
+    if (!uid) {
+      console.log('[Badge] useTrustCount: uid 없음 — 구독 스킵');
+      return;
+    }
+    console.log('[Badge] useTrustCount: 구독 시작 uid=', uid);
     const unsub = onSnapshot(doc(db, 'users', uid), (snap) => {
       if (snap.exists()) {
-        setCount((snap.data() as any).trustCount || 0);
+        const data = snap.data() as any;
+        // trustCount 필드 우선, 없으면 verifiedSchools 배열 길이로 폴백
+        const tc: number =
+          data.trustCount ?? (Array.isArray(data.verifiedSchools) ? data.verifiedSchools.length : 0);
+        console.log('[Badge] uid=', uid, 'trustCount=', tc,
+          '| raw trustCount=', data.trustCount,
+          '| verifiedSchools=', data.verifiedSchools);
+        setCount(tc);
+      } else {
+        console.log('[Badge] 사용자 문서 없음 uid=', uid);
       }
     });
     return unsub;
