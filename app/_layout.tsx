@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Stack, Redirect, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
 import { ThemeProvider, useTheme } from '../src/contexts/ThemeContext';
 import { MusicProvider } from '../src/contexts/MusicContext';
@@ -9,10 +10,32 @@ import { MuteProvider } from '../src/contexts/MuteContext';
 import { UserProvider } from '../src/contexts/UserContext';
 import { migrateDummyMeetups } from '../src/services/meetupService';
 
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
 function RootLayoutNav() {
   const { user, isLoading, onboardingCompleted } = useAuth();
   const { colors, isDark } = useTheme();
   const segments = useSegments();
+  const splashHidden = useRef(false);
+
+  // 스플래시 숨기기 — isLoading이 끝나면 반드시 호출
+  useEffect(() => {
+    if (!isLoading && !splashHidden.current) {
+      splashHidden.current = true;
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [isLoading]);
+
+  // 안전장치: 5초 후에도 스플래시가 안 숨겨졌으면 강제 숨김
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!splashHidden.current) {
+        splashHidden.current = true;
+        SplashScreen.hideAsync().catch(() => {});
+      }
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, []);
 
   // 더미 모임 데이터를 Firestore에 마이그레이션
   useEffect(() => {

@@ -23,7 +23,7 @@ export default function SplashScreenPage() {
   const { user, isLoading, onboardingCompleted } = useAuth();
 
   useEffect(() => {
-    SplashScreen.hideAsync();
+    SplashScreen.hideAsync().catch(() => {});
 
     Animated.timing(fadeAnim, {
       toValue: 1,
