@@ -276,7 +276,7 @@ export const CropEditor: React.FC<CropEditorProps> = ({
 
   return (
     <View style={s.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#000" />
+      <StatusBar barStyle="light-content" backgroundColor="#000000" translucent={false} />
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity
@@ -406,7 +406,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   headerDone: { color: '#4FC3F7', fontSize: 15, fontWeight: '600' },
-  canvas: { flex: 1 },
+  canvas: { flex: 1, backgroundColor: '#000' },
   overlay: { position: 'absolute', backgroundColor: 'rgba(0,0,0,0.6)' },
   cropBorder: {
     position: 'absolute',

@@ -35,6 +35,7 @@ import { UserProfile, SchoolEntry, UserPrivacySettings, ConnectionRequest } from
 import { useSchoolMemberCounts } from '../../src/hooks/useSchoolMemberCount';
 import { getAvatarSource } from '../../src/utils/avatar';
 import { NameWithBadge } from '../../src/utils/badge';
+import { CropEditor } from '../../src/components/CropEditor';
 import { doc, updateDoc, deleteDoc, collection, query, where, getDocs, writeBatch, onSnapshot, orderBy, limit, startAfter, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { updateProfile } from 'firebase/auth';
 import { db } from '../../src/config/firebase';
@@ -80,6 +81,10 @@ export default function ProfileScreen() {
   // 동창 인증 수
   const [trustCount, setTrustCount] = useState(0);
   const [schoolTrustCounts, setSchoolTrustCounts] = useState<Record<string, number>>({});
+
+  // 프로필 이미지 크롭
+  const [cropVisible, setCropVisible] = useState(false);
+  const [cropTargetUri, setCropTargetUri] = useState('');
 
   // 동창 현황 모달
   const [showConnectionsModal, setShowConnectionsModal] = useState(false);
@@ -176,7 +181,7 @@ export default function ProfileScreen() {
   const schoolNames = schools.map((s) => s.schoolName);
   const schoolMemberCounts = useSchoolMemberCounts(schoolNames);
 
-  // 프로필 이미지 변경 + 전체 동기화
+  // 프로필 이미지 변경 — 갤러리 선택 후 CropEditor로 전달
   async function handleChangePhoto() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
@@ -186,69 +191,78 @@ export default function ProfileScreen() {
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
+      allowsEditing: false,
+      quality: 0.9,
     });
 
-    if (!result.canceled && result.assets[0] && user) {
-      setUploadingPhoto(true);
-      try {
-        const uploaded = await uploadImage(result.assets[0].uri);
-        const newPhotoURL = uploaded.url;
+    if (!result.canceled && result.assets[0]) {
+      setCropTargetUri(result.assets[0].uri);
+      setCropVisible(true);
+    }
+  }
 
-        // 1. Firebase Auth 업데이트
-        await updateProfile(user, { photoURL: newPhotoURL });
+  // 크롭 완료 후 업로드 + 전체 동기화
+  async function handleCropDone(croppedUri: string) {
+    setCropVisible(false);
+    setCropTargetUri('');
+    if (!user) return;
 
-        // 2. Firestore users/{uid} 업데이트
-        await updateUserProfile(user.uid, { photoURL: newPhotoURL });
+    setUploadingPhoto(true);
+    try {
+      const uploaded = await uploadImage(croppedUri);
+      const newPhotoURL = uploaded.url;
 
-        // 3. 내가 쓴 게시물 authorPhotoURL 일괄 업데이트
-        const postsSnap = await getDocs(
-          query(collection(db, 'posts'), where('authorUid', '==', user.uid)),
-        );
-        if (!postsSnap.empty) {
-          const postsBatch = writeBatch(db);
-          postsSnap.docs.forEach((d) => postsBatch.update(d.ref, { authorPhotoURL: newPhotoURL }));
-          await postsBatch.commit();
-        }
+      // 1. Firebase Auth 업데이트
+      await updateProfile(user, { photoURL: newPhotoURL });
 
-        // 4. 내가 쓴 스토리 photoURL 일괄 업데이트
-        const storiesSnap = await getDocs(
-          query(collection(db, 'stories'), where('uid', '==', user.uid)),
-        );
-        if (!storiesSnap.empty) {
-          const storiesBatch = writeBatch(db);
-          storiesSnap.docs.forEach((d) => storiesBatch.update(d.ref, { photoURL: newPhotoURL }));
-          await storiesBatch.commit();
-        }
+      // 2. Firestore users/{uid} 업데이트
+      await updateUserProfile(user.uid, { photoURL: newPhotoURL });
 
-        // 5. 내가 만든 모임 hostPhotoURL 일괄 업데이트
-        const meetupsSnap = await getDocs(
-          query(collection(db, 'meetups'), where('hostUid', '==', user.uid)),
-        );
-        if (!meetupsSnap.empty) {
-          const meetupsBatch = writeBatch(db);
-          meetupsSnap.docs.forEach((d) => meetupsBatch.update(d.ref, { hostPhotoURL: newPhotoURL }));
-          await meetupsBatch.commit();
-        }
-
-        // 6. 내 채팅방 participantPhotos 업데이트
-        const chatsSnap = await getDocs(
-          query(collection(db, 'chatRooms'), where('participants', 'array-contains', user.uid)),
-        );
-        if (!chatsSnap.empty) {
-          const chatsBatch = writeBatch(db);
-          chatsSnap.docs.forEach((d) => chatsBatch.update(d.ref, { [`participantPhotos.${user.uid}`]: newPhotoURL }));
-          await chatsBatch.commit();
-        }
-
-        Alert.alert('완료', '프로필 사진이 변경되었습니다.');
-      } catch {
-        Alert.alert('오류', '사진 업로드에 실패했습니다.');
-      } finally {
-        setUploadingPhoto(false);
+      // 3. 내가 쓴 게시물 authorPhotoURL 일괄 업데이트
+      const postsSnap = await getDocs(
+        query(collection(db, 'posts'), where('authorUid', '==', user.uid)),
+      );
+      if (!postsSnap.empty) {
+        const postsBatch = writeBatch(db);
+        postsSnap.docs.forEach((d) => postsBatch.update(d.ref, { authorPhotoURL: newPhotoURL }));
+        await postsBatch.commit();
       }
+
+      // 4. 내가 쓴 스토리 photoURL 일괄 업데이트
+      const storiesSnap = await getDocs(
+        query(collection(db, 'stories'), where('uid', '==', user.uid)),
+      );
+      if (!storiesSnap.empty) {
+        const storiesBatch = writeBatch(db);
+        storiesSnap.docs.forEach((d) => storiesBatch.update(d.ref, { photoURL: newPhotoURL }));
+        await storiesBatch.commit();
+      }
+
+      // 5. 내가 만든 모임 hostPhotoURL 일괄 업데이트
+      const meetupsSnap = await getDocs(
+        query(collection(db, 'meetups'), where('hostUid', '==', user.uid)),
+      );
+      if (!meetupsSnap.empty) {
+        const meetupsBatch = writeBatch(db);
+        meetupsSnap.docs.forEach((d) => meetupsBatch.update(d.ref, { hostPhotoURL: newPhotoURL }));
+        await meetupsBatch.commit();
+      }
+
+      // 6. 내 채팅방 participantPhotos 업데이트
+      const chatsSnap = await getDocs(
+        query(collection(db, 'chatRooms'), where('participants', 'array-contains', user.uid)),
+      );
+      if (!chatsSnap.empty) {
+        const chatsBatch = writeBatch(db);
+        chatsSnap.docs.forEach((d) => chatsBatch.update(d.ref, { [`participantPhotos.${user.uid}`]: newPhotoURL }));
+        await chatsBatch.commit();
+      }
+
+      Alert.alert('완료', '프로필 사진이 변경되었습니다.');
+    } catch {
+      Alert.alert('오류', '사진 업로드에 실패했습니다.');
+    } finally {
+      setUploadingPhoto(false);
     }
   }
 
@@ -959,6 +973,17 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* 프로필 이미지 크롭 모달 */}
+      {cropVisible && cropTargetUri !== '' && (
+        <Modal visible animationType="slide" statusBarTranslucent>
+          <CropEditor
+            imageUri={cropTargetUri}
+            onCropDone={handleCropDone}
+            onCancel={() => { setCropVisible(false); setCropTargetUri(''); }}
+          />
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
