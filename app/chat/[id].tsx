@@ -16,7 +16,7 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Video, ResizeMode } from 'expo-av';
@@ -276,8 +276,9 @@ export default function ChatRoomScreen() {
       // 동영상 크기 체크 (50MB 제한)
       try {
         const info = await FileSystem.getInfoAsync(asset.uri);
-        if (info.exists && 'size' in info && info.size && info.size > 50 * 1024 * 1024) {
-          Alert.alert('파일 크기 초과', '동영상이 너무 큽니다. 1분 이내 영상을 선택해주세요.');
+        const sizeMB = ((info as any).size ?? 0) / (1024 * 1024);
+        if (sizeMB > 50) {
+          Alert.alert('동영상이 너무 큽니다', '50MB 이하 동영상만 업로드 가능합니다.');
           return;
         }
       } catch (e) {

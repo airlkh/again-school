@@ -18,7 +18,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as MediaLibrary from 'expo-media-library';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Video, ResizeMode } from 'expo-av';
 import ViewShot from 'react-native-view-shot';
 import {
@@ -184,10 +184,20 @@ export default function UploadScreen() {
     }
   };
 
-  // edit → share 전환: 먼저 캡처 후 이동
+  // edit → share 전환: 이미지면 캡처 후 이동, 동영상이면 바로 이동
   const goToShare = async () => {
-    const uri = await captureComposite();
-    setCompositeUri(uri);
+    if (selectedMedia[0]?.type === 'video') {
+      setCompositeUri(null);
+      setStep('share');
+      return;
+    }
+    try {
+      const uri = await captureComposite();
+      setCompositeUri(uri);
+    } catch (err) {
+      console.warn('캡처 실패:', err);
+      setCompositeUri(null);
+    }
     setStep('share');
   };
 
@@ -203,8 +213,10 @@ export default function UploadScreen() {
     if (isVideo) {
       try {
         const info = await FileSystem.getInfoAsync(uri);
-        if (info.exists && 'size' in info && info.size && info.size > 50 * 1024 * 1024) {
-          throw new Error('동영상이 너무 큽니다. 1분 이내 영상을 선택해주세요.');
+        const sizeMB = ((info as any).size ?? 0) / (1024 * 1024);
+        if (sizeMB > 50) {
+          Alert.alert('동영상이 너무 큽니다', '50MB 이하 동영상만 업로드 가능합니다.');
+          throw new Error('동영상이 너무 큽니다. 50MB 이하만 업로드 가능합니다.');
         }
       } catch (e: any) {
         if (e?.message?.includes('너무 큽니다')) throw e;
@@ -569,14 +581,25 @@ export default function UploadScreen() {
           </View>
         )}
 
-        {/* ── 이미지 영역 ── */}
+        {/* ── 미디어 영역 ── */}
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ViewShot
-            ref={viewShotRef}
-            options={{ format: 'jpg', quality: 0.95 }}
-            style={{ width: SW, height: imageHeight, backgroundColor: '#000' }}
-          >
-            {!isVideo ? (
+          {isVideo ? (
+            /* 동영상: ViewShot 없이 직접 렌더링 (ViewShot+Video = 크래시) */
+            <Video
+              source={{ uri: currentMedia?.uri }}
+              style={{ width: SW, height: SH * 0.5 }}
+              resizeMode={ResizeMode.CONTAIN}
+              shouldPlay={false}
+              useNativeControls
+              onError={(e) => console.warn('편집 동영상 오류:', e)}
+            />
+          ) : (
+            /* 이미지: ViewShot으로 텍스트 합성 */
+            <ViewShot
+              ref={viewShotRef}
+              options={{ format: 'jpg', quality: 0.95 }}
+              style={{ width: SW, height: imageHeight, backgroundColor: '#000' }}
+            >
               <Image
                 source={{ uri: currentMedia?.uri }}
                 style={{ width: SW, height: imageHeight }}
@@ -587,63 +610,55 @@ export default function UploadScreen() {
                   setImageHeight(Math.min(Math.max(SW * ratio, 300), SH * 0.6));
                 }}
               />
-            ) : (
-              <Video
-                source={{ uri: currentMedia?.uri }}
-                style={{ width: SW, height: 300 }}
-                resizeMode={ResizeMode.CONTAIN}
-                shouldPlay={false}
-                useNativeControls
-              />
-            )}
 
-            {/* 텍스트 오버레이 — PanGestureHandler 드래그 (입력 모드 아닐 때만) */}
-            {overlayText.trim().length > 0 && !showTextInput && (
-              <PanGestureHandler
-                onGestureEvent={onTextGestureEvent}
-                onHandlerStateChange={onTextHandlerStateChange}
-              >
-                <Animated.View
-                  style={{
-                    position: 'absolute',
-                    alignSelf: 'center',
-                    left: SW / 2 - 60,
-                    top: imageHeight / 2 - textSize / 2,
-                    maxWidth: SW * 0.85,
-                    zIndex: 10,
-                    transform: pan.getTranslateTransform(),
-                  }}
+              {/* 텍스트 오버레이 — PanGestureHandler 드래그 (입력 모드 아닐 때만) */}
+              {overlayText.trim().length > 0 && !showTextInput && (
+                <PanGestureHandler
+                  onGestureEvent={onTextGestureEvent}
+                  onHandlerStateChange={onTextHandlerStateChange}
                 >
-                  <View
+                  <Animated.View
                     style={{
-                      backgroundColor: getTextBg(),
-                      borderRadius: 6,
-                      paddingHorizontal: bgStyle !== 'none' ? 10 : 0,
-                      paddingVertical: bgStyle !== 'none' ? 4 : 0,
+                      position: 'absolute',
+                      alignSelf: 'center',
+                      left: SW / 2 - 60,
+                      top: imageHeight / 2 - textSize / 2,
+                      maxWidth: SW * 0.85,
+                      zIndex: 10,
+                      transform: pan.getTranslateTransform(),
                     }}
                   >
-                    <Text
+                    <View
                       style={{
-                        color: textColor,
-                        fontSize: textSize,
-                        fontWeight: '700',
-                        textAlign: 'center',
-                        textShadowColor: 'rgba(0,0,0,0.6)',
-                        textShadowOffset: { width: 1, height: 1 },
-                        textShadowRadius: 3,
+                        backgroundColor: getTextBg(),
+                        borderRadius: 6,
+                        paddingHorizontal: bgStyle !== 'none' ? 10 : 0,
+                        paddingVertical: bgStyle !== 'none' ? 4 : 0,
                       }}
                     >
-                      {overlayText}
-                    </Text>
-                  </View>
-                </Animated.View>
-              </PanGestureHandler>
-            )}
-          </ViewShot>
+                      <Text
+                        style={{
+                          color: textColor,
+                          fontSize: textSize,
+                          fontWeight: '700',
+                          textAlign: 'center',
+                          textShadowColor: 'rgba(0,0,0,0.6)',
+                          textShadowOffset: { width: 1, height: 1 },
+                          textShadowRadius: 3,
+                        }}
+                      >
+                        {overlayText}
+                      </Text>
+                    </View>
+                  </Animated.View>
+                </PanGestureHandler>
+              )}
+            </ViewShot>
+          )}
         </View>
 
-        {/* ── 편집 도구 (텍스트 모드 아닐 때) ── */}
-        {!showTextInput && (
+        {/* ── 편집 도구 (텍스트 모드 아닐 때, 이미지만) ── */}
+        {!showTextInput && !isVideo && (
           <View style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
             <TouchableOpacity
               onPress={() => setShowTextInput(true)}
