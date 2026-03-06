@@ -18,6 +18,8 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as MediaLibrary from 'expo-media-library';
+import * as FileSystem from 'expo-file-system';
+import { Video, ResizeMode } from 'expo-av';
 import ViewShot from 'react-native-view-shot';
 import {
   GestureHandlerRootView,
@@ -32,6 +34,12 @@ import { CLOUDINARY_CONFIG } from '../../src/config/cloudinary';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 
+function formatDuration(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 type UploadTarget = 'post' | 'story' | 'both';
 type Step = 'gallery' | 'edit' | 'share';
 
@@ -40,6 +48,7 @@ interface MediaItem {
   type: 'image' | 'video';
   width?: number;
   height?: number;
+  duration?: number;
 }
 
 export default function UploadScreen() {
@@ -127,6 +136,7 @@ export default function UploadScreen() {
       type: a.mediaType === MediaLibrary.MediaType.video ? 'video' : 'image',
       width: a.width,
       height: a.height,
+      duration: a.duration,
     }));
 
     setMediaList(items);
@@ -188,6 +198,20 @@ export default function UploadScreen() {
     onProgress?: (pct: number) => void,
   ): Promise<string> => {
     const isVideo = type === 'video';
+
+    // 동영상 크기 체크 (50MB 제한)
+    if (isVideo) {
+      try {
+        const info = await FileSystem.getInfoAsync(uri);
+        if (info.exists && 'size' in info && info.size && info.size > 50 * 1024 * 1024) {
+          throw new Error('동영상이 너무 큽니다. 1분 이내 영상을 선택해주세요.');
+        }
+      } catch (e: any) {
+        if (e?.message?.includes('너무 큽니다')) throw e;
+        console.warn('파일 크기 확인 실패:', e);
+      }
+    }
+
     const endpoint = isVideo
       ? CLOUDINARY_CONFIG.videoUploadUrl
       : CLOUDINARY_CONFIG.imageUploadUrl;
@@ -200,6 +224,9 @@ export default function UploadScreen() {
     } as any);
     formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
     formData.append('resource_type', type);
+    if (isVideo) {
+      formData.append('eager_async', 'true');
+    }
 
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
@@ -361,19 +388,13 @@ export default function UploadScreen() {
               <Text style={{ color: '#555', fontSize: 15, marginTop: 12 }}>사진을 선택하세요</Text>
             </View>
           ) : selectedMedia[0].type === 'video' ? (
-            <View
-              style={{
-                width: SW,
-                height: SW,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Text style={{ color: '#fff', fontSize: 48 }}>▶</Text>
-              <Text style={{ color: '#aaa', fontSize: 13, marginTop: 8 }}>
-                동영상 선택됨
-              </Text>
-            </View>
+            <Video
+              source={{ uri: selectedMedia[0].uri }}
+              style={{ width: SW, height: SW }}
+              resizeMode={ResizeMode.CONTAIN}
+              shouldPlay={false}
+              useNativeControls
+            />
           ) : (
             <Image
               source={{ uri: selectedMedia[0].uri }}
@@ -452,8 +473,26 @@ export default function UploadScreen() {
                   resizeMode="cover"
                 />
                 {item.type === 'video' && (
-                  <View style={{ position: 'absolute', bottom: 4, right: 4 }}>
-                    <Text style={{ fontSize: 16 }}>▶</Text>
+                  <View
+                    style={{
+                      position: 'absolute',
+                      bottom: 4,
+                      right: 4,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 3,
+                      backgroundColor: 'rgba(0,0,0,0.5)',
+                      borderRadius: 4,
+                      paddingHorizontal: 4,
+                      paddingVertical: 1,
+                    }}
+                  >
+                    <Text style={{ fontSize: 10, color: '#fff' }}>▶</Text>
+                    {item.duration != null && item.duration > 0 && (
+                      <Text style={{ fontSize: 11, color: '#fff', fontWeight: '600' }}>
+                        {formatDuration(item.duration)}
+                      </Text>
+                    )}
                   </View>
                 )}
                 {isSelected && (
@@ -549,20 +588,13 @@ export default function UploadScreen() {
                 }}
               />
             ) : (
-              <View
-                style={{
-                  width: SW,
-                  height: 300,
-                  backgroundColor: '#111',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Text style={{ color: '#fff', fontSize: 48 }}>▶</Text>
-                <Text style={{ color: '#aaa', fontSize: 13, marginTop: 8 }}>
-                  동영상
-                </Text>
-              </View>
+              <Video
+                source={{ uri: currentMedia?.uri }}
+                style={{ width: SW, height: 300 }}
+                resizeMode={ResizeMode.CONTAIN}
+                shouldPlay={false}
+                useNativeControls
+              />
             )}
 
             {/* 텍스트 오버레이 — PanGestureHandler 드래그 (입력 모드 아닐 때만) */}

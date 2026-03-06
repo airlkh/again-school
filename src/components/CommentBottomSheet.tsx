@@ -146,7 +146,7 @@ export function CommentBottomSheet({ visible, postId, onClose }: Props) {
       onBackButtonPress={handleClose}
       onSwipeComplete={handleClose}
       swipeDirection="down"
-      avoidKeyboard={false}
+      avoidKeyboard
       style={styles.modal}
       statusBarTranslucent
       propagateSwipe

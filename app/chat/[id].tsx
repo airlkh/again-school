@@ -12,10 +12,11 @@ import {
   ActionSheetIOS,
   Modal,
   Dimensions,
-  Keyboard,
   ActivityIndicator,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as FileSystem from 'expo-file-system';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Video, ResizeMode } from 'expo-av';
@@ -75,7 +76,6 @@ export default function ChatRoomScreen() {
   const [inputText, setInputText] = useState('');
   const [roomId, setRoomId] = useState<string | null>(null);
   const [previewMedia, setPreviewMedia] = useState<PreviewMedia | null>(null);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [sending, setSending] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [cropVisible, setCropVisible] = useState(false);
@@ -84,24 +84,6 @@ export default function ChatRoomScreen() {
   const flatListRef = useRef<FlatList>(null);
   const isOnline = online === '1';
   const avatarImg = Number(avatar) || 1;
-
-  // 키보드 높이 추적
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-
-    const showSub = Keyboard.addListener(showEvent, (e) => {
-      setKeyboardHeight(e.endCoordinates.height);
-    });
-    const hideSub = Keyboard.addListener(hideEvent, () => {
-      setKeyboardHeight(0);
-    });
-
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
 
   // 채팅방 초기화
   useEffect(() => {
@@ -291,6 +273,16 @@ export default function ChatRoomScreen() {
     });
 
     if (isVideo) {
+      // 동영상 크기 체크 (50MB 제한)
+      try {
+        const info = await FileSystem.getInfoAsync(asset.uri);
+        if (info.exists && 'size' in info && info.size && info.size > 50 * 1024 * 1024) {
+          Alert.alert('파일 크기 초과', '동영상이 너무 큽니다. 1분 이내 영상을 선택해주세요.');
+          return;
+        }
+      } catch (e) {
+        console.warn('파일 크기 확인 실패:', e);
+      }
       await uploadAndSendMedia(asset.uri, 'video');
     } else {
       setCropTargetUri(asset.uri);
@@ -470,10 +462,8 @@ export default function ChatRoomScreen() {
     [messages, name, avatarImg, colors, imageHeights],
   );
 
-  const inputBarBottom = keyboardHeight > 0 ? keyboardHeight - insets.bottom : 0;
-
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.surface2 }]} edges={['top', 'bottom']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.surface2 }]} edges={['top']}>
       {/* 헤더 */}
       <View style={[styles.header, { backgroundColor: colors.primary }]}>
         <TouchableOpacity onPress={goBack} style={styles.backBtn}>
@@ -499,13 +489,18 @@ export default function ChatRoomScreen() {
         <View style={styles.backBtn} />
       </View>
 
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 46 : 0}
+      >
       {/* 메시지 목록 */}
       <FlatList
         ref={flatListRef}
         data={messages}
         renderItem={renderMessage}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={[styles.messageList, { paddingBottom: inputBarBottom > 0 ? 8 : 8 }]}
+        contentContainerStyle={[styles.messageList, { paddingBottom: 8 }]}
         showsVerticalScrollIndicator={false}
         inverted
         keyboardShouldPersistTaps="handled"
@@ -526,7 +521,7 @@ export default function ChatRoomScreen() {
           {
             backgroundColor: colors.surface,
             borderTopColor: colors.border,
-            marginBottom: inputBarBottom,
+            paddingBottom: Math.max(insets.bottom, 8),
           },
         ]}
       >
@@ -559,6 +554,7 @@ export default function ChatRoomScreen() {
           />
         </TouchableOpacity>
       </View>
+      </KeyboardAvoidingView>
 
       {/* 자르기 모달 */}
       {cropVisible && cropTargetUri !== '' && (
