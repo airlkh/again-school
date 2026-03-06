@@ -292,9 +292,9 @@ export const CropEditor: React.FC<CropEditorProps> = ({
           style={s.headerDoneBtn}
         >
           {processing ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color="#4FC3F7" />
           ) : (
-            <Text style={s.headerDone}>확인</Text>
+            <Text style={s.headerDone}>완료</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -399,13 +399,11 @@ const s = StyleSheet.create({
   headerTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
   headerDoneBtn: {
     minWidth: 60,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
     alignItems: 'center',
-    backgroundColor: '#e8313a',
-    borderRadius: 8,
   },
-  headerDone: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  headerDone: { color: '#4FC3F7', fontSize: 16, fontWeight: '700' },
   canvas: { flex: 1 },
   overlay: { position: 'absolute', backgroundColor: 'rgba(0,0,0,0.6)' },
   cropBorder: {

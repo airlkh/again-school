@@ -150,6 +150,7 @@ function RootLayoutNav() {
         <Stack.Screen name="invite/index" />
         <Stack.Screen name="bookmarks/index" />
         <Stack.Screen name="trust-voters/[id]" />
+        <Stack.Screen name="profile/verifications" />
       </Stack>
     </>
   );

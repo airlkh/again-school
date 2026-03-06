@@ -16,26 +16,15 @@ import {
 import { Alert } from 'react-native';
 import { db } from '../config/firebase';
 import { useCurrentUser } from './useCurrentUser';
+import {
+  getTrustBadge,
+  TRUST_BADGE_INFO,
+  type TrustBadgeKey,
+} from '../utils/badge';
 
-// ─── 뱃지 등급 ────────────────────────────────────────────────
-
-export type TrustBadgeLevel = 'none' | 'newbie' | 'verified' | 'trusted' | 'legend';
-
-export function getTrustBadge(count: number): TrustBadgeLevel {
-  if (count >= 10) return 'legend';
-  if (count >= 6) return 'trusted';
-  if (count >= 3) return 'verified';
-  if (count >= 1) return 'newbie';
-  return 'none';
-}
-
-export const TRUST_BADGE_INFO: Record<TrustBadgeLevel, { icon: string; label: string; color: string }> = {
-  none: { icon: '', label: '', color: '' },
-  newbie: { icon: '🌱', label: '새싹 동창', color: '#4CAF50' },
-  verified: { icon: '✅', label: '인증 동창', color: '#2196F3' },
-  trusted: { icon: '⭐', label: '신뢰 동창', color: '#FF9800' },
-  legend: { icon: '🏆', label: '레전드 동창', color: '#e8313a' },
-};
+// 하위호환 re-export (badge.tsx가 단일 소스)
+export { getTrustBadge, TRUST_BADGE_INFO };
+export type TrustBadgeLevel = TrustBadgeKey;
 
 // ─── useTrust 훅 ──────────────────────────────────────────────
 
@@ -109,6 +98,7 @@ export function useTrust(targetUid: string) {
           voterName: myName || '동창',
           voterPhoto: myPhoto || null,
           schoolName: commonSchool?.schoolName || '동창',
+          graduationYear: commonSchool?.graduationYear || null,
           message: message || '',
           votedAt: serverTimestamp(),
         });

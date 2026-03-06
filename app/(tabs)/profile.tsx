@@ -35,9 +35,10 @@ import { UserProfile, SchoolEntry, UserPrivacySettings, ConnectionRequest } from
 import { useSchoolMemberCounts } from '../../src/hooks/useSchoolMemberCount';
 import { getAvatarSource } from '../../src/utils/avatar';
 import { NameWithBadge } from '../../src/utils/badge';
-import { doc, updateDoc, deleteDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
+import { doc, updateDoc, deleteDoc, collection, query, where, getDocs, writeBatch, onSnapshot } from 'firebase/firestore';
 import { updateProfile } from 'firebase/auth';
 import { db } from '../../src/config/firebase';
+import { getTrustBadge, TRUST_BADGE_INFO } from '../../src/hooks/useTrust';
 
 const SCHOOL_TYPES: SchoolEntry['schoolType'][] = ['초등학교', '중학교', '고등학교', '대학교'];
 
@@ -71,6 +72,10 @@ export default function ProfileScreen() {
   // 사용자 게시물
   const [userPosts, setUserPosts] = useState<FirestorePost[]>([]);
 
+  // 동창 인증 수
+  const [trustCount, setTrustCount] = useState(0);
+  const [schoolTrustCounts, setSchoolTrustCounts] = useState<Record<string, number>>({});
+
   // 동창 현황 모달
   const [showConnectionsModal, setShowConnectionsModal] = useState(false);
   const [connectionsTab, setConnectionsTab] = useState<'connected' | 'sent' | 'received'>('connected');
@@ -94,6 +99,32 @@ export default function ProfileScreen() {
   useEffect(() => {
     if (!user) return;
     const unsub = subscribeUserPosts(user.uid, setUserPosts);
+    return unsub;
+  }, [user]);
+
+  // trustCount + 학교별 인증 수 구독
+  useEffect(() => {
+    if (!user) return;
+    const unsub = onSnapshot(doc(db, 'users', user.uid), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setTrustCount(data.trustCount || 0);
+      }
+    });
+    return unsub;
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const col = collection(db, 'users', user.uid, 'trustVotes');
+    const unsub = onSnapshot(col, (snap) => {
+      const counts: Record<string, number> = {};
+      snap.docs.forEach((d) => {
+        const school = (d.data().schoolName as string) || '';
+        if (school) counts[school] = (counts[school] || 0) + 1;
+      });
+      setSchoolTrustCounts(counts);
+    });
     return unsub;
   }, [user]);
 
@@ -414,6 +445,55 @@ export default function ProfileScreen() {
         >
           <Text style={[styles.editBtnText, { color: colors.text }]}>프로필 편집</Text>
         </TouchableOpacity>
+
+        {/* 동창 인증 현황 */}
+        {schools.length > 0 && (
+          <View style={[styles.trustSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={styles.trustSectionHeader}>
+              <Text style={[styles.trustSectionTitle, { color: colors.text }]}>동창 인증 현황</Text>
+              {trustCount > 0 && (
+                <View style={[styles.trustBadgePill, { backgroundColor: TRUST_BADGE_INFO[getTrustBadge(trustCount)].color + '22' }]}>
+                  <Text style={{ fontSize: 12 }}>{TRUST_BADGE_INFO[getTrustBadge(trustCount)].icon}</Text>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: TRUST_BADGE_INFO[getTrustBadge(trustCount)].color }}>
+                    {TRUST_BADGE_INFO[getTrustBadge(trustCount)].label}
+                  </Text>
+                </View>
+              )}
+            </View>
+            {schools.map((s, i) => (
+              <TouchableOpacity
+                key={i}
+                style={[styles.trustSchoolCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={() => router.push({
+                  pathname: '/profile/verifications' as any,
+                  params: { uid: user?.uid, schoolName: s.schoolName, graduationYear: String(s.graduationYear) },
+                })}
+                activeOpacity={0.7}
+              >
+                <View style={styles.trustSchoolInfo}>
+                  <Text style={{ fontSize: 16 }}>
+                    {s.schoolType === '초등학교' ? '🏫' : s.schoolType === '중학교' ? '🏛️' : s.schoolType === '고등학교' ? '🎓' : '🏛️'}
+                  </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.trustSchoolName, { color: colors.text }]}>{s.schoolName}</Text>
+                    <Text style={[styles.trustSchoolYear, { color: colors.textSecondary }]}>{s.graduationYear}년 졸업</Text>
+                  </View>
+                </View>
+                <View style={styles.trustSchoolRight}>
+                  <Text style={[styles.trustSchoolCount, { color: colors.inactive }]}>
+                    👥 인증 {schoolTrustCounts[s.schoolName] || 0}명
+                  </Text>
+                  <Ionicons name="chevron-forward" size={16} color={colors.inactive} />
+                </View>
+              </TouchableOpacity>
+            ))}
+            <View style={styles.trustTotalRow}>
+              <Text style={[styles.trustTotalText, { color: colors.inactive }]}>
+                총 동창 인증 {trustCount}명
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* 학교 칩 */}
         {schools.length > 0 && (
@@ -1050,4 +1130,56 @@ const styles = StyleSheet.create({
   connActions: { flexDirection: 'row', gap: 6 },
   connAcceptBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 14 },
   connRejectBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 14, borderWidth: 1 },
+
+  // 동창 인증 현황
+  trustSection: {
+    marginHorizontal: 16,
+    marginTop: 14,
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+  },
+  trustSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  trustSectionTitle: { fontSize: 15, fontWeight: '700' },
+  trustBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  trustSchoolCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  trustSchoolInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  trustSchoolName: { fontSize: 14, fontWeight: '600' },
+  trustSchoolYear: { fontSize: 12, marginTop: 1 },
+  trustSchoolRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  trustSchoolCount: { fontSize: 12 },
+  trustTotalRow: {
+    alignItems: 'center',
+    paddingTop: 4,
+  },
+  trustTotalText: { fontSize: 12 },
 });
