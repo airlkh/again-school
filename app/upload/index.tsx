@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -31,6 +31,7 @@ import { useCurrentUser } from '../../src/hooks/useCurrentUser';
 import { createStory } from '../../src/services/storyService';
 import { createPost } from '../../src/services/postService';
 import { CLOUDINARY_CONFIG } from '../../src/config/cloudinary';
+import { compressVideoIfNeeded } from '../../src/utils/compressVideo';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 
@@ -104,9 +105,16 @@ export default function UploadScreen() {
   // 업로드
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState('');
 
   // ViewShot ref (텍스트 합성용)
   const viewShotRef = useRef<any>(null);
+
+  // 갤러리 미리보기용 동영상 source 메모이제이션 (불필요한 리렌더링 방지)
+  const previewVideoSource = useMemo(
+    () => (selectedMedia[0]?.type === 'video' ? { uri: selectedMedia[0].uri } : undefined),
+    [selectedMedia[0]?.uri, selectedMedia[0]?.type],
+  );
 
   // 키보드 높이 추적
   const [keyboardH, setKeyboardH] = useState(0);
@@ -186,19 +194,19 @@ export default function UploadScreen() {
 
   // edit → share 전환: 이미지면 캡처 후 이동, 동영상이면 바로 이동
   const goToShare = async () => {
-    if (selectedMedia[0]?.type === 'video') {
-      setCompositeUri(null);
-      setStep('share');
-      return;
-    }
     try {
+      if (selectedMedia[0]?.type === 'video') {
+        setCompositeUri(null);
+        setStep('share');
+        return;
+      }
       const uri = await captureComposite();
       setCompositeUri(uri);
-    } catch (err) {
-      console.warn('캡처 실패:', err);
-      setCompositeUri(null);
+      setStep('share');
+    } catch (e: any) {
+      console.warn('goToShare 오류:', e);
+      Alert.alert('오류', e?.message || '다시 시도해주세요');
     }
-    setStep('share');
   };
 
   // 업로드 함수
@@ -213,13 +221,12 @@ export default function UploadScreen() {
     if (isVideo) {
       try {
         const info = await FileSystem.getInfoAsync(uri);
-        const sizeMB = ((info as any).size ?? 0) / (1024 * 1024);
-        if (sizeMB > 50) {
-          Alert.alert('동영상이 너무 큽니다', '50MB 이하 동영상만 업로드 가능합니다.');
-          throw new Error('동영상이 너무 큽니다. 50MB 이하만 업로드 가능합니다.');
+        if (info.exists && (info as any).size > 50 * 1024 * 1024) {
+          Alert.alert('동영상이 너무 큽니다', '50MB 이하만 가능합니다.');
+          throw new Error('파일 크기 초과');
         }
       } catch (e: any) {
-        if (e?.message?.includes('너무 큽니다')) throw e;
+        if (e.message === '파일 크기 초과') throw e;
         console.warn('파일 크기 확인 실패:', e);
       }
     }
@@ -282,6 +289,7 @@ export default function UploadScreen() {
 
     setUploading(true);
     setProgress(0);
+    setUploadStatus('');
 
     try {
       const results: { url: string; type: 'image' | 'video' }[] = [];
@@ -291,9 +299,20 @@ export default function UploadScreen() {
         const isVideo = media.type === 'video';
 
         // 첫 번째 이미지: 합성 URI 사용 (텍스트 오버레이 포함)
-        const uriToUpload =
+        let uriToUpload =
           i === 0 && !isVideo && compositeUri ? compositeUri : media.uri;
 
+        // 동영상 자동 압축
+        if (isVideo) {
+          setUploadStatus('동영상 압축 중...');
+          uriToUpload = await compressVideoIfNeeded(
+            uriToUpload,
+            (pct) => setProgress(pct),
+          );
+          setProgress(0);
+        }
+
+        setUploadStatus('업로드 중...');
         const url = await uploadMedia(
           uriToUpload,
           isVideo ? 'video' : 'image',
@@ -344,6 +363,7 @@ export default function UploadScreen() {
     } finally {
       setUploading(false);
       setProgress(0);
+      setUploadStatus('');
     }
   };
 
@@ -401,11 +421,12 @@ export default function UploadScreen() {
             </View>
           ) : selectedMedia[0].type === 'video' ? (
             <Video
-              source={{ uri: selectedMedia[0].uri }}
+              source={previewVideoSource!}
               style={{ width: SW, height: SW }}
               resizeMode={ResizeMode.CONTAIN}
               shouldPlay={false}
               useNativeControls
+              onError={(e) => console.warn('갤러리 미리보기 동영상 오류:', e)}
             />
           ) : (
             <Image
@@ -1088,7 +1109,7 @@ export default function UploadScreen() {
             <View style={{ alignItems: 'center', gap: 6 }}>
               <ActivityIndicator color="#fff" />
               <Text style={{ color: '#fff', fontSize: 13 }}>
-                업로드 중... {progress}%
+                {uploadStatus || '업로드 중...'} {progress}%
               </Text>
             </View>
           ) : (

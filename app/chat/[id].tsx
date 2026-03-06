@@ -37,6 +37,7 @@ import { CropEditor } from '../../src/components/CropEditor';
 import { ChatMessage } from '../../src/types/auth';
 import { getDummyMessages } from '../../src/data/dummyClassmates';
 import { getAvatarSource } from '../../src/utils/avatar';
+import { compressVideoIfNeeded } from '../../src/utils/compressVideo';
 import { NameWithBadge } from '../../src/utils/badge';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -78,6 +79,7 @@ export default function ChatRoomScreen() {
   const [previewMedia, setPreviewMedia] = useState<PreviewMedia | null>(null);
   const [sending, setSending] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState('');
   const [cropVisible, setCropVisible] = useState(false);
   const [cropTargetUri, setCropTargetUri] = useState('');
   const [imageHeights, setImageHeights] = useState<Record<string, number>>({});
@@ -273,17 +275,7 @@ export default function ChatRoomScreen() {
     });
 
     if (isVideo) {
-      // 동영상 크기 체크 (50MB 제한)
-      try {
-        const info = await FileSystem.getInfoAsync(asset.uri);
-        const sizeMB = ((info as any).size ?? 0) / (1024 * 1024);
-        if (sizeMB > 50) {
-          Alert.alert('동영상이 너무 큽니다', '50MB 이하 동영상만 업로드 가능합니다.');
-          return;
-        }
-      } catch (e) {
-        console.warn('파일 크기 확인 실패:', e);
-      }
+      // 크기 체크는 compressVideoIfNeeded에서 자동 처리 (50MB 초과 시 압축)
       await uploadAndSendMedia(asset.uri, 'video');
     } else {
       setCropTargetUri(asset.uri);
@@ -307,15 +299,29 @@ export default function ChatRoomScreen() {
 
     setSending(true);
     setUploadProgress(0);
+    setUploadStatus('');
 
     try {
-      console.log('채팅 미디어 업로드 시작:', { uri: uri.substring(0, 60), type });
+      let finalUri = uri;
+
+      // 동영상 자동 압축
+      if (type === 'video') {
+        setUploadStatus('동영상 압축 중...');
+        finalUri = await compressVideoIfNeeded(
+          uri,
+          (pct) => setUploadProgress(pct),
+        );
+        setUploadProgress(0);
+      }
+
+      setUploadStatus('업로드 중...');
+      console.log('채팅 미디어 업로드 시작:', { uri: finalUri.substring(0, 60), type });
 
       let url: string;
       if (type === 'video') {
-        url = await uploadVideoToCloudinary(uri, (pct) => setUploadProgress(pct));
+        url = await uploadVideoToCloudinary(finalUri, (pct) => setUploadProgress(pct));
       } else {
-        url = await uploadToCloudinary(uri, 'image', (pct) => setUploadProgress(pct));
+        url = await uploadToCloudinary(finalUri, 'image', (pct) => setUploadProgress(pct));
       }
 
       console.log('채팅 업로드 성공:', url?.substring(0, 60));
@@ -347,6 +353,7 @@ export default function ChatRoomScreen() {
     } finally {
       setSending(false);
       setUploadProgress(0);
+      setUploadStatus('');
     }
   }
 
@@ -573,7 +580,7 @@ export default function ChatRoomScreen() {
         <View style={styles.uploadOverlay}>
           <View style={styles.uploadBox}>
             <ActivityIndicator size="large" color="#e8313a" />
-            <Text style={styles.uploadBoxTitle}>전송 중...</Text>
+            <Text style={styles.uploadBoxTitle}>{uploadStatus || '전송 중...'}</Text>
             <View style={styles.uploadBarBg}>
               <View style={[styles.uploadBarFill, { width: `${uploadProgress}%` as `${number}%` }]} />
             </View>

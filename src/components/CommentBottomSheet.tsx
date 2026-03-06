@@ -11,9 +11,8 @@ import {
   Dimensions,
   ActivityIndicator,
   Alert,
-  Platform,
 } from 'react-native';
-import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+
 import RNModal from 'react-native-modal';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -146,7 +145,7 @@ export function CommentBottomSheet({ visible, postId, onClose }: Props) {
       onBackButtonPress={handleClose}
       onSwipeComplete={handleClose}
       swipeDirection="down"
-      avoidKeyboard={false}
+      avoidKeyboard
       style={styles.modal}
       statusBarTranslucent
       propagateSwipe
@@ -228,72 +227,64 @@ export function CommentBottomSheet({ visible, postId, onClose }: Props) {
         />
 
         {/* 입력창 — 항상 키보드 바로 위에 고정 */}
-        <KeyboardAwareScrollView
-          scrollEnabled={false}
-          contentContainerStyle={{ flexGrow: 0 }}
-          enableOnAndroid
-          extraScrollHeight={Platform.OS === 'ios' ? 0 : 20}
-          keyboardShouldPersistTaps="handled"
+        <View
+          style={[
+            styles.inputBar,
+            {
+              borderTopColor: colors.border,
+              backgroundColor: colors.surface,
+              paddingBottom: inputBarPadBottom,
+            },
+          ]}
         >
+          <Image
+            source={getAvatarSource(photoURL)}
+            style={[styles.myAvatar, { backgroundColor: colors.card }]}
+          />
+
           <View
             style={[
-              styles.inputBar,
-              {
-                borderTopColor: colors.border,
-                backgroundColor: colors.surface,
-                paddingBottom: inputBarPadBottom,
-              },
+              styles.inputWrap,
+              { backgroundColor: colors.card, borderColor: colors.border },
             ]}
           >
-            <Image
-              source={getAvatarSource(photoURL)}
-              style={[styles.myAvatar, { backgroundColor: colors.card }]}
+            <TextInput
+              ref={inputRef}
+              style={[styles.input, { color: colors.text }]}
+              placeholder="댓글을 입력하세요..."
+              placeholderTextColor={colors.inactive}
+              value={inputText}
+              onChangeText={setInputText}
+              multiline
+              blurOnSubmit={false}
+              onFocus={() => setShowEmoji(false)}
             />
-
-            <View
-              style={[
-                styles.inputWrap,
-                { backgroundColor: colors.card, borderColor: colors.border },
-              ]}
+            <TouchableOpacity
+              onPress={handleEmojiToggle}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <TextInput
-                ref={inputRef}
-                style={[styles.input, { color: colors.text }]}
-                placeholder="댓글을 입력하세요..."
-                placeholderTextColor={colors.inactive}
-                value={inputText}
-                onChangeText={setInputText}
-                multiline
-                blurOnSubmit={false}
-                onFocus={() => setShowEmoji(false)}
-              />
-              <TouchableOpacity
-                onPress={handleEmojiToggle}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Text style={[styles.emojiToggle, { opacity: showEmoji ? 1 : 0.5 }]}>
-                  {showEmoji ? '⌨️' : '😊'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {inputText.trim().length > 0 ? (
-              <TouchableOpacity
-                onPress={handleSubmitComment}
-                disabled={submitting}
-                style={styles.sendBtn}
-              >
-                {submitting ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.sendBtnText}>↑</Text>
-                )}
-              </TouchableOpacity>
-            ) : (
-              <View style={{ width: 34 }} />
-            )}
+              <Text style={[styles.emojiToggle, { opacity: showEmoji ? 1 : 0.5 }]}>
+                {showEmoji ? '⌨️' : '😊'}
+              </Text>
+            </TouchableOpacity>
           </View>
-        </KeyboardAwareScrollView>
+
+          {inputText.trim().length > 0 ? (
+            <TouchableOpacity
+              onPress={handleSubmitComment}
+              disabled={submitting}
+              style={styles.sendBtn}
+            >
+              {submitting ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.sendBtnText}>↑</Text>
+              )}
+            </TouchableOpacity>
+          ) : (
+            <View style={{ width: 34 }} />
+          )}
+        </View>
 
         {/* 이모지 그리드 */}
         {showEmoji && (
