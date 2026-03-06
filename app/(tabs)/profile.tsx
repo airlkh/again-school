@@ -433,6 +433,11 @@ export default function ProfileScreen() {
         data={userPosts}
         numColumns={3}
         keyExtractor={(item) => item.id}
+        getItemLayout={(_, index) => ({
+          length: GRID_SIZE,
+          offset: GRID_SIZE * Math.floor(index / 3),
+          index,
+        })}
         renderItem={({ item: post }) => (
           <TouchableOpacity style={styles.postGridItem} onPress={() => router.push(`/post/${post.id}`)}>
             <Image source={{ uri: post.imageUrl }} style={styles.postGridImage} resizeMode="cover" fadeDuration={0} />
@@ -576,12 +581,18 @@ export default function ProfileScreen() {
           </>
         }
         ListEmptyComponent={
-          !loadingPosts ? (
+          loadingPosts ? (
+            <View style={styles.skeletonGrid}>
+              {Array.from({ length: 9 }).map((_, i) => (
+                <View key={i} style={[styles.skeletonItem, { backgroundColor: isDark ? '#2a2a2a' : '#e8e8e8' }]} />
+              ))}
+            </View>
+          ) : (
             <View style={styles.emptyGrid}>
               <Ionicons name="camera-outline" size={44} color={colors.inactive} />
               <Text style={[styles.emptyGridText, { color: colors.inactive }]}>아직 게시물이 없습니다</Text>
             </View>
-          ) : null
+          )
         }
         ListFooterComponent={
           <>
@@ -966,8 +977,8 @@ function SettingItem({ icon, label, detail, onPress }: {
   );
 }
 
-const GRID_GAP = 1;
-const GRID_ITEM_SIZE = (Dimensions.get('window').width - GRID_GAP * 2) / 3;
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const GRID_SIZE = Math.floor(SCREEN_WIDTH / 3);
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
@@ -1070,19 +1081,30 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   postGridItem: {
-    width: GRID_ITEM_SIZE,
-    height: GRID_ITEM_SIZE,
-    padding: GRID_GAP / 2,
+    width: GRID_SIZE,
+    height: GRID_SIZE,
+    borderWidth: 0.5,
+    borderColor: 'transparent',
   },
   postGridImage: {
-    width: '100%',
-    height: '100%',
+    width: GRID_SIZE,
+    height: GRID_SIZE,
     backgroundColor: '#f0f0f0',
   },
   multiImageIcon: {
     position: 'absolute',
     top: 6,
     right: 6,
+  },
+  skeletonGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  skeletonItem: {
+    width: GRID_SIZE,
+    height: GRID_SIZE,
+    borderWidth: 0.5,
+    borderColor: 'transparent',
   },
   emptyGrid: {
     alignItems: 'center',

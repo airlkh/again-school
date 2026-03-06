@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Stack, Redirect, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { View, ActivityIndicator, StyleSheet, AppState } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, AppState, AppStateStatus } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
 import { ThemeProvider, useTheme } from '../src/contexts/ThemeContext';
@@ -48,27 +48,37 @@ function RootLayoutNav() {
 
   // 온라인/오프라인 상태 업데이트
   useEffect(() => {
-    if (!user) return;
+    if (!user?.uid) return;
 
-    const updateOnlineStatus = (isOnline: boolean) => {
-      updateDoc(doc(db, 'users', user.uid), {
-        isOnline,
-        lastSeen: serverTimestamp(),
-      }).catch(() => {});
+    const updateStatus = async (online: boolean) => {
+      try {
+        await updateDoc(doc(db, 'users', user.uid), {
+          isOnline: online,
+          lastSeen: serverTimestamp(),
+        });
+      } catch (e) {
+        console.warn('상태 업데이트 실패:', e);
+      }
     };
 
     // 앱 시작 시 온라인
-    updateOnlineStatus(true);
+    updateStatus(true);
 
-    const subscription = AppState.addEventListener('change', (state) => {
-      updateOnlineStatus(state === 'active');
-    });
+    const handleAppState = (state: AppStateStatus) => {
+      if (state === 'active') {
+        updateStatus(true);
+      } else if (state === 'background' || state === 'inactive') {
+        updateStatus(false);
+      }
+    };
+
+    const sub = AppState.addEventListener('change', handleAppState);
 
     return () => {
-      updateOnlineStatus(false);
-      subscription.remove();
+      updateStatus(false);
+      sub.remove();
     };
-  }, [user]);
+  }, [user?.uid]);
 
   console.log('[RootLayout] 렌더링 상태:', {
     user: user ? user.uid : null,

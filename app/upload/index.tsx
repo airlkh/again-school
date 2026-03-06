@@ -18,7 +18,6 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as MediaLibrary from 'expo-media-library';
-import * as FileSystem from 'expo-file-system/legacy';
 import { Video, ResizeMode } from 'expo-av';
 import ViewShot from 'react-native-view-shot';
 import {
@@ -34,6 +33,14 @@ import { CLOUDINARY_CONFIG } from '../../src/config/cloudinary';
 import { compressVideoIfNeeded } from '../../src/utils/compressVideo';
 
 const { width: SW, height: SH } = Dimensions.get('window');
+
+// 동영상 여부 감지 (확장자 + type 필드)
+function isVideoMedia(uri?: string, type?: string): boolean {
+  if (type === 'video') return true;
+  if (!uri) return false;
+  const lower = uri.toLowerCase();
+  return lower.includes('.mp4') || lower.includes('.mov') || lower.includes('.avi') || lower.includes('.mkv');
+}
 
 function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -195,7 +202,7 @@ export default function UploadScreen() {
   // edit → share 전환: 이미지면 캡처 후 이동, 동영상이면 바로 이동
   const goToShare = async () => {
     try {
-      if (selectedMedia[0]?.type === 'video') {
+      if (isVideoMedia(selectedMedia[0]?.uri, selectedMedia[0]?.type)) {
         setCompositeUri(null);
         setStep('share');
         return;
@@ -215,21 +222,7 @@ export default function UploadScreen() {
     type: 'image' | 'video',
     onProgress?: (pct: number) => void,
   ): Promise<string> => {
-    const isVideo = type === 'video';
-
-    // 동영상 크기 체크 (50MB 제한)
-    if (isVideo) {
-      try {
-        const info = await FileSystem.getInfoAsync(uri);
-        if (info.exists && (info as any).size > 50 * 1024 * 1024) {
-          Alert.alert('동영상이 너무 큽니다', '50MB 이하만 가능합니다.');
-          throw new Error('파일 크기 초과');
-        }
-      } catch (e: any) {
-        if (e.message === '파일 크기 초과') throw e;
-        console.warn('파일 크기 확인 실패:', e);
-      }
-    }
+    const isVideo = isVideoMedia(uri, type);
 
     const endpoint = isVideo
       ? CLOUDINARY_CONFIG.videoUploadUrl

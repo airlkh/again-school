@@ -9,6 +9,7 @@ import {
   Image,
   Keyboard,
   KeyboardEvent,
+  Platform,
   Dimensions,
   ActivityIndicator,
   Alert,
@@ -69,16 +70,16 @@ export function CommentBottomSheet({ visible, postId, onClose }: Props) {
   const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
-  // 키보드 높이 추적
+  // 키보드 높이 추적 (Android/iOS 기기별 차이 보정)
   useEffect(() => {
     const showSub = Keyboard.addListener(
-      'keyboardDidShow',
+      Platform.OS === 'android' ? 'keyboardDidShow' : 'keyboardWillShow',
       (e: KeyboardEvent) => {
         setKeyboardHeight(e.endCoordinates.height);
       },
     );
     const hideSub = Keyboard.addListener(
-      'keyboardDidHide',
+      Platform.OS === 'android' ? 'keyboardDidHide' : 'keyboardWillHide',
       () => setKeyboardHeight(0),
     );
     return () => {

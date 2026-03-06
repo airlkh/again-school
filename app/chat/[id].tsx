@@ -91,10 +91,18 @@ export default function ChatRoomScreen() {
 
   // 상대방 온라인 상태 실시간 구독
   useEffect(() => {
-    if (!otherUid) return;
+    if (!otherUid) {
+      console.log('[Chat] otherUid 없음 — 온라인 상태 구독 스킵');
+      return;
+    }
+    console.log('[Chat] 상대방 온라인 상태 구독 시작:', otherUid);
     return onSnapshot(doc(db, 'users', otherUid), (snap) => {
       if (snap.exists()) {
-        setIsOnline(snap.data()?.isOnline || false);
+        const online = snap.data()?.isOnline === true;
+        console.log('[Chat] 상대방 isOnline:', online, '/ uid:', otherUid);
+        setIsOnline(online);
+      } else {
+        console.log('[Chat] 상대방 유저 문서 없음:', otherUid);
       }
     });
   }, [otherUid]);
