@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Image,
   Keyboard,
+  KeyboardEvent,
   Dimensions,
   ActivityIndicator,
   Alert,
@@ -66,6 +67,25 @@ export function CommentBottomSheet({ visible, postId, onClose }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
   const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  // 키보드 높이 추적
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      'keyboardDidShow',
+      (e: KeyboardEvent) => {
+        setKeyboardHeight(e.endCoordinates.height);
+      },
+    );
+    const hideSub = Keyboard.addListener(
+      'keyboardDidHide',
+      () => setKeyboardHeight(0),
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   // 댓글 실시간 구독
   useEffect(() => {
@@ -145,7 +165,7 @@ export function CommentBottomSheet({ visible, postId, onClose }: Props) {
       onBackButtonPress={handleClose}
       onSwipeComplete={handleClose}
       swipeDirection="down"
-      avoidKeyboard
+      avoidKeyboard={false}
       style={styles.modal}
       statusBarTranslucent
       propagateSwipe
@@ -156,6 +176,7 @@ export function CommentBottomSheet({ visible, postId, onClose }: Props) {
           {
             backgroundColor: colors.surface,
             maxHeight: SCREEN_HEIGHT * 0.75,
+            marginBottom: keyboardHeight,
           },
         ]}
       >

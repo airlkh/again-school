@@ -39,6 +39,8 @@ import { getDummyMessages } from '../../src/data/dummyClassmates';
 import { getAvatarSource } from '../../src/utils/avatar';
 import { compressVideoIfNeeded } from '../../src/utils/compressVideo';
 import { NameWithBadge } from '../../src/utils/badge';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../../src/config/firebase';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const MAX_BUBBLE_IMAGE_WIDTH = SCREEN_WIDTH * 0.55;
@@ -84,8 +86,18 @@ export default function ChatRoomScreen() {
   const [cropTargetUri, setCropTargetUri] = useState('');
   const [imageHeights, setImageHeights] = useState<Record<string, number>>({});
   const flatListRef = useRef<FlatList>(null);
-  const isOnline = online === '1';
+  const [isOnline, setIsOnline] = useState(online === '1');
   const avatarImg = Number(avatar) || 1;
+
+  // 상대방 온라인 상태 실시간 구독
+  useEffect(() => {
+    if (!otherUid) return;
+    return onSnapshot(doc(db, 'users', otherUid), (snap) => {
+      if (snap.exists()) {
+        setIsOnline(snap.data()?.isOnline || false);
+      }
+    });
+  }, [otherUid]);
 
   // 채팅방 초기화
   useEffect(() => {
@@ -416,8 +428,8 @@ export default function ChatRoomScreen() {
           {item.isMe ? (
             <View style={[styles.bubbleRow, styles.bubbleRowRight]}>
               <View style={styles.bubbleMetaLeft}>
-                {item.readBy && item.readBy.length > 1 && (
-                  <Text style={[styles.readLabel, { color: colors.primary }]}>읽음</Text>
+                {item.readBy?.includes(otherUid ?? '') ? null : (
+                  <Text style={[styles.readLabel, { color: colors.inactive }]}>읽지않음</Text>
                 )}
                 <Text style={[styles.bubbleTime, { color: colors.inactive }]}>{item.time}</Text>
               </View>
@@ -488,7 +500,7 @@ export default function ChatRoomScreen() {
           />
           <View>
             <NameWithBadge name={name as string} uid={otherUid as string} nameStyle={styles.headerName} />
-            <Text style={styles.headerStatus}>
+            <Text style={[styles.headerStatus, isOnline && { color: '#a5f3a6' }]}>
               {isOnline ? '온라인' : '오프라인'}
             </Text>
           </View>

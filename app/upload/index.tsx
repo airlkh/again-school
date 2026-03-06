@@ -605,15 +605,20 @@ export default function UploadScreen() {
         {/* ── 미디어 영역 ── */}
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           {isVideo ? (
-            /* 동영상: ViewShot 없이 직접 렌더링 (ViewShot+Video = 크래시) */
-            <Video
-              source={{ uri: currentMedia?.uri }}
-              style={{ width: SW, height: SH * 0.5 }}
-              resizeMode={ResizeMode.CONTAIN}
-              shouldPlay={false}
-              useNativeControls
-              onError={(e) => console.warn('편집 동영상 오류:', e)}
-            />
+            /* 동영상: Video 컴포넌트 크래시 방지 — 편집 없이 안내만 표시 */
+            <View style={{
+              flex: 1,
+              backgroundColor: '#000',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <Text style={{ color: '#fff', fontSize: 16 }}>
+                🎬 동영상이 선택되었습니다
+              </Text>
+              <Text style={{ color: '#999', fontSize: 13, marginTop: 8 }}>
+                다음을 눌러 업로드하세요
+              </Text>
+            </View>
           ) : (
             /* 이미지: ViewShot으로 텍스트 합성 */
             <ViewShot

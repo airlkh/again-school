@@ -62,10 +62,25 @@ export function useTrust(targetUid: string) {
       getDoc(doc(db, 'users', targetUid)),
     ]);
 
-    const mySchools: string[] = (mySnap.data()?.schoolNames || []).map((s: string) => s.toLowerCase().trim());
-    const targetSchools: string[] = (targetSnap.data()?.schoolNames || []).map((s: string) => s.toLowerCase().trim());
+    const getSchoolNames = (userData: any): string[] => {
+      if (userData?.schoolNames?.length > 0) {
+        return userData.schoolNames.map((s: string) => s.trim());
+      }
+      return (userData?.schools || [])
+        .map((s: any) => (s.schoolName || s.name || '') as string)
+        .filter(Boolean)
+        .map((s: string) => s.trim());
+    };
 
-    const isSameSchool = mySchools.some((s) => targetSchools.includes(s));
+    const mySchoolNames = getSchoolNames(mySnap.data());
+    const targetSchoolNames = getSchoolNames(targetSnap.data());
+
+    console.log('내 schoolNames:', mySchoolNames);
+    console.log('상대 schoolNames:', targetSchoolNames);
+
+    const isSameSchool = mySchoolNames.some((a) =>
+      targetSchoolNames.some((b) => a.trim() === b.trim()),
+    );
     if (!isSameSchool) {
       Alert.alert('인증 불가', '같은 학교 동창만 인증할 수 있습니다.');
       return;
@@ -90,7 +105,7 @@ export function useTrust(targetUid: string) {
         // 공통 학교 이름 찾기
         const mySchoolEntries = mySnap.data()?.schools || [];
         const commonSchool = mySchoolEntries.find((s: { schoolName: string }) =>
-          targetSchools.includes(s.schoolName.toLowerCase().trim()),
+          targetSchoolNames.some((t) => t.trim() === s.schoolName.trim()),
         );
 
         await setDoc(voteRef, {

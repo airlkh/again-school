@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Stack, Redirect, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, AppState } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
 import { ThemeProvider, useTheme } from '../src/contexts/ThemeContext';
@@ -9,6 +9,8 @@ import { MusicProvider } from '../src/contexts/MusicContext';
 import { MuteProvider } from '../src/contexts/MuteContext';
 import { UserProvider } from '../src/contexts/UserContext';
 import { migrateDummyMeetups } from '../src/services/meetupService';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../src/config/firebase';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -42,6 +44,30 @@ function RootLayoutNav() {
     if (user) {
       migrateDummyMeetups().catch(() => {});
     }
+  }, [user]);
+
+  // 온라인/오프라인 상태 업데이트
+  useEffect(() => {
+    if (!user) return;
+
+    const updateOnlineStatus = (isOnline: boolean) => {
+      updateDoc(doc(db, 'users', user.uid), {
+        isOnline,
+        lastSeen: serverTimestamp(),
+      }).catch(() => {});
+    };
+
+    // 앱 시작 시 온라인
+    updateOnlineStatus(true);
+
+    const subscription = AppState.addEventListener('change', (state) => {
+      updateOnlineStatus(state === 'active');
+    });
+
+    return () => {
+      updateOnlineStatus(false);
+      subscription.remove();
+    };
   }, [user]);
 
   console.log('[RootLayout] 렌더링 상태:', {

@@ -43,6 +43,8 @@ import { getAvatarSource } from '../../src/utils/avatar';
 import { NameWithBadge } from '../../src/utils/badge';
 import { CommentBottomSheet } from '../../src/components/CommentBottomSheet';
 import { Video, ResizeMode } from 'expo-av';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '../../src/config/firebase';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -566,12 +568,32 @@ function MeetupEventCard({ meetup }: { meetup: Meetup }) {
 // ─── 메인 화면 ─────────────────────────────────────────────────────
 export default function HomeScreen() {
   const { colors } = useTheme();
+  const { user: currentUser } = useAuth();
   const [fsPosts, setFsPosts] = useState<FirestorePost[]>([]);
   const [fsStories, setFsStories] = useState<FirestoreStory[]>([]);
   const [fsMeetups, setFsMeetups] = useState<Meetup[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [hiddenPostIds, setHiddenPostIds] = useState<Set<string>>(new Set());
   const [visiblePostIds, setVisiblePostIds] = useState<Set<string>>(new Set());
+  const [unreadChat, setUnreadChat] = useState(0);
+
+  // 읽지 않은 채팅 수 구독
+  useEffect(() => {
+    if (!currentUser) return;
+    const q = query(
+      collection(db, 'chatRooms'),
+      where('participants', 'array-contains', currentUser.uid),
+    );
+    return onSnapshot(q, (snap) => {
+      let total = 0;
+      snap.docs.forEach((d) => {
+        const data = d.data();
+        const unread = data.unreadCount?.[currentUser.uid] || 0;
+        total += unread;
+      });
+      setUnreadChat(total);
+    });
+  }, [currentUser]);
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: Array<{ key: string }> }) => {
     setVisiblePostIds(new Set(viewableItems.map((item) => item.key)));
@@ -695,6 +717,27 @@ export default function HomeScreen() {
             onPress={() => router.push('/chat')}
           >
             <Ionicons name="chatbubble-ellipses-outline" size={22} color={colors.text} />
+            {unreadChat > 0 && (
+              <View style={{
+                position: 'absolute',
+                top: 2, right: 2,
+                backgroundColor: '#e8313a',
+                borderRadius: 10,
+                minWidth: 18,
+                height: 18,
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingHorizontal: 4,
+              }}>
+                <Text style={{
+                  color: '#fff',
+                  fontSize: 11,
+                  fontWeight: '700',
+                }}>
+                  {unreadChat > 99 ? '99+' : unreadChat}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
       </View>

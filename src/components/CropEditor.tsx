@@ -8,6 +8,7 @@ import {
   Text,
   StyleSheet,
   ActivityIndicator,
+  StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -275,6 +276,7 @@ export const CropEditor: React.FC<CropEditorProps> = ({
 
   return (
     <View style={s.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#000" />
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity
@@ -395,15 +397,15 @@ const s = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 4,
   },
-  headerCancel: { color: '#fff', fontSize: 16, fontWeight: '500' },
-  headerTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  headerCancel: { color: '#ffffff', fontSize: 15, fontWeight: '600' },
+  headerTitle: { color: '#ffffff', fontSize: 15, fontWeight: '700' },
   headerDoneBtn: {
     minWidth: 60,
     paddingVertical: 6,
     paddingHorizontal: 4,
     alignItems: 'center',
   },
-  headerDone: { color: '#4FC3F7', fontSize: 16, fontWeight: '700' },
+  headerDone: { color: '#4FC3F7', fontSize: 15, fontWeight: '600' },
   canvas: { flex: 1 },
   overlay: { position: 'absolute', backgroundColor: 'rgba(0,0,0,0.6)' },
   cropBorder: {
@@ -442,7 +444,7 @@ const s = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.15)',
   },
-  ratioBtnActive: { backgroundColor: '#e8313a' },
-  ratioBtnText: { color: '#fff', fontSize: 12, fontWeight: '400' },
+  ratioBtnActive: { backgroundColor: 'rgba(255,255,255,0.35)' },
+  ratioBtnText: { color: '#ffffff', fontSize: 12, fontWeight: '400' },
   ratioBtnTextActive: { fontWeight: '700' },
 });

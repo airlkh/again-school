@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -30,12 +30,12 @@ import {
   acceptConnectionRequest,
 } from '../../src/services/firestoreService';
 import { uploadImage } from '../../src/services/mediaService';
-import { subscribeUserPosts, FirestorePost } from '../../src/services/postService';
+import { FirestorePost } from '../../src/services/postService';
 import { UserProfile, SchoolEntry, UserPrivacySettings, ConnectionRequest } from '../../src/types/auth';
 import { useSchoolMemberCounts } from '../../src/hooks/useSchoolMemberCount';
 import { getAvatarSource } from '../../src/utils/avatar';
 import { NameWithBadge } from '../../src/utils/badge';
-import { doc, updateDoc, deleteDoc, collection, query, where, getDocs, writeBatch, onSnapshot } from 'firebase/firestore';
+import { doc, updateDoc, deleteDoc, collection, query, where, getDocs, writeBatch, onSnapshot, orderBy, limit, startAfter, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { updateProfile } from 'firebase/auth';
 import { db } from '../../src/config/firebase';
 import { getTrustBadge, TRUST_BADGE_INFO } from '../../src/hooks/useTrust';
@@ -69,8 +69,13 @@ export default function ProfileScreen() {
     showSchools: true,
   });
 
-  // 사용자 게시물
+  // 사용자 게시물 (페이징)
   const [userPosts, setUserPosts] = useState<FirestorePost[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
+  const lastPostDoc = useRef<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const hasMoreRef = useRef(true);
+  const loadingRef = useRef(false);
+  const POST_PAGE = 12;
 
   // 동창 인증 수
   const [trustCount, setTrustCount] = useState(0);
@@ -79,6 +84,36 @@ export default function ProfileScreen() {
   // 동창 현황 모달
   const [showConnectionsModal, setShowConnectionsModal] = useState(false);
   const [connectionsTab, setConnectionsTab] = useState<'connected' | 'sent' | 'received'>('connected');
+
+  // 게시물 페이징 로드
+  const loadPosts = useCallback(async (reset = false) => {
+    if (!user || loadingRef.current) return;
+    if (!reset && !hasMoreRef.current) return;
+    loadingRef.current = true;
+    setLoadingPosts(true);
+    try {
+      const postsCol = collection(db, 'posts');
+      const q = (reset || !lastPostDoc.current)
+        ? query(postsCol, where('authorUid', '==', user.uid), orderBy('createdAt', 'desc'), limit(POST_PAGE))
+        : query(postsCol, where('authorUid', '==', user.uid), orderBy('createdAt', 'desc'), startAfter(lastPostDoc.current), limit(POST_PAGE));
+      const snap = await getDocs(q);
+      const newPosts = snap.docs.map((d) => ({ id: d.id, ...d.data() } as FirestorePost));
+      if (snap.docs.length > 0) {
+        lastPostDoc.current = snap.docs[snap.docs.length - 1];
+      }
+      hasMoreRef.current = snap.docs.length >= POST_PAGE;
+      if (reset) {
+        setUserPosts(newPosts);
+      } else {
+        setUserPosts((prev) => [...prev, ...newPosts]);
+      }
+    } catch (err) {
+      console.error('게시물 로드 오류:', err);
+    } finally {
+      loadingRef.current = false;
+      setLoadingPosts(false);
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -98,9 +133,11 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     if (!user) return;
-    const unsub = subscribeUserPosts(user.uid, setUserPosts);
-    return unsub;
-  }, [user]);
+    lastPostDoc.current = null;
+    hasMoreRef.current = true;
+    loadPosts(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadPosts]);
 
   // trustCount + 학교별 인증 수 구독
   useEffect(() => {
@@ -392,7 +429,22 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      <KeyboardScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <FlatList
+        data={userPosts}
+        numColumns={3}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item: post }) => (
+          <TouchableOpacity style={styles.postGridItem} onPress={() => router.push(`/post/${post.id}`)}>
+            <Image source={{ uri: post.imageUrl }} style={styles.postGridImage} resizeMode="cover" fadeDuration={0} />
+            {post.mediaItems && post.mediaItems.length > 1 && (
+              <View style={styles.multiImageIcon}>
+                <Ionicons name="copy-outline" size={14} color="#fff" />
+              </View>
+            )}
+          </TouchableOpacity>
+        )}
+        ListHeaderComponent={
+          <>
         {/* 프로필 상단 - Instagram 스타일 */}
         <View style={styles.profileTopRow}>
           <TouchableOpacity onPress={handleChangePhoto} disabled={uploadingPhoto}>
@@ -521,27 +573,23 @@ export default function ProfileScreen() {
             <Ionicons name="bookmark-outline" size={22} color={colors.inactive} />
           </TouchableOpacity>
         </View>
-
-        {/* 게시물 그리드 */}
-        {userPosts.length > 0 ? (
-          <View style={styles.postGrid}>
-            {userPosts.map((post) => (
-              <TouchableOpacity key={post.id} style={styles.postGridItem} onPress={() => router.push(`/post/${post.id}`)}>
-                <Image source={{ uri: post.imageUrl }} style={styles.postGridImage} resizeMode="cover" />
-                {post.mediaItems && post.mediaItems.length > 1 && (
-                  <View style={styles.multiImageIcon}>
-                    <Ionicons name="copy-outline" size={14} color="#fff" />
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-        ) : (
-          <View style={styles.emptyGrid}>
-            <Ionicons name="camera-outline" size={44} color={colors.inactive} />
-            <Text style={[styles.emptyGridText, { color: colors.inactive }]}>아직 게시물이 없습니다</Text>
-          </View>
-        )}
+          </>
+        }
+        ListEmptyComponent={
+          !loadingPosts ? (
+            <View style={styles.emptyGrid}>
+              <Ionicons name="camera-outline" size={44} color={colors.inactive} />
+              <Text style={[styles.emptyGridText, { color: colors.inactive }]}>아직 게시물이 없습니다</Text>
+            </View>
+          ) : null
+        }
+        ListFooterComponent={
+          <>
+            {loadingPosts && (
+              <View style={{ padding: 20, alignItems: 'center' }}>
+                <ActivityIndicator size="small" color={colors.primary} />
+              </View>
+            )}
 
         {/* 직장 정보 */}
         <View style={[styles.section, { backgroundColor: colors.surface }]}>
@@ -661,7 +709,17 @@ export default function ProfileScreen() {
         </View>
 
         <Text style={[styles.version, { color: colors.inactive }]}>Again School v1.0.0</Text>
-      </KeyboardScrollView>
+          </>
+        }
+        onEndReached={() => loadPosts(false)}
+        onEndReachedThreshold={0.5}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={6}
+        windowSize={5}
+        initialNumToRender={12}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      />
 
       {/* 학교 추가/수정 모달 */}
       <Modal visible={showSchoolModal} animationType="slide" transparent>
