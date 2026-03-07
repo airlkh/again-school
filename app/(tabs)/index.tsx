@@ -585,13 +585,19 @@ export default function HomeScreen() {
       where('participants', 'array-contains', currentUser.uid),
     );
     return onSnapshot(q, (snap) => {
-      let total = 0;
-      snap.docs.forEach((d) => {
-        const data = d.data();
-        const unread = data.unreadCount?.[currentUser.uid] || 0;
-        total += unread;
-      });
-      setUnreadChat(total);
+      try {
+        let total = 0;
+        snap.docs.forEach((d) => {
+          const data = d.data();
+          const unread = data.unreadCount?.[currentUser.uid] || 0;
+          total += unread;
+        });
+        setUnreadChat(total);
+      } catch (e) {
+        console.warn('[HomeScreen] 채팅 unread 처리 오류:', e);
+      }
+    }, (error) => {
+      console.warn('[HomeScreen] 채팅 onSnapshot 오류:', error);
     });
   }, [currentUser]);
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
@@ -615,13 +621,28 @@ export default function HomeScreen() {
   }, []);
 
   useEffect(() => {
-    const unsubPosts = subscribePosts((posts) => setFsPosts(posts));
-    const unsubStories = subscribeStories((stories) => setFsStories(stories));
-    const unsubMeetups = subscribeMeetups((meetups) => setFsMeetups(meetups));
+    let unsubPosts: (() => void) | undefined;
+    let unsubStories: (() => void) | undefined;
+    let unsubMeetups: (() => void) | undefined;
+    try {
+      unsubPosts = subscribePosts((posts) => {
+        try { setFsPosts(posts ?? []); } catch (e) { console.warn('[HomeScreen] posts 처리 오류:', e); }
+      });
+    } catch (e) { console.warn('[HomeScreen] subscribePosts 오류:', e); }
+    try {
+      unsubStories = subscribeStories((stories) => {
+        try { setFsStories(stories ?? []); } catch (e) { console.warn('[HomeScreen] stories 처리 오류:', e); }
+      });
+    } catch (e) { console.warn('[HomeScreen] subscribeStories 오류:', e); }
+    try {
+      unsubMeetups = subscribeMeetups((meetups) => {
+        try { setFsMeetups(meetups ?? []); } catch (e) { console.warn('[HomeScreen] meetups 처리 오류:', e); }
+      });
+    } catch (e) { console.warn('[HomeScreen] subscribeMeetups 오류:', e); }
     return () => {
-      unsubPosts();
-      unsubStories();
-      unsubMeetups();
+      unsubPosts?.();
+      unsubStories?.();
+      unsubMeetups?.();
     };
   }, []);
 
@@ -637,13 +658,13 @@ export default function HomeScreen() {
 
     // Merge Firestore posts first, then dummy posts
     const allPosts: { data: DummyPost | FirestorePost; isFirestore: boolean }[] = [
-      ...fsPosts.map((p) => ({ data: p, isFirestore: true })),
+      ...(fsPosts || []).filter((p) => p && p.id).map((p) => ({ data: p, isFirestore: true })),
       ...DUMMY_POSTS.map((p) => ({ data: p, isFirestore: false })),
     ];
 
     // Merge Firestore meetups with dummy meetups
     const allMeetups = [
-      ...fsMeetups.filter((m) => m.status === 'recruiting'),
+      ...(fsMeetups || []).filter((m) => m && m.status === 'recruiting'),
       ...DUMMY_MEETUPS.filter((m) => m.status === 'recruiting'),
     ];
 

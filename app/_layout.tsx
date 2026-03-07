@@ -42,7 +42,11 @@ function RootLayoutNav() {
   // 더미 모임 데이터를 Firestore에 마이그레이션
   useEffect(() => {
     if (user) {
-      migrateDummyMeetups().catch(() => {});
+      try {
+        migrateDummyMeetups().catch((e) => console.warn('[RootLayout] migrateDummyMeetups 오류:', e));
+      } catch (e) {
+        console.warn('[RootLayout] migrateDummyMeetups 동기 오류:', e);
+      }
     }
   }, [user]);
 
@@ -57,7 +61,7 @@ function RootLayoutNav() {
           lastSeen: serverTimestamp(),
         });
       } catch (e) {
-        console.warn('상태 업데이트 실패:', e);
+        console.warn('[RootLayout] 상태 업데이트 실패:', e);
       }
     };
 
@@ -65,10 +69,14 @@ function RootLayoutNav() {
     updateStatus(true);
 
     const handleAppState = (state: AppStateStatus) => {
-      if (state === 'active') {
-        updateStatus(true);
-      } else if (state === 'background' || state === 'inactive') {
-        updateStatus(false);
+      try {
+        if (state === 'active') {
+          updateStatus(true);
+        } else if (state === 'background' || state === 'inactive') {
+          updateStatus(false);
+        }
+      } catch (e) {
+        console.warn('[RootLayout] AppState 처리 오류:', e);
       }
     };
 
@@ -76,7 +84,7 @@ function RootLayoutNav() {
 
     return () => {
       updateStatus(false);
-      sub.remove();
+      sub?.remove();
     };
   }, [user?.uid]);
 
