@@ -102,8 +102,8 @@ export default function ProfileDetailScreen() {
     ? DUMMY_CLASSMATES.filter(
         (c) =>
           c.id !== profile.id &&
-          c.schools.some((s) =>
-            profile.schools.some(
+          (c.schools || []).some((s) =>
+            (profile.schools || []).some(
               (ps) =>
                 ps.schoolName === s.schoolName &&
                 ps.graduationYear === s.graduationYear,

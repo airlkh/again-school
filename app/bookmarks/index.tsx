@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { collection, onSnapshot, query, where, getDocs, orderBy, deleteDoc, doc } from 'firebase/firestore';
+import { Video, ResizeMode } from 'expo-av';
 import { db } from '../../src/config/firebase';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -58,6 +59,9 @@ export default function BookmarksPage() {
 
   // 댓글 바텀시트
   const [commentPostId, setCommentPostId] = useState<string | null>(null);
+
+  // 동영상 재생 모달
+  const [playingVideo, setPlayingVideo] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -236,9 +240,19 @@ export default function BookmarksPage() {
             {/* 미디어 */}
             {selectedPost?.imageUrl && (
               selectedPost.mediaType === 'video' ? (
-                <View style={styles.videoPlaceholder}>
-                  <Text style={{ color: '#fff', fontSize: 48 }}>▶</Text>
-                </View>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => setPlayingVideo(selectedPost.videoUrl || selectedPost.imageUrl)}
+                  style={styles.videoPlaceholder}
+                >
+                  {selectedPost.thumbnailUrl ? (
+                    <Image source={{ uri: selectedPost.thumbnailUrl }} style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH * 0.75, position: 'absolute' }} resizeMode="cover" />
+                  ) : null}
+                  <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="play" size={32} color="#fff" />
+                  </View>
+                  <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 8 }}>탭하여 재생</Text>
+                </TouchableOpacity>
               ) : (
                 <Image
                   source={{ uri: selectedPost.imageUrl }}
@@ -319,6 +333,18 @@ export default function BookmarksPage() {
             )}
           </ScrollView>
         </SafeAreaView>
+      </Modal>
+
+      {/* 동영상 전체화면 모달 */}
+      <Modal visible={!!playingVideo} animationType="fade" onRequestClose={() => setPlayingVideo(null)}>
+        <View style={{ flex: 1, backgroundColor: '#000' }}>
+          <TouchableOpacity onPress={() => setPlayingVideo(null)} style={{ position: 'absolute', top: 50, right: 20, zIndex: 10, padding: 10 }}>
+            <Ionicons name="close" size={28} color="#fff" />
+          </TouchableOpacity>
+          {playingVideo && (
+            <Video source={{ uri: playingVideo }} style={{ flex: 1 }} useNativeControls resizeMode={ResizeMode.CONTAIN} shouldPlay />
+          )}
+        </View>
       </Modal>
 
       {/* 댓글 바텀시트 */}

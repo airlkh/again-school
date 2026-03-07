@@ -38,11 +38,17 @@ export function useTrust(targetUid: string) {
     if (!targetUid) return;
 
     const unsub = onSnapshot(doc(db, 'users', targetUid), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        setTrustCount(data.trustCount || 0);
-        setIsTrustedByMe((data.trustedBy || []).includes(myUid));
+      try {
+        if (snap.exists()) {
+          const data = snap.data();
+          setTrustCount(data?.trustCount || 0);
+          setIsTrustedByMe((data?.trustedBy || []).includes(myUid));
+        }
+      } catch (e) {
+        console.warn('[useTrust] onSnapshot 데이터 처리 오류:', e);
       }
+    }, (error) => {
+      console.warn('[useTrust] onSnapshot 오류:', error);
     });
     return unsub;
   }, [targetUid, myUid]);
@@ -57,10 +63,17 @@ export function useTrust(targetUid: string) {
     }
 
     // 같은 학교 확인
-    const [mySnap, targetSnap] = await Promise.all([
-      getDoc(doc(db, 'users', myUid)),
-      getDoc(doc(db, 'users', targetUid)),
-    ]);
+    let mySnap, targetSnap;
+    try {
+      [mySnap, targetSnap] = await Promise.all([
+        getDoc(doc(db, 'users', myUid)),
+        getDoc(doc(db, 'users', targetUid)),
+      ]);
+    } catch (e) {
+      console.warn('[useTrust] 유저 데이터 로드 오류:', e);
+      Alert.alert('오류', '데이터를 불러올 수 없습니다.');
+      return;
+    }
 
     const getSchoolNames = (userData: any): string[] => {
       const names: string[] = [];

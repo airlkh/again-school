@@ -34,7 +34,6 @@ import { FirestorePost } from '../../src/services/postService';
 import { UserProfile, SchoolEntry, UserPrivacySettings, ConnectionRequest } from '../../src/types/auth';
 import { useSchoolMemberCounts } from '../../src/hooks/useSchoolMemberCount';
 import { getAvatarSource } from '../../src/utils/avatar';
-import { NameWithBadge } from '../../src/utils/badge';
 import { CropEditor } from '../../src/components/CropEditor';
 import { doc, updateDoc, deleteDoc, collection, query, where, getDocs, writeBatch, onSnapshot, orderBy, limit, startAfter, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { updateProfile } from 'firebase/auth';
@@ -202,19 +201,33 @@ export default function ProfileScreen() {
   // 프로필 구독
   useEffect(() => {
     if (!user?.uid) return;
-    return subscribeUserProfile(user.uid, (p) => {
-      setProfile(p);
-      if (p) {
-        setWorkplace(p.workplace ?? '');
-        setPrivacySettings(p.privacySettings ?? { showWorkplace: true, showSchools: true });
-      }
-    });
+    try {
+      return subscribeUserProfile(user.uid, (p) => {
+        try {
+          setProfile(p);
+          if (p) {
+            setWorkplace(p.workplace ?? '');
+            setPrivacySettings(p.privacySettings ?? { showWorkplace: true, showSchools: true });
+          }
+        } catch (e) {
+          console.warn('[Profile] 프로필 콜백 오류:', e);
+        }
+      });
+    } catch (e) {
+      console.warn('[Profile] subscribeUserProfile 오류:', e);
+    }
   }, [user?.uid]);
 
   // 동창 연결 구독
   useEffect(() => {
     if (!user?.uid) return;
-    return subscribeMyConnections(user.uid, setConnections);
+    try {
+      return subscribeMyConnections(user.uid, (conns) => {
+        try { setConnections(conns || []); } catch (e) { console.warn('[Profile] connections 처리 오류:', e); }
+      });
+    } catch (e) {
+      console.warn('[Profile] subscribeMyConnections 오류:', e);
+    }
   }, [user?.uid]);
 
   // 게시물 최초 로드
@@ -257,15 +270,15 @@ export default function ProfileScreen() {
   }, [user?.uid]);
 
   // 파생값 useMemo
-  const connectedCount = useMemo(() => connections.filter((c) => c.status === 'accepted').length, [connections]);
-  const sentCount = useMemo(() => connections.filter((c) => c.status === 'pending' && c.fromUid === user?.uid).length, [connections, user?.uid]);
-  const receivedCount = useMemo(() => connections.filter((c) => c.status === 'pending' && c.toUid === user?.uid).length, [connections, user?.uid]);
+  const connectedCount = useMemo(() => (connections || []).filter((c) => c?.status === 'accepted').length, [connections]);
+  const sentCount = useMemo(() => (connections || []).filter((c) => c?.status === 'pending' && c?.fromUid === user?.uid).length, [connections, user?.uid]);
+  const receivedCount = useMemo(() => (connections || []).filter((c) => c?.status === 'pending' && c?.toUid === user?.uid).length, [connections, user?.uid]);
 
   const displayName = profile?.displayName || user?.displayName || '사용자';
   const job = profile?.job || '';
-  const region = profile?.region ? `${profile.region.sido} ${profile.region.sigungu}`.trim() : '';
+  const region = profile?.region ? `${profile?.region?.sido || ''} ${profile?.region?.sigungu || ''}`.trim() : '';
   const schools = profile?.schools || [];
-  const schoolNames = useMemo(() => schools.map((s) => s.schoolName), [schools]);
+  const schoolNames = useMemo(() => (schools || []).map((s) => s?.schoolName || '').filter(Boolean), [schools]);
   const schoolMemberCounts = useSchoolMemberCounts(schoolNames);
 
   // 프로필 이미지 변경
@@ -395,17 +408,19 @@ export default function ProfileScreen() {
   }
 
   function handleEditSchool(index: number) {
-    const s = schools[index];
+    const s = schools?.[index];
+    if (!s) return;
     setEditingSchoolIndex(index);
-    setNewSchoolName(s.schoolName);
-    setNewSchoolType(s.schoolType);
-    setNewGradYear(String(s.graduationYear));
+    setNewSchoolName(s.schoolName || '');
+    setNewSchoolType(s.schoolType || '중학교');
+    setNewGradYear(String(s.graduationYear || ''));
     setNewIsPublic(s.isPublic ?? true);
     setShowSchoolModal(true);
   }
 
   function handleDeleteSchool(index: number) {
-    Alert.alert('학교 삭제', `"${schools[index].schoolName}"을 삭제하시겠습니까?`, [
+    const schoolName = schools?.[index]?.schoolName || '학교';
+    Alert.alert('학교 삭제', `"${schoolName}"을 삭제하시겠습니까?`, [
       { text: '취소', style: 'cancel' },
       {
         text: '삭제',
@@ -501,7 +516,8 @@ export default function ProfileScreen() {
   }
 
   // 동창 현황 목록 필터
-  const filteredConnections = useMemo(() => connections.filter((c) => {
+  const filteredConnections = useMemo(() => (connections || []).filter((c) => {
+    if (!c) return false;
     if (connectionsTab === 'connected') return c.status === 'accepted';
     if (connectionsTab === 'sent') return c.status === 'pending' && c.fromUid === user?.uid;
     return c.status === 'pending' && c.toUid === user?.uid;
@@ -544,12 +560,14 @@ export default function ProfileScreen() {
 
       {/* 프로필 정보 */}
       <View style={styles.profileInfo}>
-        <NameWithBadge
-          name={displayName}
-          uid={user?.uid}
-          nameStyle={[styles.displayName, { color: colors.text }]}
-          size="medium"
-        />
+        <Text style={[styles.displayName, { color: colors.text }]}>{displayName}</Text>
+        {trustCount > 0 && (
+          <View style={{ alignItems: 'center', marginTop: 2 }}>
+            <Text style={{ fontSize: 12, color: TRUST_BADGE_INFO[getTrustBadge(trustCount)].color }}>
+              {TRUST_BADGE_INFO[getTrustBadge(trustCount)].icon} {TRUST_BADGE_INFO[getTrustBadge(trustCount)].label}
+            </Text>
+          </View>
+        )}
         {job ? <Text style={[styles.job, { color: colors.textSecondary }]}>{job}</Text> : null}
         {region ? (
           <View style={styles.regionRow}>
@@ -581,13 +599,15 @@ export default function ProfileScreen() {
               </View>
             )}
           </View>
-          {schools.map((s, i) => (
+          {(schools || []).map((s, i) => {
+            if (!s) return null;
+            return (
             <TouchableOpacity
               key={i}
               style={[styles.trustSchoolCard, { backgroundColor: colors.card, borderColor: colors.border }]}
               onPress={() => router.push({
                 pathname: '/profile/verifications' as any,
-                params: { uid: user?.uid, schoolName: s.schoolName, graduationYear: String(s.graduationYear) },
+                params: { uid: user?.uid, schoolName: s.schoolName || '', graduationYear: String(s.graduationYear || '') },
               })}
               activeOpacity={0.7}
             >
@@ -596,18 +616,19 @@ export default function ProfileScreen() {
                   {s.schoolType === '초등학교' ? '🏫' : s.schoolType === '중학교' ? '🏛️' : s.schoolType === '고등학교' ? '🎓' : '🏛️'}
                 </Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.trustSchoolName, { color: colors.text }]}>{s.schoolName}</Text>
-                  <Text style={[styles.trustSchoolYear, { color: colors.textSecondary }]}>{s.graduationYear}년 졸업</Text>
+                  <Text style={[styles.trustSchoolName, { color: colors.text }]}>{s.schoolName || ''}</Text>
+                  <Text style={[styles.trustSchoolYear, { color: colors.textSecondary }]}>{s.graduationYear || ''}년 졸업</Text>
                 </View>
               </View>
               <View style={styles.trustSchoolRight}>
                 <Text style={[styles.trustSchoolCount, { color: colors.inactive }]}>
-                  👥 인증 {schoolTrustCounts[s.schoolName] || 0}명
+                  👥 인증 {schoolTrustCounts[s.schoolName || ''] || 0}명
                 </Text>
                 <Ionicons name="chevron-forward" size={16} color={colors.inactive} />
               </View>
             </TouchableOpacity>
-          ))}
+            );
+          })}
           <View style={styles.trustTotalRow}>
             <Text style={[styles.trustTotalText, { color: colors.inactive }]}>
               총 동창 인증 {trustCount}명
@@ -619,11 +640,11 @@ export default function ProfileScreen() {
       {/* 학교 칩 */}
       {schools.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
-          {schools.map((s, i) => (
+          {(schools || []).map((s, i) => (
             <TouchableOpacity key={i} onPress={() => handleEditSchool(i)} style={[styles.schoolChip, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={{ fontSize: 12 }}>{s.schoolType === '초등학교' ? '🏫' : s.schoolType === '중학교' ? '🏛️' : '🎓'}</Text>
-              <Text style={[styles.schoolChipText, { color: colors.text }]} numberOfLines={1}>{s.schoolName}</Text>
-              <Text style={[styles.schoolChipYear, { color: colors.textSecondary }]}>{s.graduationYear}</Text>
+              <Text style={{ fontSize: 12 }}>{s?.schoolType === '초등학교' ? '🏫' : s?.schoolType === '중학교' ? '🏛️' : '🎓'}</Text>
+              <Text style={[styles.schoolChipText, { color: colors.text }]} numberOfLines={1}>{s?.schoolName || ''}</Text>
+              <Text style={[styles.schoolChipYear, { color: colors.textSecondary }]}>{s?.graduationYear || ''}</Text>
             </TouchableOpacity>
           ))}
           <TouchableOpacity onPress={() => { resetSchoolForm(); setShowSchoolModal(true); }} style={[styles.schoolChip, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -662,8 +683,8 @@ export default function ProfileScreen() {
             <Text style={styles.schoolEmoji}>💼</Text>
             <View style={styles.schoolInfo}>
               <Text style={[styles.schoolName, { color: colors.text }]}>{workplace}</Text>
-              <Text style={[styles.schoolPublicLabel, { color: privacySettings.showWorkplace ? '#4CAF50' : '#e8313a' }]}>
-                {privacySettings.showWorkplace ? '🔓 동창에게 공개' : '🔒 비공개'}
+              <Text style={[styles.schoolPublicLabel, { color: (privacySettings?.showWorkplace ?? true) ? '#4CAF50' : '#e8313a' }]}>
+                {(privacySettings?.showWorkplace ?? true) ? '🔓 동창에게 공개' : '🔒 비공개'}
               </Text>
             </View>
             <TouchableOpacity
@@ -743,7 +764,7 @@ export default function ProfileScreen() {
         <SettingItem icon="notifications-outline" label="알림 설정"
           onPress={() => router.push('/settings/notifications' as any)} />
         <SettingItem icon="eye-outline" label="공개 범위 설정"
-          detail={privacySettings.showSchools && privacySettings.showWorkplace ? '전체 공개' : '일부 비공개'}
+          detail={privacySettings?.showSchools && privacySettings?.showWorkplace ? '전체 공개' : '일부 비공개'}
           onPress={() => Alert.alert('개인정보 공개 설정', '위의 "개인정보 공개 설정" 섹션에서 변경할 수 있습니다.')} />
         <SettingItem icon="document-text-outline" label="이용약관"
           onPress={() => Alert.alert('이용약관', 'Again School 이용약관입니다.')} />

@@ -462,6 +462,13 @@ export default function UploadScreen() {
           numColumns={3}
           keyExtractor={(_, i) => i.toString()}
           style={{ flex: 1 }}
+          removeClippedSubviews={false}
+          nestedScrollEnabled={true}
+          scrollEventThrottle={16}
+          maxToRenderPerBatch={15}
+          windowSize={7}
+          initialNumToRender={18}
+          onEndReachedThreshold={0.5}
           renderItem={({ item }) => {
             const selIdx = selectedMedia.findIndex((m) => m.uri === item.uri);
             const isSelected = selIdx >= 0;

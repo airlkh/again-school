@@ -62,7 +62,8 @@ function StoryBar({ fsStories }: { fsStories: FirestoreStory[] }) {
   const { user } = useAuth();
 
   // Group Firestore stories by user
-  const groupedFsStories = fsStories.reduce((acc, s) => {
+  const groupedFsStories = (fsStories || []).reduce((acc, s) => {
+    if (!s?.uid) return acc;
     if (!acc[s.uid]) {
       acc[s.uid] = { uid: s.uid, name: s.name, avatarImg: s.avatarImg, photoURL: s.photoURL ?? null, stories: [] };
     }
@@ -85,9 +86,16 @@ function StoryBar({ fsStories }: { fsStories: FirestoreStory[] }) {
           onPress={() => router.push('/upload')}
         >
           <View style={styles.myStoryRing}>
-            <View style={[styles.myStoryAvatar, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Ionicons name="person" size={26} color={colors.inactive} />
-            </View>
+            {user?.photoURL ? (
+              <Image
+                source={{ uri: user.photoURL }}
+                style={[styles.myStoryAvatarImg, { backgroundColor: colors.card, borderColor: colors.border }]}
+              />
+            ) : (
+              <View style={[styles.myStoryAvatar, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Ionicons name="person" size={26} color={colors.inactive} />
+              </View>
+            )}
             <View style={[styles.addBadge, { borderColor: colors.surface }]}>
               <Ionicons name="add" size={14} color="#fff" />
             </View>
@@ -162,6 +170,7 @@ function PostCard({ post, isFirestore, onHide, isVisible = true }: { post: Dummy
   const [imgIndex, setImgIndex] = useState(0);
   const [showMenu, setShowMenu] = useState(false);
   const [commentSheetVisible, setCommentSheetVisible] = useState(false);
+  const [playingVideo, setPlayingVideo] = useState<string | null>(null);
   const [imgHeight, setImgHeight] = useState(SCREEN_WIDTH);
   const [multiImgHeights, setMultiImgHeights] = useState<Record<number, number>>({});
 
@@ -174,10 +183,12 @@ function PostCard({ post, isFirestore, onHide, isVisible = true }: { post: Dummy
   const heartOpacity = useRef(new Animated.Value(0)).current;
   const lastTap = useRef(0);
 
+  const [heartColor, setHeartColor] = useState<string>(Colors.primary);
   const handleDoubleTap = useCallback(() => {
     const now = Date.now();
     if (now - lastTap.current < 300) {
-      if (!liked) toggleLike();
+      toggleLike();
+      setHeartColor(liked ? '#ffffff' : Colors.primary);
       heartScale.setValue(0);
       heartOpacity.setValue(1);
       Animated.sequence([
@@ -212,8 +223,8 @@ function PostCard({ post, isFirestore, onHide, isVisible = true }: { post: Dummy
   }
 
   const postMeta = isFirestore
-    ? timeAgo(fsPost!.createdAt)
-    : `${schoolName} · ${dPost?.postedAt}`;
+    ? timeAgo(fsPost?.createdAt ?? 0)
+    : `${schoolName} · ${dPost?.postedAt ?? ''}`;
 
   return (
     <View style={[styles.postCard, { backgroundColor: colors.surface }]}>
@@ -264,6 +275,10 @@ function PostCard({ post, isFirestore, onHide, isVisible = true }: { post: Dummy
               pagingEnabled
               showsHorizontalScrollIndicator={false}
               keyExtractor={(_, i) => String(i)}
+              snapToInterval={SCREEN_WIDTH}
+              snapToAlignment="start"
+              decelerationRate="fast"
+              getItemLayout={(_, i) => ({ length: SCREEN_WIDTH, offset: SCREEN_WIDTH * i, index: i })}
               onMomentumScrollEnd={(e) => {
                 const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
                 setImgIndex(idx);
@@ -296,28 +311,20 @@ function PostCard({ post, isFirestore, onHide, isVisible = true }: { post: Dummy
               </View>
             )}
             <Animated.View pointerEvents="none" style={[styles.heartOverlay, { opacity: heartOpacity, transform: [{ scale: heartScale }] }]}>
-              <Ionicons name="heart" size={80} color="#fff" style={{ textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 10 }} />
+              <Ionicons name="heart" size={80} color={heartColor} style={{ textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 10 }} />
             </Animated.View>
           </View>
         </TouchableOpacity>
       ) : isVideoMedia(videoUrl || imageUrl, mediaType) && (videoUrl || imageUrl) ? (
-        <TouchableOpacity activeOpacity={1} onPress={handleDoubleTap}>
-          <View>
-            <Video
-              source={{ uri: (videoUrl || imageUrl)! }}
-              style={[styles.postImage, { backgroundColor: colors.card }]}
-              resizeMode={ResizeMode.COVER}
-              shouldPlay={isVisible}
-              isLooping
-              isMuted={videoMuted}
-            />
-            <TouchableOpacity
-              style={styles.muteBtn}
-              onPress={toggleVideoMute}
-              activeOpacity={0.8}
-            >
-              <Text style={{ fontSize: 18 }}>{videoMuted ? '🔇' : '🔊'}</Text>
-            </TouchableOpacity>
+        <TouchableOpacity activeOpacity={1} onPress={() => setPlayingVideo((videoUrl || imageUrl)!)}>
+          <View style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }}>
+            {thumbnailUrl ? (
+              <Image source={{ uri: thumbnailUrl }} style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH, position: 'absolute' }} resizeMode="cover" />
+            ) : null}
+            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="play" size={32} color="#fff" />
+            </View>
+            <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 8 }}>탭하여 재생</Text>
             <View style={styles.videoBadge}>
               <Ionicons name="play" size={10} color="#fff" />
               <Text style={styles.videoBadgeText}>동영상</Text>
@@ -329,7 +336,7 @@ function PostCard({ post, isFirestore, onHide, isVisible = true }: { post: Dummy
               </View>
             )}
             <Animated.View pointerEvents="none" style={[styles.heartOverlay, { opacity: heartOpacity, transform: [{ scale: heartScale }] }]}>
-              <Ionicons name="heart" size={80} color="#fff" style={{ textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 10 }} />
+              <Ionicons name="heart" size={80} color={heartColor} style={{ textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 10 }} />
             </Animated.View>
           </View>
         </TouchableOpacity>
@@ -353,7 +360,7 @@ function PostCard({ post, isFirestore, onHide, isVisible = true }: { post: Dummy
               </View>
             )}
             <Animated.View pointerEvents="none" style={[styles.heartOverlay, { opacity: heartOpacity, transform: [{ scale: heartScale }] }]}>
-              <Ionicons name="heart" size={80} color="#fff" style={{ textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 10 }} />
+              <Ionicons name="heart" size={80} color={heartColor} style={{ textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 10 }} />
             </Animated.View>
           </View>
         </TouchableOpacity>
@@ -420,11 +427,23 @@ function PostCard({ post, isFirestore, onHide, isVisible = true }: { post: Dummy
         </Text>
       </TouchableOpacity>
 
-      {isFirestore && (
+      {isFirestore && fsPost && (
         <Text style={[styles.postTimeAgo, { color: colors.textSecondary }]}>
-          {timeAgo(fsPost!.createdAt)}
+          {timeAgo(fsPost.createdAt ?? 0)}
         </Text>
       )}
+
+      {/* 동영상 전체화면 모달 */}
+      <Modal visible={!!playingVideo} animationType="fade" onRequestClose={() => setPlayingVideo(null)}>
+        <View style={{ flex: 1, backgroundColor: '#000' }}>
+          <TouchableOpacity onPress={() => setPlayingVideo(null)} style={{ position: 'absolute', top: 50, right: 20, zIndex: 10, padding: 10 }}>
+            <Ionicons name="close" size={28} color="#fff" />
+          </TouchableOpacity>
+          {playingVideo && (
+            <Video source={{ uri: playingVideo }} style={{ flex: 1 }} useNativeControls resizeMode={ResizeMode.CONTAIN} shouldPlay />
+          )}
+        </View>
+      </Modal>
 
       {/* Android 바텀시트 메뉴 */}
       <Modal visible={showMenu} transparent animationType="fade" onRequestClose={() => setShowMenu(false)}>
@@ -518,7 +537,9 @@ function ClassmateRecommendCard() {
 
 // ─── 모임 이벤트 카드 ──────────────────────────────────────────────
 function MeetupEventCard({ meetup }: { meetup: Meetup }) {
-  const [, m, d] = meetup.date.split('-');
+  const dateParts = (meetup.date || '').split('-');
+  const m = dateParts[1] || '1';
+  const d = dateParts[2] || '1';
   const { colors } = useTheme();
 
   return (
@@ -527,25 +548,25 @@ function MeetupEventCard({ meetup }: { meetup: Meetup }) {
       onPress={() => router.push(`/meetup/${meetup.id}`)}
       activeOpacity={0.85}
     >
-      <Image source={{ uri: meetup.imageUrl }} style={[styles.eventImage, { backgroundColor: colors.card }]} />
+      <Image source={{ uri: meetup.imageUrl || undefined }} style={[styles.eventImage, { backgroundColor: colors.card }]} />
       <View style={styles.eventBadge}>
         <Ionicons name="calendar" size={12} color="#fff" />
         <Text style={styles.eventBadgeText}>모임</Text>
       </View>
       <View style={styles.eventBody}>
-        <Text style={[styles.eventSchool, { color: colors.primary }]}>{meetup.schoolName}</Text>
+        <Text style={[styles.eventSchool, { color: colors.primary }]}>{meetup.schoolName || ''}</Text>
         <Text style={[styles.eventTitle, { color: colors.text }]} numberOfLines={1}>{meetup.title}</Text>
         <View style={styles.eventRow}>
           <Ionicons name="time-outline" size={14} color={colors.textSecondary} />
-          <Text style={[styles.eventMeta, { color: colors.textSecondary }]}>{Number(m)}월 {Number(d)}일 {meetup.time}</Text>
+          <Text style={[styles.eventMeta, { color: colors.textSecondary }]}>{Number(m)}월 {Number(d)}일 {meetup.time || ''}</Text>
         </View>
         <View style={styles.eventRow}>
           <Ionicons name="location-outline" size={14} color={colors.textSecondary} />
-          <Text style={[styles.eventMeta, { color: colors.textSecondary }]}>{meetup.location}</Text>
+          <Text style={[styles.eventMeta, { color: colors.textSecondary }]}>{meetup.location || ''}</Text>
         </View>
         <View style={[styles.eventFooter, { borderTopColor: colors.border }]}>
           <View style={styles.eventAttendees}>
-            {meetup.attendees.slice(0, 3).map((a, i) => (
+            {(meetup.attendees || []).slice(0, 3).map((a, i) => (
               <Image
                 key={a.uid}
                 source={getAvatarSource(a.photoURL)}
@@ -553,7 +574,7 @@ function MeetupEventCard({ meetup }: { meetup: Meetup }) {
               />
             ))}
             <Text style={[styles.eventCount, { color: colors.textSecondary }]}>
-              {(meetup.participants ?? meetup.attendees).length}/{meetup.maxAttendees}명
+              {(meetup.participants ?? meetup.attendees ?? []).length}/{meetup.maxAttendees ?? 0}명
             </Text>
           </View>
           <View style={styles.eventJoinBtn}>
@@ -607,8 +628,12 @@ export default function HomeScreen() {
 
   useEffect(() => {
     AsyncStorage.getItem('@hidden_posts').then((val) => {
-      if (val) setHiddenPostIds(new Set(JSON.parse(val)));
-    });
+      try {
+        if (val) setHiddenPostIds(new Set(JSON.parse(val)));
+      } catch (e) {
+        console.warn('[HomeScreen] hidden_posts 파싱 오류:', e);
+      }
+    }).catch(() => {});
   }, []);
 
   const hidePost = useCallback((postId: string) => {
@@ -831,6 +856,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: Colors.border,
+  },
+  myStoryAvatarImg: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    borderWidth: 1,
   },
   addBadge: {
     position: 'absolute',

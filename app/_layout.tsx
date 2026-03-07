@@ -92,12 +92,13 @@ function RootLayoutNav() {
     user: user ? user.uid : null,
     isLoading,
     onboardingCompleted,
-    segments: segments.join('/'),
+    segments: (segments || []).join('/'),
   });
 
   // 스플래시(index) 또는 인트로 슬라이드에서는 리다이렉트 스킵
-  const inSplash = (segments as string[]).length === 0 || segments[0] === 'index';
-  const inIntro = segments[0] === 'onboarding'; // 그룹이 아닌 일반 onboarding
+  const segs = (segments || []) as string[];
+  const inSplash = segs.length === 0 || segs[0] === 'index';
+  const inIntro = segs[0] === 'onboarding'; // 그룹이 아닌 일반 onboarding
 
   if (isLoading) {
     // 스플래시 화면에 있을 때는 로딩 스피너 대신 Stack 렌더링
@@ -114,8 +115,8 @@ function RootLayoutNav() {
   }
 
   if (!inSplash && !inIntro && !isLoading) {
-    const inAuthGroup = segments[0] === '(auth)';
-    const inOnboardingGroup = segments[0] === '(onboarding)';
+    const inAuthGroup = segs[0] === '(auth)';
+    const inOnboardingGroup = segs[0] === '(onboarding)';
 
     // 1. 미인증 → 로그인
     if (!user && !inAuthGroup) {
@@ -148,8 +149,8 @@ function RootLayoutNav() {
 
   console.log('[RootLayout] → Stack 렌더링 (리다이렉트 없음)');
 
-  const inAuthGroup = segments[0] === '(auth)';
-  const inOnboardingGroup = segments[0] === '(onboarding)';
+  const inAuthGroup = segs[0] === '(auth)';
+  const inOnboardingGroup = segs[0] === '(onboarding)';
   const statusStyle = inAuthGroup || inOnboardingGroup || inSplash
     ? 'light'
     : (isDark ? 'light' : 'dark');

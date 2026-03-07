@@ -171,7 +171,7 @@ export default function SearchScreen() {
             displayName: p.displayName,
             avatarImg: p.avatarImg ?? 1,
             photoURL: p.photoURL,
-            schools: p.schools,
+            schools: p.schools || [],
             region: `${p.region?.sido ?? ''} ${p.region?.sigungu ?? ''}`.trim(),
             verified: true,
             workplace: p.workplace,
@@ -343,14 +343,14 @@ export default function SearchScreen() {
     ({ item }: { item: SearchResult }) => {
       const isMe = item.uid === user?.uid;
       const myNames = mySchools.map((s) => s.schoolName.toLowerCase().trim());
-      const targetNames = item.schools.map((s) => s.schoolName.toLowerCase().trim());
+      const targetNames = (item.schools || []).map((s) => s.schoolName.toLowerCase().trim());
       const isSameSchool = myNames.some((n) => targetNames.includes(n));
       const privShowSchools = item.privacySettings?.showSchools ?? true;
       const canSeeSchools = isMe || (privShowSchools && isSameSchool);
       const visibleSchools = canSeeSchools
         ? (isMe
-            ? item.schools
-            : item.schools.filter((s) => {
+            ? (item.schools || [])
+            : (item.schools || []).filter((s) => {
                 if (s.isPublic === false) return false;
                 return myNames.includes(s.schoolName.toLowerCase().trim());
               }))

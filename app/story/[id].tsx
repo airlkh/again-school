@@ -19,6 +19,7 @@ import { DUMMY_STORIES, DummyStory } from '../../src/data/dummyClassmates';
 import { subscribeUserStories, FirestoreStory, markStoryViewed } from '../../src/services/storyService';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { getAvatarSource } from '../../src/utils/avatar';
+import { Video, ResizeMode } from 'expo-av';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PROGRESS_DURATION = 5000;
@@ -180,11 +181,22 @@ export default function StoryViewerScreen() {
         activeOpacity={1}
         onPress={(e) => handleTap(e.nativeEvent.locationX)}
       >
-        <Image
-          source={{ uri: currentImage }}
-          style={styles.storyImage}
-          resizeMode="cover"
-        />
+        {isFirestore && fsStories[currentIndex]?.mediaType === 'video' ? (
+          <Video
+            source={{ uri: currentImage! }}
+            style={styles.storyImage}
+            resizeMode={ResizeMode.COVER}
+            shouldPlay
+            isLooping
+            isMuted={false}
+          />
+        ) : (
+          <Image
+            source={{ uri: currentImage }}
+            style={styles.storyImage}
+            resizeMode="cover"
+          />
+        )}
 
         <View style={styles.topGradient} />
 

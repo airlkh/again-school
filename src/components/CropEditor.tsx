@@ -264,7 +264,7 @@ export const CropEditor: React.FC<CropEditorProps> = ({
             height: Math.round(Math.max(1, cropH)),
           },
         }],
-        { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG },
+        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG },
       );
       onCropDone(result.uri);
     } catch (err) {
