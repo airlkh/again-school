@@ -16,7 +16,6 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as FileSystem from 'expo-file-system/legacy';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Video, ResizeMode } from 'expo-av';
@@ -37,7 +36,6 @@ import { CropEditor } from '../../src/components/CropEditor';
 import { ChatMessage } from '../../src/types/auth';
 import { getDummyMessages } from '../../src/data/dummyClassmates';
 import { getAvatarSource } from '../../src/utils/avatar';
-import { compressVideoIfNeeded } from '../../src/utils/compressVideo';
 import { NameWithBadge } from '../../src/utils/badge';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../src/config/firebase';
@@ -295,7 +293,6 @@ export default function ChatRoomScreen() {
     });
 
     if (isVideo) {
-      // 크기 체크는 compressVideoIfNeeded에서 자동 처리 (50MB 초과 시 압축)
       await uploadAndSendMedia(asset.uri, 'video');
     } else {
       setCropTargetUri(asset.uri);
@@ -322,18 +319,7 @@ export default function ChatRoomScreen() {
     setUploadStatus('');
 
     try {
-      let finalUri = uri;
-
-      // 동영상 URI 변환 (content:// → file://)
-      if (type === 'video') {
-        setUploadStatus('동영상 준비 중...');
-        try {
-          finalUri = await compressVideoIfNeeded(uri);
-        } catch (e) {
-          console.warn('동영상 URI 변환 실패, 원본 사용:', e);
-        }
-        setUploadProgress(0);
-      }
+      const finalUri = uri;
 
       setUploadStatus('업로드 중...');
       console.log('채팅 미디어 업로드 시작:', { uri: finalUri.substring(0, 60), type });

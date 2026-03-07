@@ -63,26 +63,38 @@ export function useTrust(targetUid: string) {
     ]);
 
     const getSchoolNames = (userData: any): string[] => {
+      const names: string[] = [];
+
+      // 1. schoolNames 배열 직접 사용
       if (userData?.schoolNames?.length > 0) {
-        return userData.schoolNames.map((s: string) => s.trim());
+        userData.schoolNames.forEach((n: string) => {
+          if (n) names.push(n.trim());
+        });
       }
-      return (userData?.schools || [])
-        .map((s: any) => (s.schoolName || s.name || '') as string)
-        .filter(Boolean)
-        .map((s: string) => s.trim());
+
+      // 2. schools 배열에서 추출
+      if (userData?.schools?.length > 0) {
+        userData.schools.forEach((s: any) => {
+          const name = (s.schoolName || s.name || s.school || '') as string;
+          if (name) names.push(name.trim());
+        });
+      }
+
+      // 중복 제거
+      return [...new Set(names)];
     };
 
     const mySchoolNames = getSchoolNames(mySnap.data());
     const targetSchoolNames = getSchoolNames(targetSnap.data());
 
-    console.log('내 schoolNames:', mySchoolNames);
-    console.log('상대 schoolNames:', targetSchoolNames);
+    console.log('내 학교:', mySchoolNames);
+    console.log('상대 학교:', targetSchoolNames);
 
     const isSameSchool = mySchoolNames.some((a) =>
-      targetSchoolNames.some((b) => a.trim() === b.trim()),
+      targetSchoolNames.some((b) => a.trim().toLowerCase() === b.trim().toLowerCase()),
     );
     if (!isSameSchool) {
-      Alert.alert('인증 불가', '같은 학교 동창만 인증할 수 있습니다.');
+      Alert.alert('인증 불가', '같은 학교 동창끼리만 인증할 수 있습니다.');
       return;
     }
 
@@ -105,7 +117,7 @@ export function useTrust(targetUid: string) {
         // 공통 학교 이름 찾기
         const mySchoolEntries = mySnap.data()?.schools || [];
         const commonSchool = mySchoolEntries.find((s: { schoolName: string }) =>
-          targetSchoolNames.some((t) => t.trim() === s.schoolName.trim()),
+          targetSchoolNames.some((t) => t.trim().toLowerCase() === s.schoolName.trim().toLowerCase()),
         );
 
         await setDoc(voteRef, {

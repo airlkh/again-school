@@ -30,7 +30,6 @@ import { useCurrentUser } from '../../src/hooks/useCurrentUser';
 import { createStory } from '../../src/services/storyService';
 import { createPost } from '../../src/services/postService';
 import { CLOUDINARY_CONFIG } from '../../src/config/cloudinary';
-import { compressVideoIfNeeded } from '../../src/utils/compressVideo';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 
@@ -294,17 +293,6 @@ export default function UploadScreen() {
         // 첫 번째 이미지: 합성 URI 사용 (텍스트 오버레이 포함)
         let uriToUpload =
           i === 0 && !isVideo && compositeUri ? compositeUri : media.uri;
-
-        // 동영상 URI 변환
-        if (isVideo) {
-          setUploadStatus('동영상 준비 중...');
-          try {
-            uriToUpload = await compressVideoIfNeeded(uriToUpload);
-          } catch (e) {
-            console.warn('동영상 URI 변환 실패, 원본 사용:', e);
-          }
-          setProgress(0);
-        }
 
         setUploadStatus('업로드 중...');
         const url = await uploadMedia(

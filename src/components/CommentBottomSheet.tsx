@@ -177,7 +177,6 @@ export function CommentBottomSheet({ visible, postId, onClose }: Props) {
           {
             backgroundColor: colors.surface,
             maxHeight: SCREEN_HEIGHT * 0.75,
-            marginBottom: keyboardHeight,
           },
         ]}
       >
@@ -255,7 +254,7 @@ export function CommentBottomSheet({ visible, postId, onClose }: Props) {
             {
               borderTopColor: colors.border,
               backgroundColor: colors.surface,
-              paddingBottom: inputBarPadBottom,
+              paddingBottom: keyboardHeight > 0 ? keyboardHeight : inputBarPadBottom,
             },
           ]}
         >
