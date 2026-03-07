@@ -216,47 +216,50 @@ export default function UploadScreen() {
   ): Promise<string> => {
     const isVideo = isVideoMedia(uri, type);
 
-    const endpoint = isVideo
-      ? CLOUDINARY_CONFIG.videoUploadUrl
-      : CLOUDINARY_CONFIG.imageUploadUrl;
-
-    const formData = new FormData();
-    formData.append('file', {
-      uri,
-      type: isVideo ? 'video/mp4' : 'image/jpeg',
-      name: `${type}_${Date.now()}.${isVideo ? 'mp4' : 'jpg'}`,
-    } as any);
-    formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
-    formData.append('resource_type', type);
-    if (isVideo) {
-      formData.append('eager_async', 'true');
-    }
-
     return new Promise((resolve, reject) => {
+      const formData = new FormData();
+
+      formData.append('file', {
+        uri: uri,
+        type: isVideo ? 'video/mp4' : 'image/jpeg',
+        name: isVideo
+          ? `video_${Date.now()}.mp4`
+          : `image_${Date.now()}.jpg`,
+      } as any);
+
+      formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+
+      if (isVideo) {
+        formData.append('resource_type', 'video');
+      }
+
       const xhr = new XMLHttpRequest();
+      xhr.timeout = 600000;
+
       xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable && onProgress) {
-          onProgress(Math.min(Math.round((e.loaded / e.total) * 100), 99));
+        if (e.lengthComputable) {
+          onProgress?.(Math.round((e.loaded / e.total) * 100));
         }
       };
-      xhr.onreadystatechange = () => {
-        if (xhr.readyState !== 4) return;
+
+      xhr.onload = () => {
         if (xhr.status === 200) {
-          try {
-            const res = JSON.parse(xhr.responseText);
-            onProgress?.(100);
-            resolve(res.secure_url);
-          } catch {
-            reject(new Error('응답 파싱 실패'));
-          }
-        } else if (xhr.status > 0) {
+          const res = JSON.parse(xhr.responseText);
+          resolve(res.secure_url);
+        } else {
+          console.error('Cloudinary 오류:', xhr.status, xhr.responseText);
           reject(new Error(`업로드 실패: ${xhr.status}`));
         }
       };
+
       xhr.onerror = () => reject(new Error('네트워크 오류'));
       xhr.ontimeout = () => reject(new Error('시간 초과'));
-      xhr.open('POST', endpoint);
-      xhr.timeout = 600000;
+
+      const url = isVideo
+        ? CLOUDINARY_CONFIG.videoUploadUrl
+        : CLOUDINARY_CONFIG.imageUploadUrl;
+
+      xhr.open('POST', url);
       xhr.send(formData);
     });
   };

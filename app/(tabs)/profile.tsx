@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -42,6 +42,85 @@ import { db } from '../../src/config/firebase';
 import { getTrustBadge, TRUST_BADGE_INFO } from '../../src/hooks/useTrust';
 
 const SCHOOL_TYPES: SchoolEntry['schoolType'][] = ['초등학교', '중학교', '고등학교', '대학교'];
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const GRID_SIZE = Math.floor(SCREEN_WIDTH / 3);
+
+// ─── 게시물 그리드 (React.memo로 분리 — 부모 리렌더링 차단) ───
+const PostGrid = React.memo(function PostGrid({
+  posts,
+  loadingPosts,
+  isDark,
+  colors,
+  onEndReached,
+  headerComponent,
+  footerComponent,
+}: {
+  posts: FirestorePost[];
+  loadingPosts: boolean;
+  isDark: boolean;
+  colors: any;
+  onEndReached: () => void;
+  headerComponent: React.ReactElement;
+  footerComponent: React.ReactElement;
+}) {
+  const renderPostItem = useCallback(({ item: post }: { item: FirestorePost }) => (
+    <TouchableOpacity style={styles.postGridItem} onPress={() => router.push(`/post/${post.id}`)}>
+      <Image source={{ uri: post.imageUrl }} style={styles.postGridImage} resizeMode="cover" fadeDuration={0} />
+      {post.mediaItems && post.mediaItems.length > 1 && (
+        <View style={styles.multiImageIcon}>
+          <Ionicons name="copy-outline" size={14} color="#fff" />
+        </View>
+      )}
+    </TouchableOpacity>
+  ), []);
+
+  return (
+    <FlatList
+      data={posts}
+      numColumns={3}
+      keyExtractor={keyExtractor}
+      getItemLayout={getItemLayout}
+      renderItem={renderPostItem}
+      ListHeaderComponent={headerComponent}
+      ListEmptyComponent={
+        loadingPosts ? (
+          <View style={styles.skeletonGrid}>
+            {Array.from({ length: 9 }).map((_, i) => (
+              <View key={i} style={[styles.skeletonItem, { backgroundColor: isDark ? '#2a2a2a' : '#e8e8e8' }]} />
+            ))}
+          </View>
+        ) : (
+          <View style={styles.emptyGrid}>
+            <Ionicons name="camera-outline" size={44} color={colors.inactive} />
+            <Text style={[styles.emptyGridText, { color: colors.inactive }]}>아직 게시물이 없습니다</Text>
+          </View>
+        )
+      }
+      ListFooterComponent={footerComponent}
+      onEndReached={onEndReached}
+      onEndReachedThreshold={0.5}
+      removeClippedSubviews={true}
+      maxToRenderPerBatch={6}
+      windowSize={5}
+      initialNumToRender={12}
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={styles.scrollContent}
+    />
+  );
+});
+
+function keyExtractor(item: FirestorePost) {
+  return item.id;
+}
+
+function getItemLayout(_: any, index: number) {
+  return {
+    length: GRID_SIZE,
+    offset: GRID_SIZE * Math.floor(index / 3),
+    index,
+  };
+}
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
@@ -92,10 +171,9 @@ export default function ProfileScreen() {
 
   // 게시물 페이징 로드
   const loadPosts = useCallback(async (reset = false) => {
-    if (!user || loadingRef.current) return;
+    if (!user?.uid || loadingRef.current) return;
     if (!reset && !hasMoreRef.current) return;
     loadingRef.current = true;
-    // 최초 로드 시에만 로딩 표시 (깜박임 방지)
     if (!lastPostDoc.current) setLoadingPosts(true);
     try {
       const postsCol = collection(db, 'posts');
@@ -119,10 +197,11 @@ export default function ProfileScreen() {
       loadingRef.current = false;
       setLoadingPosts(false);
     }
-  }, [user]);
+  }, [user?.uid]);
 
+  // 프로필 구독
   useEffect(() => {
-    if (!user) return;
+    if (!user?.uid) return;
     return subscribeUserProfile(user.uid, (p) => {
       setProfile(p);
       if (p) {
@@ -130,36 +209,39 @@ export default function ProfileScreen() {
         setPrivacySettings(p.privacySettings ?? { showWorkplace: true, showSchools: true });
       }
     });
-  }, [user]);
+  }, [user?.uid]);
 
+  // 동창 연결 구독
   useEffect(() => {
-    if (!user) return;
+    if (!user?.uid) return;
     return subscribeMyConnections(user.uid, setConnections);
-  }, [user]);
+  }, [user?.uid]);
 
+  // 게시물 최초 로드
   useEffect(() => {
-    if (!user) return;
+    if (!user?.uid) return;
     lastPostDoc.current = null;
     hasMoreRef.current = true;
     loadPosts(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadPosts]);
+  }, [user?.uid]);
 
-  // trustCount + 학교별 인증 수 구독
+  // trustCount + trustVotes 1회 조회
   useEffect(() => {
-    if (!user) return;
-    const unsub = onSnapshot(doc(db, 'users', user.uid), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        setTrustCount(data.trustCount || 0);
-      }
-    });
-    return unsub;
-  }, [user]);
-
-  useEffect(() => {
-    if (!user) return;
+    if (!user?.uid) return;
     (async () => {
+      try {
+        const userSnap = await getDocs(
+          query(collection(db, 'users'), where('__name__', '==', user.uid)),
+        );
+        if (!userSnap.empty) {
+          const data = userSnap.docs[0].data();
+          setTrustCount(data.trustCount || 0);
+        }
+      } catch (e) {
+        console.warn('trustCount 로드 실패:', e);
+      }
+
       try {
         const snap = await getDocs(collection(db, 'users', user.uid, 'trustVotes'));
         const counts: Record<string, number> = {};
@@ -172,20 +254,21 @@ export default function ProfileScreen() {
         console.warn('trustVotes 로드 실패:', e);
       }
     })();
-  }, [user, trustCount]);
+  }, [user?.uid]);
 
-  const connectedCount = connections.filter((c) => c.status === 'accepted').length;
-  const sentCount = connections.filter((c) => c.status === 'pending' && c.fromUid === user?.uid).length;
-  const receivedCount = connections.filter((c) => c.status === 'pending' && c.toUid === user?.uid).length;
+  // 파생값 useMemo
+  const connectedCount = useMemo(() => connections.filter((c) => c.status === 'accepted').length, [connections]);
+  const sentCount = useMemo(() => connections.filter((c) => c.status === 'pending' && c.fromUid === user?.uid).length, [connections, user?.uid]);
+  const receivedCount = useMemo(() => connections.filter((c) => c.status === 'pending' && c.toUid === user?.uid).length, [connections, user?.uid]);
 
   const displayName = profile?.displayName || user?.displayName || '사용자';
   const job = profile?.job || '';
   const region = profile?.region ? `${profile.region.sido} ${profile.region.sigungu}`.trim() : '';
   const schools = profile?.schools || [];
-  const schoolNames = schools.map((s) => s.schoolName);
+  const schoolNames = useMemo(() => schools.map((s) => s.schoolName), [schools]);
   const schoolMemberCounts = useSchoolMemberCounts(schoolNames);
 
-  // 프로필 이미지 변경 — 갤러리 선택 후 CropEditor로 전달
+  // 프로필 이미지 변경
   async function handleChangePhoto() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
@@ -216,13 +299,9 @@ export default function ProfileScreen() {
       const uploaded = await uploadImage(croppedUri);
       const newPhotoURL = uploaded.url;
 
-      // 1. Firebase Auth 업데이트
       await updateProfile(user, { photoURL: newPhotoURL });
-
-      // 2. Firestore users/{uid} 업데이트
       await updateUserProfile(user.uid, { photoURL: newPhotoURL });
 
-      // 3. 내가 쓴 게시물 authorPhotoURL 일괄 업데이트
       const postsSnap = await getDocs(
         query(collection(db, 'posts'), where('authorUid', '==', user.uid)),
       );
@@ -232,7 +311,6 @@ export default function ProfileScreen() {
         await postsBatch.commit();
       }
 
-      // 4. 내가 쓴 스토리 photoURL 일괄 업데이트
       const storiesSnap = await getDocs(
         query(collection(db, 'stories'), where('uid', '==', user.uid)),
       );
@@ -242,7 +320,6 @@ export default function ProfileScreen() {
         await storiesBatch.commit();
       }
 
-      // 5. 내가 만든 모임 hostPhotoURL 일괄 업데이트
       const meetupsSnap = await getDocs(
         query(collection(db, 'meetups'), where('hostUid', '==', user.uid)),
       );
@@ -252,7 +329,6 @@ export default function ProfileScreen() {
         await meetupsBatch.commit();
       }
 
-      // 6. 내 채팅방 participantPhotos 업데이트
       const chatsSnap = await getDocs(
         query(collection(db, 'chatRooms'), where('participants', 'array-contains', user.uid)),
       );
@@ -425,24 +501,267 @@ export default function ProfileScreen() {
   }
 
   // 동창 현황 목록 필터
-  const filteredConnections = connections.filter((c) => {
+  const filteredConnections = useMemo(() => connections.filter((c) => {
     if (connectionsTab === 'connected') return c.status === 'accepted';
     if (connectionsTab === 'sent') return c.status === 'pending' && c.fromUid === user?.uid;
     return c.status === 'pending' && c.toUid === user?.uid;
-  });
+  }), [connections, connectionsTab, user?.uid]);
 
   const photoUrl = profile?.photoURL ?? null;
 
-  const renderPostItem = useCallback(({ item: post }: { item: FirestorePost }) => (
-    <TouchableOpacity style={styles.postGridItem} onPress={() => router.push(`/post/${post.id}`)}>
-      <Image source={{ uri: post.imageUrl }} style={styles.postGridImage} resizeMode="cover" fadeDuration={0} />
-      {post.mediaItems && post.mediaItems.length > 1 && (
-        <View style={styles.multiImageIcon}>
-          <Ionicons name="copy-outline" size={14} color="#fff" />
+  const handleLoadMore = useCallback(() => loadPosts(false), [loadPosts]);
+
+  // ─── ListHeaderComponent (useMemo로 안정화) ───
+  const listHeader = useMemo(() => (
+    <>
+      {/* 프로필 상단 - Instagram 스타일 */}
+      <View style={styles.profileTopRow}>
+        <TouchableOpacity onPress={handleChangePhoto} disabled={uploadingPhoto}>
+          <Image source={getAvatarSource(photoUrl)} style={[styles.avatar, { backgroundColor: colors.card }]} />
+          <View style={[styles.cameraIcon, { backgroundColor: colors.primary }]}>
+            {uploadingPhoto ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Ionicons name="camera" size={16} color="#fff" />
+            )}
+          </View>
+        </TouchableOpacity>
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <Text style={[styles.statNumber, { color: colors.text }]}>{userPosts.length}</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>게시물</Text>
+          </View>
+          <TouchableOpacity style={styles.statItem} onPress={() => { setConnectionsTab('connected'); setShowConnectionsModal(true); }}>
+            <Text style={[styles.statNumber, { color: colors.text }]}>{connectedCount}</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>동창</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.statItem} onPress={() => { setConnectionsTab('received'); setShowConnectionsModal(true); }}>
+            <Text style={[styles.statNumber, { color: colors.text }]}>{sentCount + receivedCount}</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>연결</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* 프로필 정보 */}
+      <View style={styles.profileInfo}>
+        <NameWithBadge
+          name={displayName}
+          uid={user?.uid}
+          nameStyle={[styles.displayName, { color: colors.text }]}
+          size="medium"
+        />
+        {job ? <Text style={[styles.job, { color: colors.textSecondary }]}>{job}</Text> : null}
+        {region ? (
+          <View style={styles.regionRow}>
+            <Ionicons name="location-outline" size={14} color={colors.inactive} />
+            <Text style={[styles.regionText, { color: colors.inactive }]}>{region}</Text>
+          </View>
+        ) : null}
+      </View>
+
+      {/* 프로필 편집 버튼 */}
+      <TouchableOpacity
+        style={[styles.editBtn, { backgroundColor: isDark ? colors.surface2 : '#fef2f2', borderColor: colors.border }]}
+        onPress={() => router.push('/profile/edit')}
+      >
+        <Text style={[styles.editBtnText, { color: colors.text }]}>프로필 편집</Text>
+      </TouchableOpacity>
+
+      {/* 동창 인증 현황 */}
+      {schools.length > 0 && (
+        <View style={[styles.trustSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={styles.trustSectionHeader}>
+            <Text style={[styles.trustSectionTitle, { color: colors.text }]}>동창 인증 현황</Text>
+            {trustCount > 0 && (
+              <View style={[styles.trustBadgePill, { backgroundColor: TRUST_BADGE_INFO[getTrustBadge(trustCount)].color + '22' }]}>
+                <Text style={{ fontSize: 12 }}>{TRUST_BADGE_INFO[getTrustBadge(trustCount)].icon}</Text>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: TRUST_BADGE_INFO[getTrustBadge(trustCount)].color }}>
+                  {TRUST_BADGE_INFO[getTrustBadge(trustCount)].label}
+                </Text>
+              </View>
+            )}
+          </View>
+          {schools.map((s, i) => (
+            <TouchableOpacity
+              key={i}
+              style={[styles.trustSchoolCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={() => router.push({
+                pathname: '/profile/verifications' as any,
+                params: { uid: user?.uid, schoolName: s.schoolName, graduationYear: String(s.graduationYear) },
+              })}
+              activeOpacity={0.7}
+            >
+              <View style={styles.trustSchoolInfo}>
+                <Text style={{ fontSize: 16 }}>
+                  {s.schoolType === '초등학교' ? '🏫' : s.schoolType === '중학교' ? '🏛️' : s.schoolType === '고등학교' ? '🎓' : '🏛️'}
+                </Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.trustSchoolName, { color: colors.text }]}>{s.schoolName}</Text>
+                  <Text style={[styles.trustSchoolYear, { color: colors.textSecondary }]}>{s.graduationYear}년 졸업</Text>
+                </View>
+              </View>
+              <View style={styles.trustSchoolRight}>
+                <Text style={[styles.trustSchoolCount, { color: colors.inactive }]}>
+                  👥 인증 {schoolTrustCounts[s.schoolName] || 0}명
+                </Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.inactive} />
+              </View>
+            </TouchableOpacity>
+          ))}
+          <View style={styles.trustTotalRow}>
+            <Text style={[styles.trustTotalText, { color: colors.inactive }]}>
+              총 동창 인증 {trustCount}명
+            </Text>
+          </View>
         </View>
       )}
-    </TouchableOpacity>
-  ), []);
+
+      {/* 학교 칩 */}
+      {schools.length > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
+          {schools.map((s, i) => (
+            <TouchableOpacity key={i} onPress={() => handleEditSchool(i)} style={[styles.schoolChip, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={{ fontSize: 12 }}>{s.schoolType === '초등학교' ? '🏫' : s.schoolType === '중학교' ? '🏛️' : '🎓'}</Text>
+              <Text style={[styles.schoolChipText, { color: colors.text }]} numberOfLines={1}>{s.schoolName}</Text>
+              <Text style={[styles.schoolChipYear, { color: colors.textSecondary }]}>{s.graduationYear}</Text>
+            </TouchableOpacity>
+          ))}
+          <TouchableOpacity onPress={() => { resetSchoolForm(); setShowSchoolModal(true); }} style={[styles.schoolChip, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Ionicons name="add" size={14} color={colors.primary} />
+            <Text style={[styles.schoolChipText, { color: colors.primary }]}>추가</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      )}
+
+      {/* 그리드 탭 바 */}
+      <View style={[styles.gridTabBar, { borderTopColor: colors.border, borderBottomColor: colors.border }]}>
+        <TouchableOpacity style={[styles.gridTab, { borderBottomColor: colors.text, borderBottomWidth: 1 }]}>
+          <Ionicons name="grid-outline" size={22} color={colors.text} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.gridTab} onPress={() => router.push('/bookmarks')}>
+          <Ionicons name="bookmark-outline" size={22} color={colors.inactive} />
+        </TouchableOpacity>
+      </View>
+    </>
+  ), [photoUrl, uploadingPhoto, userPosts.length, connectedCount, sentCount, receivedCount, displayName, job, region, schools, trustCount, schoolTrustCounts, colors, isDark, user?.uid]);
+
+  // ─── ListFooterComponent (useMemo로 안정화) ───
+  const listFooter = useMemo(() => (
+    <>
+      {loadingPosts && (
+        <View style={{ padding: 20, alignItems: 'center' }}>
+          <ActivityIndicator size="small" color={colors.primary} />
+        </View>
+      )}
+
+      {/* 직장 정보 */}
+      <View style={[styles.section, { backgroundColor: colors.surface }]}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>직장 정보</Text>
+        {workplace ? (
+          <View style={[styles.schoolCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={styles.schoolEmoji}>💼</Text>
+            <View style={styles.schoolInfo}>
+              <Text style={[styles.schoolName, { color: colors.text }]}>{workplace}</Text>
+              <Text style={[styles.schoolPublicLabel, { color: privacySettings.showWorkplace ? '#4CAF50' : '#e8313a' }]}>
+                {privacySettings.showWorkplace ? '🔓 동창에게 공개' : '🔒 비공개'}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.schoolActionBtn, { backgroundColor: isDark ? colors.surface2 : '#f0f0f0' }]}
+              onPress={() => setShowWorkplaceModal(true)}
+            >
+              <Text style={[styles.schoolActionText, { color: isDark ? colors.text : '#333' }]}>수정</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <Text style={[styles.emptyText, { color: colors.inactive }]}>등록된 직장이 없습니다</Text>
+        )}
+        <TouchableOpacity
+          style={[styles.addSchoolBtn, { borderTopColor: colors.border }]}
+          onPress={() => setShowWorkplaceModal(true)}
+        >
+          <Ionicons name={workplace ? 'create-outline' : 'add-circle-outline'} size={18} color={colors.primary} />
+          <Text style={[styles.addSchoolText, { color: colors.primary }]}>{workplace ? '직장 수정' : '직장 추가'}</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* 개인정보 공개 설정 */}
+      <View style={[styles.section, { backgroundColor: colors.surface }]}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>개인정보 공개 설정</Text>
+        <Text style={[styles.privacyDesc, { color: colors.inactive }]}>
+          비공개 설정 시 동창이라도 해당 정보가 보이지 않습니다
+        </Text>
+
+        <View style={[styles.privacyRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.privacyLabel, { color: colors.text }]}>🏫 학교 정보</Text>
+            <Text style={[styles.privacySub, { color: colors.inactive }]}>
+              {privacySettings.showSchools ? '같은 학교 동창에게만 공개' : '완전 비공개'}
+            </Text>
+          </View>
+          <Switch
+            value={privacySettings.showSchools}
+            onValueChange={(val) => handleSavePrivacy({ ...privacySettings, showSchools: val })}
+            trackColor={{ false: isDark ? '#555' : '#ddd', true: '#e8313a' }}
+            thumbColor="#fff"
+          />
+        </View>
+
+        <View style={[styles.privacyRow, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 10 }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.privacyLabel, { color: colors.text }]}>💼 직장 정보</Text>
+            <Text style={[styles.privacySub, { color: colors.inactive }]}>
+              {privacySettings.showWorkplace ? '동창에게 공개' : '완전 비공개'}
+            </Text>
+          </View>
+          <Switch
+            value={privacySettings.showWorkplace}
+            onValueChange={(val) => handleSavePrivacy({ ...privacySettings, showWorkplace: val })}
+            trackColor={{ false: isDark ? '#555' : '#ddd', true: '#e8313a' }}
+            thumbColor="#fff"
+          />
+        </View>
+
+        <View style={[styles.privacyHint, { backgroundColor: isDark ? '#2e2010' : '#fff7ed' }]}>
+          <Text style={[styles.privacyHintText, { color: '#f97316' }]}>
+            ℹ️  학력 및 직장 정보는 개인정보입니다.{'\n'}    비공개 설정 시 동창이라도 볼 수 없습니다.
+          </Text>
+        </View>
+      </View>
+
+      {/* 설정 */}
+      <View style={[styles.section, { backgroundColor: colors.surface }]}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>설정</Text>
+        <SettingItem icon="contrast-outline" label="화면 모드"
+          detail={mode === 'light' ? '라이트' : mode === 'dark' ? '다크' : '시스템 자동'}
+          onPress={() => Alert.alert('화면 모드', '화면 모드를 선택하세요', [
+            { text: '라이트 모드', onPress: () => setMode('light') },
+            { text: '다크 모드', onPress: () => setMode('dark') },
+            { text: '시스템 설정 따르기', onPress: () => setMode('system') },
+            { text: '취소', style: 'cancel' },
+          ])} />
+        <SettingItem icon="notifications-outline" label="알림 설정"
+          onPress={() => router.push('/settings/notifications' as any)} />
+        <SettingItem icon="eye-outline" label="공개 범위 설정"
+          detail={privacySettings.showSchools && privacySettings.showWorkplace ? '전체 공개' : '일부 비공개'}
+          onPress={() => Alert.alert('개인정보 공개 설정', '위의 "개인정보 공개 설정" 섹션에서 변경할 수 있습니다.')} />
+        <SettingItem icon="document-text-outline" label="이용약관"
+          onPress={() => Alert.alert('이용약관', 'Again School 이용약관입니다.')} />
+        <SettingItem icon="shield-checkmark-outline" label="개인정보처리방침"
+          onPress={() => Alert.alert('개인정보처리방침', 'Again School 개인정보처리방침입니다.')} />
+        <TouchableOpacity style={[styles.settingItem, { borderBottomColor: colors.card }]} onPress={handleLogout}>
+          <Ionicons name="log-out-outline" size={22} color={colors.primary} />
+          <Text style={[styles.settingLabel, { color: colors.primary }]}>로그아웃</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.settingItem, { borderBottomColor: colors.card }]} onPress={handleDeleteAccount}>
+          <Ionicons name="trash-outline" size={22} color={colors.inactive} />
+          <Text style={[styles.settingLabel, { color: colors.inactive }]}>계정 삭제</Text>
+        </TouchableOpacity>
+      </View>
+
+      <Text style={[styles.version, { color: colors.inactive }]}>Again School v1.0.0</Text>
+    </>
+  ), [loadingPosts, workplace, privacySettings, colors, isDark, mode]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
@@ -458,298 +777,14 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      <FlatList
-        data={userPosts}
-        numColumns={3}
-        keyExtractor={(item) => item.id}
-        getItemLayout={(_, index) => ({
-          length: GRID_SIZE,
-          offset: GRID_SIZE * Math.floor(index / 3),
-          index,
-        })}
-        renderItem={renderPostItem}
-        ListHeaderComponent={
-          <>
-        {/* 프로필 상단 - Instagram 스타일 */}
-        <View style={styles.profileTopRow}>
-          <TouchableOpacity onPress={handleChangePhoto} disabled={uploadingPhoto}>
-            <Image source={getAvatarSource(photoUrl)} style={[styles.avatar, { backgroundColor: colors.card }]} />
-            <View style={[styles.cameraIcon, { backgroundColor: colors.primary }]}>
-              {uploadingPhoto ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Ionicons name="camera" size={16} color="#fff" />
-              )}
-            </View>
-          </TouchableOpacity>
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Text style={[styles.statNumber, { color: colors.text }]}>{userPosts.length}</Text>
-              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>게시물</Text>
-            </View>
-            <TouchableOpacity style={styles.statItem} onPress={() => { setConnectionsTab('connected'); setShowConnectionsModal(true); }}>
-              <Text style={[styles.statNumber, { color: colors.text }]}>{connectedCount}</Text>
-              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>동창</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.statItem} onPress={() => { setConnectionsTab('received'); setShowConnectionsModal(true); }}>
-              <Text style={[styles.statNumber, { color: colors.text }]}>{sentCount + receivedCount}</Text>
-              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>연결</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* 프로필 정보 */}
-        <View style={styles.profileInfo}>
-          <NameWithBadge
-            name={displayName}
-            uid={user?.uid}
-            nameStyle={[styles.displayName, { color: colors.text }]}
-            size="medium"
-          />
-          {job ? <Text style={[styles.job, { color: colors.textSecondary }]}>{job}</Text> : null}
-          {region ? (
-            <View style={styles.regionRow}>
-              <Ionicons name="location-outline" size={14} color={colors.inactive} />
-              <Text style={[styles.regionText, { color: colors.inactive }]}>{region}</Text>
-            </View>
-          ) : null}
-        </View>
-
-        {/* 프로필 편집 버튼 */}
-        <TouchableOpacity
-          style={[styles.editBtn, { backgroundColor: isDark ? colors.surface2 : '#fef2f2', borderColor: colors.border }]}
-          onPress={() => router.push('/profile/edit')}
-        >
-          <Text style={[styles.editBtnText, { color: colors.text }]}>프로필 편집</Text>
-        </TouchableOpacity>
-
-        {/* 동창 인증 현황 */}
-        {schools.length > 0 && (
-          <View style={[styles.trustSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={styles.trustSectionHeader}>
-              <Text style={[styles.trustSectionTitle, { color: colors.text }]}>동창 인증 현황</Text>
-              {trustCount > 0 && (
-                <View style={[styles.trustBadgePill, { backgroundColor: TRUST_BADGE_INFO[getTrustBadge(trustCount)].color + '22' }]}>
-                  <Text style={{ fontSize: 12 }}>{TRUST_BADGE_INFO[getTrustBadge(trustCount)].icon}</Text>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: TRUST_BADGE_INFO[getTrustBadge(trustCount)].color }}>
-                    {TRUST_BADGE_INFO[getTrustBadge(trustCount)].label}
-                  </Text>
-                </View>
-              )}
-            </View>
-            {schools.map((s, i) => (
-              <TouchableOpacity
-                key={i}
-                style={[styles.trustSchoolCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-                onPress={() => router.push({
-                  pathname: '/profile/verifications' as any,
-                  params: { uid: user?.uid, schoolName: s.schoolName, graduationYear: String(s.graduationYear) },
-                })}
-                activeOpacity={0.7}
-              >
-                <View style={styles.trustSchoolInfo}>
-                  <Text style={{ fontSize: 16 }}>
-                    {s.schoolType === '초등학교' ? '🏫' : s.schoolType === '중학교' ? '🏛️' : s.schoolType === '고등학교' ? '🎓' : '🏛️'}
-                  </Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.trustSchoolName, { color: colors.text }]}>{s.schoolName}</Text>
-                    <Text style={[styles.trustSchoolYear, { color: colors.textSecondary }]}>{s.graduationYear}년 졸업</Text>
-                  </View>
-                </View>
-                <View style={styles.trustSchoolRight}>
-                  <Text style={[styles.trustSchoolCount, { color: colors.inactive }]}>
-                    👥 인증 {schoolTrustCounts[s.schoolName] || 0}명
-                  </Text>
-                  <Ionicons name="chevron-forward" size={16} color={colors.inactive} />
-                </View>
-              </TouchableOpacity>
-            ))}
-            <View style={styles.trustTotalRow}>
-              <Text style={[styles.trustTotalText, { color: colors.inactive }]}>
-                총 동창 인증 {trustCount}명
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {/* 학교 칩 */}
-        {schools.length > 0 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
-            {schools.map((s, i) => (
-              <TouchableOpacity key={i} onPress={() => handleEditSchool(i)} style={[styles.schoolChip, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Text style={{ fontSize: 12 }}>{s.schoolType === '초등학교' ? '🏫' : s.schoolType === '중학교' ? '🏛️' : '🎓'}</Text>
-                <Text style={[styles.schoolChipText, { color: colors.text }]} numberOfLines={1}>{s.schoolName}</Text>
-                <Text style={[styles.schoolChipYear, { color: colors.textSecondary }]}>{s.graduationYear}</Text>
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity onPress={() => { resetSchoolForm(); setShowSchoolModal(true); }} style={[styles.schoolChip, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Ionicons name="add" size={14} color={colors.primary} />
-              <Text style={[styles.schoolChipText, { color: colors.primary }]}>추가</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        )}
-
-        {/* 그리드 탭 바 */}
-        <View style={[styles.gridTabBar, { borderTopColor: colors.border, borderBottomColor: colors.border }]}>
-          <TouchableOpacity style={[styles.gridTab, { borderBottomColor: colors.text, borderBottomWidth: 1 }]}>
-            <Ionicons name="grid-outline" size={22} color={colors.text} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.gridTab} onPress={() => router.push('/bookmarks')}>
-            <Ionicons name="bookmark-outline" size={22} color={colors.inactive} />
-          </TouchableOpacity>
-        </View>
-          </>
-        }
-        ListEmptyComponent={
-          loadingPosts ? (
-            <View style={styles.skeletonGrid}>
-              {Array.from({ length: 9 }).map((_, i) => (
-                <View key={i} style={[styles.skeletonItem, { backgroundColor: isDark ? '#2a2a2a' : '#e8e8e8' }]} />
-              ))}
-            </View>
-          ) : (
-            <View style={styles.emptyGrid}>
-              <Ionicons name="camera-outline" size={44} color={colors.inactive} />
-              <Text style={[styles.emptyGridText, { color: colors.inactive }]}>아직 게시물이 없습니다</Text>
-            </View>
-          )
-        }
-        ListFooterComponent={
-          <>
-            {loadingPosts && (
-              <View style={{ padding: 20, alignItems: 'center' }}>
-                <ActivityIndicator size="small" color={colors.primary} />
-              </View>
-            )}
-
-        {/* 직장 정보 */}
-        <View style={[styles.section, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>직장 정보</Text>
-          {workplace ? (
-            <View style={[styles.schoolCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={styles.schoolEmoji}>💼</Text>
-              <View style={styles.schoolInfo}>
-                <Text style={[styles.schoolName, { color: colors.text }]}>{workplace}</Text>
-                <Text style={[styles.schoolPublicLabel, { color: privacySettings.showWorkplace ? '#4CAF50' : '#e8313a' }]}>
-                  {privacySettings.showWorkplace ? '🔓 동창에게 공개' : '🔒 비공개'}
-                </Text>
-              </View>
-              <TouchableOpacity
-                style={[styles.schoolActionBtn, { backgroundColor: isDark ? colors.surface2 : '#f0f0f0' }]}
-                onPress={() => setShowWorkplaceModal(true)}
-              >
-                <Text style={[styles.schoolActionText, { color: isDark ? colors.text : '#333' }]}>수정</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <Text style={[styles.emptyText, { color: colors.inactive }]}>등록된 직장이 없습니다</Text>
-          )}
-          <TouchableOpacity
-            style={[styles.addSchoolBtn, { borderTopColor: colors.border }]}
-            onPress={() => setShowWorkplaceModal(true)}
-          >
-            <Ionicons name={workplace ? 'create-outline' : 'add-circle-outline'} size={18} color={colors.primary} />
-            <Text style={[styles.addSchoolText, { color: colors.primary }]}>{workplace ? '직장 수정' : '직장 추가'}</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* 개인정보 공개 설정 */}
-        <View style={[styles.section, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>개인정보 공개 설정</Text>
-          <Text style={[styles.privacyDesc, { color: colors.inactive }]}>
-            비공개 설정 시 동창이라도 해당 정보가 보이지 않습니다
-          </Text>
-
-          <View style={[styles.privacyRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.privacyLabel, { color: colors.text }]}>🏫 학교 정보</Text>
-              <Text style={[styles.privacySub, { color: colors.inactive }]}>
-                {privacySettings.showSchools ? '같은 학교 동창에게만 공개' : '완전 비공개'}
-              </Text>
-            </View>
-            <Switch
-              value={privacySettings.showSchools}
-              onValueChange={(val) => handleSavePrivacy({ ...privacySettings, showSchools: val })}
-              trackColor={{ false: isDark ? '#555' : '#ddd', true: '#e8313a' }}
-              thumbColor="#fff"
-            />
-          </View>
-
-          <View style={[styles.privacyRow, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 10 }]}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.privacyLabel, { color: colors.text }]}>💼 직장 정보</Text>
-              <Text style={[styles.privacySub, { color: colors.inactive }]}>
-                {privacySettings.showWorkplace ? '동창에게 공개' : '완전 비공개'}
-              </Text>
-            </View>
-            <Switch
-              value={privacySettings.showWorkplace}
-              onValueChange={(val) => handleSavePrivacy({ ...privacySettings, showWorkplace: val })}
-              trackColor={{ false: isDark ? '#555' : '#ddd', true: '#e8313a' }}
-              thumbColor="#fff"
-            />
-          </View>
-
-          <View style={[styles.privacyHint, { backgroundColor: isDark ? '#2e2010' : '#fff7ed' }]}>
-            <Text style={[styles.privacyHintText, { color: '#f97316' }]}>
-              ℹ️  학력 및 직장 정보는 개인정보입니다.{'\n'}    비공개 설정 시 동창이라도 볼 수 없습니다.
-            </Text>
-          </View>
-        </View>
-
-        {/* 프리미엄 배너 */}
-        <View style={styles.premiumBanner}>
-          <View style={styles.premiumContent}>
-            <Ionicons name="star" size={24} color="#fff" />
-            <View style={styles.premiumText}>
-              <Text style={styles.premiumTitle}>프리미엄으로 업그레이드</Text>
-              <Text style={styles.premiumSub}>더 많은 동창을 찾아보세요</Text>
-            </View>
-          </View>
-          <Ionicons name="chevron-forward" size={22} color="rgba(255,255,255,0.7)" />
-        </View>
-
-        {/* 설정 */}
-        <View style={[styles.section, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>설정</Text>
-          <SettingItem icon="contrast-outline" label="화면 모드"
-            detail={mode === 'light' ? '라이트' : mode === 'dark' ? '다크' : '시스템 자동'}
-            onPress={() => Alert.alert('화면 모드', '화면 모드를 선택하세요', [
-              { text: '라이트 모드', onPress: () => setMode('light') },
-              { text: '다크 모드', onPress: () => setMode('dark') },
-              { text: '시스템 설정 따르기', onPress: () => setMode('system') },
-              { text: '취소', style: 'cancel' },
-            ])} />
-          <SettingItem icon="notifications-outline" label="알림 설정"
-            onPress={() => router.push('/settings/notifications' as any)} />
-          <SettingItem icon="eye-outline" label="공개 범위 설정"
-            detail={privacySettings.showSchools && privacySettings.showWorkplace ? '전체 공개' : '일부 비공개'}
-            onPress={() => Alert.alert('개인정보 공개 설정', '위의 "개인정보 공개 설정" 섹션에서 변경할 수 있습니다.')} />
-          <SettingItem icon="document-text-outline" label="이용약관"
-            onPress={() => Alert.alert('이용약관', 'Again School 이용약관입니다.')} />
-          <SettingItem icon="shield-checkmark-outline" label="개인정보처리방침"
-            onPress={() => Alert.alert('개인정보처리방침', 'Again School 개인정보처리방침입니다.')} />
-          <TouchableOpacity style={[styles.settingItem, { borderBottomColor: colors.card }]} onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={22} color={colors.primary} />
-            <Text style={[styles.settingLabel, { color: colors.primary }]}>로그아웃</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.settingItem, { borderBottomColor: colors.card }]} onPress={handleDeleteAccount}>
-            <Ionicons name="trash-outline" size={22} color={colors.inactive} />
-            <Text style={[styles.settingLabel, { color: colors.inactive }]}>계정 삭제</Text>
-          </TouchableOpacity>
-        </View>
-
-        <Text style={[styles.version, { color: colors.inactive }]}>Again School v1.0.0</Text>
-          </>
-        }
-        onEndReached={() => loadPosts(false)}
-        onEndReachedThreshold={0.5}
-        removeClippedSubviews={true}
-        maxToRenderPerBatch={6}
-        windowSize={5}
-        initialNumToRender={12}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+      <PostGrid
+        posts={userPosts}
+        loadingPosts={loadingPosts}
+        isDark={isDark}
+        colors={colors}
+        onEndReached={handleLoadMore}
+        headerComponent={listHeader}
+        footerComponent={listFooter}
       />
 
       {/* 학교 추가/수정 모달 */}
@@ -1007,9 +1042,6 @@ function SettingItem({ icon, label, detail, onPress }: {
     </TouchableOpacity>
   );
 }
-
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const GRID_SIZE = Math.floor(SCREEN_WIDTH / 3);
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
