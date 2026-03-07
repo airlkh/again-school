@@ -95,7 +95,8 @@ export default function ProfileScreen() {
     if (!user || loadingRef.current) return;
     if (!reset && !hasMoreRef.current) return;
     loadingRef.current = true;
-    setLoadingPosts(true);
+    // 최초 로드 시에만 로딩 표시 (깜박임 방지)
+    if (!lastPostDoc.current) setLoadingPosts(true);
     try {
       const postsCol = collection(db, 'posts');
       const q = (reset || !lastPostDoc.current)
@@ -158,17 +159,20 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     if (!user) return;
-    const col = collection(db, 'users', user.uid, 'trustVotes');
-    const unsub = onSnapshot(col, (snap) => {
-      const counts: Record<string, number> = {};
-      snap.docs.forEach((d) => {
-        const school = (d.data().schoolName as string) || '';
-        if (school) counts[school] = (counts[school] || 0) + 1;
-      });
-      setSchoolTrustCounts(counts);
-    });
-    return unsub;
-  }, [user]);
+    (async () => {
+      try {
+        const snap = await getDocs(collection(db, 'users', user.uid, 'trustVotes'));
+        const counts: Record<string, number> = {};
+        snap.docs.forEach((d) => {
+          const school = (d.data().schoolName as string) || '';
+          if (school) counts[school] = (counts[school] || 0) + 1;
+        });
+        setSchoolTrustCounts(counts);
+      } catch (e) {
+        console.warn('trustVotes 로드 실패:', e);
+      }
+    })();
+  }, [user, trustCount]);
 
   const connectedCount = connections.filter((c) => c.status === 'accepted').length;
   const sentCount = connections.filter((c) => c.status === 'pending' && c.fromUid === user?.uid).length;
@@ -429,6 +433,17 @@ export default function ProfileScreen() {
 
   const photoUrl = profile?.photoURL ?? null;
 
+  const renderPostItem = useCallback(({ item: post }: { item: FirestorePost }) => (
+    <TouchableOpacity style={styles.postGridItem} onPress={() => router.push(`/post/${post.id}`)}>
+      <Image source={{ uri: post.imageUrl }} style={styles.postGridImage} resizeMode="cover" fadeDuration={0} />
+      {post.mediaItems && post.mediaItems.length > 1 && (
+        <View style={styles.multiImageIcon}>
+          <Ionicons name="copy-outline" size={14} color="#fff" />
+        </View>
+      )}
+    </TouchableOpacity>
+  ), []);
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
@@ -452,16 +467,7 @@ export default function ProfileScreen() {
           offset: GRID_SIZE * Math.floor(index / 3),
           index,
         })}
-        renderItem={({ item: post }) => (
-          <TouchableOpacity style={styles.postGridItem} onPress={() => router.push(`/post/${post.id}`)}>
-            <Image source={{ uri: post.imageUrl }} style={styles.postGridImage} resizeMode="cover" fadeDuration={0} />
-            {post.mediaItems && post.mediaItems.length > 1 && (
-              <View style={styles.multiImageIcon}>
-                <Ionicons name="copy-outline" size={14} color="#fff" />
-              </View>
-            )}
-          </TouchableOpacity>
-        )}
+        renderItem={renderPostItem}
         ListHeaderComponent={
           <>
         {/* 프로필 상단 - Instagram 스타일 */}
@@ -692,7 +698,7 @@ export default function ProfileScreen() {
         </View>
 
         {/* 프리미엄 배너 */}
-        <TouchableOpacity style={styles.premiumBanner} activeOpacity={0.85}>
+        <View style={styles.premiumBanner}>
           <View style={styles.premiumContent}>
             <Ionicons name="star" size={24} color="#fff" />
             <View style={styles.premiumText}>
@@ -701,7 +707,7 @@ export default function ProfileScreen() {
             </View>
           </View>
           <Ionicons name="chevron-forward" size={22} color="rgba(255,255,255,0.7)" />
-        </TouchableOpacity>
+        </View>
 
         {/* 설정 */}
         <View style={[styles.section, { backgroundColor: colors.surface }]}>

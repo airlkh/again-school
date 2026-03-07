@@ -295,13 +295,14 @@ export default function UploadScreen() {
         let uriToUpload =
           i === 0 && !isVideo && compositeUri ? compositeUri : media.uri;
 
-        // 동영상 자동 압축
+        // 동영상 URI 변환
         if (isVideo) {
-          setUploadStatus('동영상 압축 중...');
-          uriToUpload = await compressVideoIfNeeded(
-            uriToUpload,
-            (pct) => setProgress(pct),
-          );
+          setUploadStatus('동영상 준비 중...');
+          try {
+            uriToUpload = await compressVideoIfNeeded(uriToUpload);
+          } catch (e) {
+            console.warn('동영상 URI 변환 실패, 원본 사용:', e);
+          }
           setProgress(0);
         }
 

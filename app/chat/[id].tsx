@@ -324,13 +324,14 @@ export default function ChatRoomScreen() {
     try {
       let finalUri = uri;
 
-      // 동영상 자동 압축
+      // 동영상 URI 변환 (content:// → file://)
       if (type === 'video') {
-        setUploadStatus('동영상 압축 중...');
-        finalUri = await compressVideoIfNeeded(
-          uri,
-          (pct) => setUploadProgress(pct),
-        );
+        setUploadStatus('동영상 준비 중...');
+        try {
+          finalUri = await compressVideoIfNeeded(uri);
+        } catch (e) {
+          console.warn('동영상 URI 변환 실패, 원본 사용:', e);
+        }
         setUploadProgress(0);
       }
 
