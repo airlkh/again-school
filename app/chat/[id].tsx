@@ -84,6 +84,7 @@ export default function ChatRoomScreen() {
   const [cropTargetUri, setCropTargetUri] = useState('');
   const [imageHeights, setImageHeights] = useState<Record<string, number>>({});
   const flatListRef = useRef<FlatList>(null);
+  const videoRef = useRef<Video>(null);
   const [isOnline, setIsOnline] = useState(online === '1');
   const avatarImg = Number(avatar) || 1;
 
@@ -364,6 +365,19 @@ export default function ChatRoomScreen() {
     }
   }
 
+  // 영상 모달 닫기 (크래시 방지)
+  async function handleClosePreview() {
+    try {
+      if (videoRef.current) {
+        await videoRef.current.stopAsync();
+        await videoRef.current.unloadAsync();
+      }
+    } catch (e) {
+      console.warn('영상 정리 오류:', e);
+    }
+    setPreviewMedia(null);
+  }
+
   // 날짜 구분선 필요 여부
   function needsDateDivider(index: number): boolean {
     if (index === messages.length - 1) return true;
@@ -597,13 +611,14 @@ export default function ChatRoomScreen() {
       )}
 
       {/* 미디어 전체화면 모달 */}
-      <Modal visible={!!previewMedia} transparent animationType="fade" onRequestClose={() => setPreviewMedia(null)}>
+      <Modal visible={!!previewMedia} transparent animationType="fade" onRequestClose={handleClosePreview}>
         <View style={styles.fullscreenOverlay}>
-          <TouchableOpacity style={styles.fullscreenClose} onPress={() => setPreviewMedia(null)}>
+          <TouchableOpacity style={styles.fullscreenClose} onPress={handleClosePreview}>
             <Ionicons name="close" size={28} color="#fff" />
           </TouchableOpacity>
           {previewMedia?.type === 'video' ? (
             <Video
+              ref={videoRef}
               source={{ uri: previewMedia.url }}
               style={styles.fullscreenImage}
               resizeMode={ResizeMode.CONTAIN}
