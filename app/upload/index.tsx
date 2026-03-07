@@ -18,7 +18,6 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as MediaLibrary from 'expo-media-library';
-import { Video, ResizeMode } from 'expo-av';
 import ViewShot from 'react-native-view-shot';
 import {
   GestureHandlerRootView,
@@ -115,12 +114,6 @@ export default function UploadScreen() {
 
   // ViewShot ref (텍스트 합성용)
   const viewShotRef = useRef<any>(null);
-
-  // 갤러리 미리보기용 동영상 source 메모이제이션 (불필요한 리렌더링 방지)
-  const previewVideoSource = useMemo(
-    () => (selectedMedia[0]?.type === 'video' ? { uri: selectedMedia[0].uri } : undefined),
-    [selectedMedia[0]?.uri, selectedMedia[0]?.type],
-  );
 
   // 키보드 높이 추적
   const [keyboardH, setKeyboardH] = useState(0);
@@ -402,14 +395,10 @@ export default function UploadScreen() {
               <Text style={{ color: '#555', fontSize: 15, marginTop: 12 }}>사진을 선택하세요</Text>
             </View>
           ) : selectedMedia[0].type === 'video' ? (
-            <Video
-              source={previewVideoSource!}
-              style={{ width: SW, height: SW }}
-              resizeMode={ResizeMode.CONTAIN}
-              shouldPlay={false}
-              useNativeControls
-              onError={(e) => console.warn('갤러리 미리보기 동영상 오류:', e)}
-            />
+            <View style={{ width: SW, height: SW, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 60 }}>🎬</Text>
+              <Text style={{ color: '#fff', marginTop: 8, fontSize: 14 }}>동영상 선택됨</Text>
+            </View>
           ) : (
             <Image
               source={{ uri: selectedMedia[0].uri }}

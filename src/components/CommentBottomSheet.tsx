@@ -9,7 +9,6 @@ import {
   Image,
   Keyboard,
   KeyboardEvent,
-  Platform,
   Dimensions,
   ActivityIndicator,
   Alert,
@@ -70,16 +69,16 @@ export function CommentBottomSheet({ visible, postId, onClose }: Props) {
   const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
-  // 키보드 높이 추적 (Android/iOS 기기별 차이 보정)
+  // 키보드 높이 추적
   useEffect(() => {
     const showSub = Keyboard.addListener(
-      Platform.OS === 'android' ? 'keyboardDidShow' : 'keyboardWillShow',
+      'keyboardDidShow',
       (e: KeyboardEvent) => {
         setKeyboardHeight(e.endCoordinates.height);
       },
     );
     const hideSub = Keyboard.addListener(
-      Platform.OS === 'android' ? 'keyboardDidHide' : 'keyboardWillHide',
+      'keyboardDidHide',
       () => setKeyboardHeight(0),
     );
     return () => {
@@ -166,7 +165,7 @@ export function CommentBottomSheet({ visible, postId, onClose }: Props) {
       onBackButtonPress={handleClose}
       onSwipeComplete={handleClose}
       swipeDirection="down"
-      avoidKeyboard={false}
+      avoidKeyboard={true}
       style={styles.modal}
       statusBarTranslucent
       propagateSwipe
@@ -177,6 +176,7 @@ export function CommentBottomSheet({ visible, postId, onClose }: Props) {
           {
             backgroundColor: colors.surface,
             maxHeight: SCREEN_HEIGHT * 0.75,
+            marginBottom: keyboardHeight,
           },
         ]}
       >
@@ -254,7 +254,7 @@ export function CommentBottomSheet({ visible, postId, onClose }: Props) {
             {
               borderTopColor: colors.border,
               backgroundColor: colors.surface,
-              paddingBottom: keyboardHeight > 0 ? keyboardHeight : inputBarPadBottom,
+              paddingBottom: inputBarPadBottom,
             },
           ]}
         >
