@@ -306,13 +306,23 @@ export default function UploadScreen() {
 
       // 게시물 저장
       if (uploadTarget === 'post' || uploadTarget === 'both') {
+        const firstResult = results[0];
+        const firstIsVideo = firstResult?.type === 'video';
+
+        // Cloudinary 동영상 썸네일: 확장자를 .jpg로 변경
+        const videoThumbnail = firstIsVideo && firstResult?.url
+          ? firstResult.url.replace(/\.(mp4|mov|avi|webm)($|\?)/, '.jpg$2')
+          : undefined;
+
         await createPost({
           authorUid: uid,
           authorName: displayName || '사용자',
           authorAvatarImg: avatarImg,
           authorPhotoURL: photoURL,
-          imageUrl: results[0]?.url || '',
-          mediaType: results[0]?.type || 'image',
+          imageUrl: firstIsVideo ? (videoThumbnail || firstResult?.url || '') : (firstResult?.url || ''),
+          mediaType: firstResult?.type || 'image',
+          videoUrl: firstIsVideo ? firstResult?.url : undefined,
+          thumbnailUrl: videoThumbnail,
           mediaItems: results.map((r) => r.url),
           caption: caption || '',
         });
