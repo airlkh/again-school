@@ -35,7 +35,7 @@ import { UserProfile, SchoolEntry, UserPrivacySettings, ConnectionRequest } from
 import { useSchoolMemberCounts } from '../../src/hooks/useSchoolMemberCount';
 import { getAvatarSource } from '../../src/utils/avatar';
 import { CropEditor } from '../../src/components/CropEditor';
-import { doc, updateDoc, deleteDoc, collection, query, where, getDocs, writeBatch, onSnapshot, orderBy, limit, startAfter, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs, writeBatch, onSnapshot, orderBy, limit, startAfter, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { updateProfile } from 'firebase/auth';
 import { db } from '../../src/config/firebase';
 import { getTrustBadge, TRUST_BADGE_INFO } from '../../src/hooks/useTrust';
@@ -173,12 +173,19 @@ export default function ProfileScreen() {
     if (!user?.uid || loadingRef.current) return;
     if (!reset && !hasMoreRef.current) return;
     loadingRef.current = true;
-    if (!lastPostDoc.current) setLoadingPosts(true);
+    // 최초 로드 시에만 스켈레톤 표시 (reset 시 기존 게시물 유지하여 떨림 방지)
+    if (userPosts.length === 0 && !lastPostDoc.current) setLoadingPosts(true);
     try {
       const postsCol = collection(db, 'posts');
-      const q = (reset || !lastPostDoc.current)
-        ? query(postsCol, where('authorUid', '==', user.uid), orderBy('createdAt', 'desc'), limit(POST_PAGE))
-        : query(postsCol, where('authorUid', '==', user.uid), orderBy('createdAt', 'desc'), startAfter(lastPostDoc.current), limit(POST_PAGE));
+      let q;
+      if (reset) {
+        lastPostDoc.current = null;
+        q = query(postsCol, where('authorUid', '==', user.uid), orderBy('createdAt', 'desc'), limit(POST_PAGE));
+      } else if (!lastPostDoc.current) {
+        q = query(postsCol, where('authorUid', '==', user.uid), orderBy('createdAt', 'desc'), limit(POST_PAGE));
+      } else {
+        q = query(postsCol, where('authorUid', '==', user.uid), orderBy('createdAt', 'desc'), startAfter(lastPostDoc.current), limit(POST_PAGE));
+      }
       const snap = await getDocs(q);
       const newPosts = snap.docs.map((d) => ({ id: d.id, ...d.data() } as FirestorePost));
       if (snap.docs.length > 0) {
@@ -190,8 +197,8 @@ export default function ProfileScreen() {
       } else {
         setUserPosts((prev) => [...prev, ...newPosts]);
       }
-    } catch (err) {
-      console.error('게시물 로드 오류:', err);
+    } catch (err: any) {
+      console.warn('게시물 로드 오류:', err?.code, err?.message, err);
     } finally {
       loadingRef.current = false;
       setLoadingPosts(false);
@@ -244,11 +251,9 @@ export default function ProfileScreen() {
     if (!user?.uid) return;
     (async () => {
       try {
-        const userSnap = await getDocs(
-          query(collection(db, 'users'), where('__name__', '==', user.uid)),
-        );
-        if (!userSnap.empty) {
-          const data = userSnap.docs[0].data();
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
           setTrustCount(data.trustCount || 0);
         }
       } catch (e) {
