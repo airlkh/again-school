@@ -96,6 +96,7 @@ function generateSearchKeywords(name?: string, schools?: SchoolEntry[]): string[
   }
   if (schools) {
     for (const s of schools) {
+      if (!s?.schoolName) continue;
       const lower = s.schoolName.toLowerCase();
       for (let i = 0; i < lower.length; i++) {
         for (let j = i + 1; j <= lower.length; j++) {
@@ -144,6 +145,8 @@ export function subscribeUserProfile(
     } else {
       callback(null);
     }
+  }, (error) => {
+    console.warn('[firestoreService] subscribeUserProfile 오류:', error);
   });
 }
 
@@ -173,6 +176,8 @@ export function subscribeClassmates(
       }
     });
     callback(results);
+  }, (error) => {
+    console.warn('[firestoreService] subscribeClassmates 오류:', error);
   });
 }
 
@@ -199,7 +204,7 @@ export async function searchClassmates(
       const kw = filters.keyword.toLowerCase();
       const nameMatch = data.displayName?.toLowerCase().includes(kw);
       const schoolMatch = data.schools?.some((s) =>
-        s.schoolName.toLowerCase().includes(kw),
+        s?.schoolName?.toLowerCase().includes(kw),
       );
       const yearMatch = data.schools?.some((s) =>
         String(s.graduationYear).includes(kw),
@@ -279,5 +284,7 @@ export function subscribeMyConnections(
       results.push({ id: docSnap.id, ...docSnap.data() } as ConnectionRequest);
     });
     callback(results);
+  }, (error) => {
+    console.warn('[firestoreService] subscribeMyConnections 오류:', error);
   });
 }

@@ -110,6 +110,9 @@ export default function BookmarksPage() {
 
       setBookmarks(sorted);
       setLoading(false);
+    }, (error) => {
+      console.warn('[Bookmarks] onSnapshot 오류:', error);
+      setLoading(false);
     });
 
     return unsub;

@@ -56,6 +56,8 @@ export default function TrustVotersPage() {
       setVoters(
         snap.docs.map((d) => ({ id: d.id, ...d.data() } as TrustVote)),
       );
+    }, (error) => {
+      console.warn('[TrustVoters] onSnapshot 오류:', error);
     });
     return unsub;
   }, [targetUid]);

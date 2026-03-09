@@ -342,8 +342,8 @@ export default function SearchScreen() {
   const renderItem = useCallback(
     ({ item }: { item: SearchResult }) => {
       const isMe = item.uid === user?.uid;
-      const myNames = mySchools.map((s) => s.schoolName.toLowerCase().trim());
-      const targetNames = (item.schools || []).map((s) => s.schoolName.toLowerCase().trim());
+      const myNames = (mySchools || []).map((s) => (s?.schoolName || '').toLowerCase().trim()).filter(Boolean);
+      const targetNames = (item.schools || []).map((s) => (s?.schoolName || '').toLowerCase().trim()).filter(Boolean);
       const isSameSchool = myNames.some((n) => targetNames.includes(n));
       const privShowSchools = item.privacySettings?.showSchools ?? true;
       const canSeeSchools = isMe || (privShowSchools && isSameSchool);
@@ -351,6 +351,7 @@ export default function SearchScreen() {
         ? (isMe
             ? (item.schools || [])
             : (item.schools || []).filter((s) => {
+                if (!s?.schoolName) return false;
                 if (s.isPublic === false) return false;
                 return myNames.includes(s.schoolName.toLowerCase().trim());
               }))

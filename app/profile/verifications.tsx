@@ -65,6 +65,8 @@ export default function VerificationsScreen() {
       setVoters(
         snap.docs.map((d) => ({ id: d.id, ...d.data() } as TrustVote)),
       );
+    }, (error) => {
+      console.warn('[Verifications] onSnapshot 오류:', error);
     });
     return unsub;
   }, [uid, schoolName]);

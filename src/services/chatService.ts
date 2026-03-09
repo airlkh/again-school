@@ -117,6 +117,8 @@ export function subscribeMessages(
       messages.push({ id: docSnap.id, ...docSnap.data() } as ChatMessage);
     });
     callback(messages);
+  }, (error) => {
+    console.warn('[chatService] subscribeMessages 오류:', error);
   });
 }
 
@@ -139,6 +141,8 @@ export function subscribeChatRooms(
     // 최신 메시지 순 정렬
     rooms.sort((a, b) => (b.lastMessageAt ?? 0) - (a.lastMessageAt ?? 0));
     callback(rooms);
+  }, (error) => {
+    console.warn('[chatService] subscribeChatRooms 오류:', error);
   });
 }
 

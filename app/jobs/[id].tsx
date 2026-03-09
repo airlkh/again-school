@@ -38,6 +38,8 @@ export default function JobDetailScreen() {
       if (snap.exists()) {
         setJob({ id: snap.id, ...snap.data() } as JobPost);
       }
+    }, (error) => {
+      console.warn('[JobDetail] onSnapshot 오류:', error);
     });
     return unsub;
   }, [id]);

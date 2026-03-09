@@ -13,6 +13,8 @@ export function useBookmark(postId: string) {
     const bookmarkRef = doc(db, 'users', user.uid, 'bookmarks', postId);
     const unsub = onSnapshot(bookmarkRef, (snap) => {
       setBookmarked(snap.exists());
+    }, (error) => {
+      console.warn('[useBookmark] onSnapshot 오류:', error);
     });
     return unsub;
   }, [user?.uid, postId]);

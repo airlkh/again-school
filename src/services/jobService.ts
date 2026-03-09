@@ -43,5 +43,7 @@ export function subscribeJobs(
       results.push({ id: docSnap.id, ...docSnap.data() } as JobPost);
     });
     callback(results);
+  }, (error) => {
+    console.warn('[jobService] subscribeJobs 오류:', error);
   });
 }

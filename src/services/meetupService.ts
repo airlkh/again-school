@@ -101,6 +101,8 @@ export function subscribeMeetups(
     });
     results.sort((a, b) => b.createdAt - a.createdAt);
     callback(results);
+  }, (error) => {
+    console.warn('[meetupService] subscribeMeetups 오류:', error);
   });
 }
 

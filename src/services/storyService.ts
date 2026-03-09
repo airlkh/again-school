@@ -73,6 +73,8 @@ export function subscribeStories(
     // 최신순 정렬
     results.sort((a, b) => b.createdAt - a.createdAt);
     callback(results);
+  }, (error) => {
+    console.warn('[storyService] subscribeStories 오류:', error);
   });
 }
 
@@ -95,5 +97,7 @@ export function subscribeUserStories(
     });
     results.sort((a, b) => a.createdAt - b.createdAt);
     callback(results);
+  }, (error) => {
+    console.warn('[storyService] subscribeUserStories 오류:', error);
   });
 }

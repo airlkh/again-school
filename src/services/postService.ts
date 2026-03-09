@@ -112,6 +112,8 @@ export function subscribePosts(
       results.push({ id: docSnap.id, ...docSnap.data() } as FirestorePost);
     });
     callback(results);
+  }, (error) => {
+    console.warn('[postService] subscribePosts 오류:', error);
   });
 }
 
@@ -167,6 +169,8 @@ export function subscribeComments(
       results.push({ id: docSnap.id, ...docSnap.data() } as FirestoreComment);
     });
     callback(results);
+  }, (error) => {
+    console.warn('[postService] subscribeComments 오류:', error);
   });
 }
 
@@ -182,6 +186,8 @@ export function subscribePost(
     } else {
       callback(null);
     }
+  }, (error) => {
+    console.warn('[postService] subscribePost 오류:', error);
   });
 }
 
@@ -197,5 +203,7 @@ export function subscribeUserPosts(
       results.push({ id: docSnap.id, ...docSnap.data() } as FirestorePost);
     });
     callback(results);
+  }, (error) => {
+    console.warn('[postService] subscribeUserPosts 오류:', error);
   });
 }

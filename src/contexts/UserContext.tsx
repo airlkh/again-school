@@ -31,8 +31,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setProfile(null);
       return;
     }
-    const unsub = subscribeUserProfile(user.uid, (p) => setProfile(p));
-    return unsub;
+    try {
+      const unsub = subscribeUserProfile(user.uid, (p) => {
+        try { setProfile(p); } catch (e) { console.warn('[UserContext] profile 처리 오류:', e); }
+      });
+      return unsub;
+    } catch (e) {
+      console.warn('[UserContext] subscribeUserProfile 오류:', e);
+    }
   }, [user?.uid]);
 
   const displayName = profile?.displayName || user?.displayName || '익명';

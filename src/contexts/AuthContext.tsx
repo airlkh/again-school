@@ -38,7 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setupNotificationHandlers();
           }
         } catch (error: any) {
-          console.error('[AuthContext] checkOnboardingCompleted 에러:', error.code, error.message);
+          console.warn('[AuthContext] checkOnboardingCompleted 에러:', error?.code, error?.message);
           setOnboardingCompleted(false);
         }
       } else {

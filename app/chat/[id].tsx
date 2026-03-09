@@ -98,11 +98,10 @@ export default function ChatRoomScreen() {
     return onSnapshot(doc(db, 'users', otherUid), (snap) => {
       if (snap.exists()) {
         const online = snap.data()?.isOnline === true;
-        console.log('[Chat] 상대방 isOnline:', online, '/ uid:', otherUid);
         setIsOnline(online);
-      } else {
-        console.log('[Chat] 상대방 유저 문서 없음:', otherUid);
       }
+    }, (error) => {
+      console.warn('[Chat] 온라인 상태 구독 오류:', error);
     });
   }, [otherUid]);
 

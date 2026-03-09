@@ -55,6 +55,8 @@ export default function NotificationsScreen() {
         results.push({ id: docSnap.id, ...docSnap.data() } as FirestoreNotification);
       });
       setFsNotifications(results);
+    }, (error) => {
+      console.warn('[Notifications] onSnapshot 오류:', error);
     });
     return unsub;
   }, [user]);

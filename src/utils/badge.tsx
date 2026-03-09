@@ -32,18 +32,18 @@ function useTrustCount(uid?: string): number {
     }
     console.log('[Badge] useTrustCount: 구독 시작 uid=', uid);
     const unsub = onSnapshot(doc(db, 'users', uid), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data() as any;
-        // trustCount 필드 우선, 없으면 verifiedSchools 배열 길이로 폴백
-        const tc: number =
-          data.trustCount ?? (Array.isArray(data.verifiedSchools) ? data.verifiedSchools.length : 0);
-        console.log('[Badge] uid=', uid, 'trustCount=', tc,
-          '| raw trustCount=', data.trustCount,
-          '| verifiedSchools=', data.verifiedSchools);
-        setCount(tc);
-      } else {
-        console.log('[Badge] 사용자 문서 없음 uid=', uid);
+      try {
+        if (snap.exists()) {
+          const data = snap.data() as any;
+          const tc: number =
+            data.trustCount ?? (Array.isArray(data.verifiedSchools) ? data.verifiedSchools.length : 0);
+          setCount(tc);
+        }
+      } catch (e) {
+        console.warn('[Badge] onSnapshot 데이터 처리 오류:', e);
       }
+    }, (error) => {
+      console.warn('[Badge] onSnapshot 오류:', error);
     });
     return unsub;
   }, [uid]);

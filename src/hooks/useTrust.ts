@@ -129,8 +129,8 @@ export function useTrust(targetUid: string) {
       } else {
         // 공통 학교 이름 찾기
         const mySchoolEntries = mySnap.data()?.schools || [];
-        const commonSchool = mySchoolEntries.find((s: { schoolName: string }) =>
-          targetSchoolNames.some((t) => t.trim().toLowerCase() === s.schoolName.trim().toLowerCase()),
+        const commonSchool = mySchoolEntries.find((s: { schoolName?: string }) =>
+          s?.schoolName && targetSchoolNames.some((t) => t.trim().toLowerCase() === (s.schoolName || '').trim().toLowerCase()),
         );
 
         await setDoc(voteRef, {

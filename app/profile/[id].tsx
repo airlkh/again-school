@@ -35,8 +35,9 @@ import { getAvatarSource } from '../../src/utils/avatar';
 import { NameWithBadge } from '../../src/utils/badge';
 
 function getVisibleSchools(targetSchools: SchoolEntry[], mySchools: SchoolEntry[]): SchoolEntry[] {
-  const mySchoolNames = mySchools.map((s) => s.schoolName.toLowerCase().trim());
-  return targetSchools.filter((school) => {
+  const mySchoolNames = (mySchools || []).map((s) => (s?.schoolName || '').toLowerCase().trim()).filter(Boolean);
+  return (targetSchools || []).filter((school) => {
+    if (!school?.schoolName) return false;
     if (school.isPublic === false) return false;
     return mySchoolNames.includes(school.schoolName.toLowerCase().trim());
   });
@@ -48,8 +49,8 @@ function checkPrivacy(
   mySchools: SchoolEntry[],
 ) {
   const privacy = targetPrivacy ?? { showWorkplace: true, showSchools: true };
-  const myNames = mySchools.map((s) => s.schoolName.toLowerCase().trim());
-  const targetNames = targetSchools.map((s) => s.schoolName.toLowerCase().trim());
+  const myNames = (mySchools || []).map((s) => (s?.schoolName || '').toLowerCase().trim()).filter(Boolean);
+  const targetNames = (targetSchools || []).map((s) => (s?.schoolName || '').toLowerCase().trim()).filter(Boolean);
   const isSameSchool = myNames.some((n) => targetNames.includes(n));
   return {
     canSeeSchools: privacy.showSchools && isSameSchool,
@@ -75,27 +76,41 @@ export default function ProfileDetailScreen() {
   useEffect(() => {
     if (!id) return;
 
-    const unsub = subscribeUserProfile(id, (fp) => {
-      if (fp) {
-        setFirestoreProfile(fp);
-        setIsLoading(false);
-      } else {
-        // Firestore에 없으면 더미 데이터 fallback
-        const dummy = findClassmateById(id);
-        if (dummy) setProfile(dummy);
-        setIsLoading(false);
-      }
-    });
-
-    return unsub;
+    try {
+      const unsub = subscribeUserProfile(id, (fp) => {
+        try {
+          if (fp) {
+            setFirestoreProfile(fp);
+            setIsLoading(false);
+          } else {
+            const dummy = findClassmateById(id);
+            if (dummy) setProfile(dummy);
+            setIsLoading(false);
+          }
+        } catch (e) {
+          console.warn('[ProfileDetail] 프로필 콜백 오류:', e);
+          setIsLoading(false);
+        }
+      });
+      return unsub;
+    } catch (e) {
+      console.warn('[ProfileDetail] subscribeUserProfile 오류:', e);
+      setIsLoading(false);
+    }
   }, [id]);
 
   // 연결 상태 구독
   useEffect(() => {
-    if (!user) return;
-    const unsub = subscribeMyConnections(user.uid, setConnections);
-    return unsub;
-  }, [user]);
+    if (!user?.uid) return;
+    try {
+      const unsub = subscribeMyConnections(user.uid, (conns) => {
+        try { setConnections(conns || []); } catch (e) { console.warn('[ProfileDetail] connections 처리 오류:', e); }
+      });
+      return unsub;
+    } catch (e) {
+      console.warn('[ProfileDetail] subscribeMyConnections 오류:', e);
+    }
+  }, [user?.uid]);
 
   // 공통 동창 수 계산 (더미 기준)
   const commonCount = profile
