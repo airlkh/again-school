@@ -42,7 +42,7 @@ import { useMute } from '../../src/contexts/MuteContext';
 import { getAvatarSource } from '../../src/utils/avatar';
 import { NameWithBadge } from '../../src/utils/badge';
 import { CommentBottomSheet } from '../../src/components/CommentBottomSheet';
-import { Video, ResizeMode } from 'expo-av';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../src/config/firebase';
 
@@ -174,6 +174,23 @@ function PostCard({ post, isFirestore, onHide, isVisible = true }: { post: Dummy
   const [imgHeight, setImgHeight] = useState(SCREEN_WIDTH);
   const [multiImgHeights, setMultiImgHeights] = useState<Record<number, number>>({});
   const [imgLoadFailed, setImgLoadFailed] = useState(false);
+
+  // 동영상 모달 플레이어 (expo-video)
+  // useVideoPlayer는 source 변경 시 자동으로 이전 player release + 새 player 생성
+  const videoPlayer = useVideoPlayer(playingVideo ?? '', (player) => {
+    player.loop = false;
+  });
+
+  useEffect(() => {
+    if (playingVideo) {
+      videoPlayer.play();
+    }
+  }, [playingVideo, videoPlayer]);
+
+  const handleCloseVideo = useCallback(() => {
+    try { videoPlayer.pause(); } catch {}
+    setPlayingVideo(null);
+  }, [videoPlayer]);
 
   // 통합 좋아요 훅 (더미/Firestore 모두 처리)
   const { liked, count: likesCount, toggleLike } = useLike(post.id);
@@ -453,13 +470,18 @@ function PostCard({ post, isFirestore, onHide, isVisible = true }: { post: Dummy
       )}
 
       {/* 동영상 전체화면 모달 */}
-      <Modal visible={!!playingVideo} animationType="fade" onRequestClose={() => setPlayingVideo(null)}>
+      <Modal visible={!!playingVideo} animationType="fade" onRequestClose={handleCloseVideo}>
         <View style={{ flex: 1, backgroundColor: '#000' }}>
-          <TouchableOpacity onPress={() => setPlayingVideo(null)} style={{ position: 'absolute', top: 50, right: 20, zIndex: 10, padding: 10 }}>
+          <TouchableOpacity onPress={handleCloseVideo} style={{ position: 'absolute', top: 50, right: 20, zIndex: 10, padding: 10 }}>
             <Ionicons name="close" size={28} color="#fff" />
           </TouchableOpacity>
           {playingVideo && (
-            <Video source={{ uri: playingVideo }} style={{ flex: 1 }} useNativeControls resizeMode={ResizeMode.CONTAIN} shouldPlay />
+            <VideoView
+              player={videoPlayer}
+              style={{ flex: 1 }}
+              nativeControls
+              contentFit="contain"
+            />
           )}
         </View>
       </Modal>

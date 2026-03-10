@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { collection, onSnapshot, query, where, getDocs, orderBy, deleteDoc, doc } from 'firebase/firestore';
-import { Video, ResizeMode } from 'expo-av';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import { db } from '../../src/config/firebase';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -60,8 +60,23 @@ export default function BookmarksPage() {
   // 댓글 바텀시트
   const [commentPostId, setCommentPostId] = useState<string | null>(null);
 
-  // 동영상 재생 모달
+  // 동영상 재생 모달 (expo-video)
   const [playingVideo, setPlayingVideo] = useState<string | null>(null);
+
+  const videoPlayer = useVideoPlayer(playingVideo ?? '', (player) => {
+    player.loop = false;
+  });
+
+  useEffect(() => {
+    if (playingVideo) {
+      videoPlayer.play();
+    }
+  }, [playingVideo, videoPlayer]);
+
+  const handleCloseVideo = useCallback(() => {
+    try { videoPlayer.pause(); } catch {}
+    setPlayingVideo(null);
+  }, [videoPlayer]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -339,13 +354,18 @@ export default function BookmarksPage() {
       </Modal>
 
       {/* 동영상 전체화면 모달 */}
-      <Modal visible={!!playingVideo} animationType="fade" onRequestClose={() => setPlayingVideo(null)}>
+      <Modal visible={!!playingVideo} animationType="fade" onRequestClose={handleCloseVideo}>
         <View style={{ flex: 1, backgroundColor: '#000' }}>
-          <TouchableOpacity onPress={() => setPlayingVideo(null)} style={{ position: 'absolute', top: 50, right: 20, zIndex: 10, padding: 10 }}>
+          <TouchableOpacity onPress={handleCloseVideo} style={{ position: 'absolute', top: 50, right: 20, zIndex: 10, padding: 10 }}>
             <Ionicons name="close" size={28} color="#fff" />
           </TouchableOpacity>
           {playingVideo && (
-            <Video source={{ uri: playingVideo }} style={{ flex: 1 }} useNativeControls resizeMode={ResizeMode.CONTAIN} shouldPlay />
+            <VideoView
+              player={videoPlayer}
+              style={{ flex: 1 }}
+              nativeControls
+              contentFit="contain"
+            />
           )}
         </View>
       </Modal>
