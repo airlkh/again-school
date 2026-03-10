@@ -163,6 +163,7 @@ export default function ProfileScreen() {
   // 프로필 이미지 크롭
   const [cropVisible, setCropVisible] = useState(false);
   const [cropTargetUri, setCropTargetUri] = useState('');
+  const [cropAssetSize, setCropAssetSize] = useState<{ width: number; height: number } | null>(null);
 
   // 동창 현황 모달
   const [showConnectionsModal, setShowConnectionsModal] = useState(false);
@@ -295,13 +296,15 @@ export default function ProfileScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'] as ImagePicker.MediaType[],
       allowsEditing: false,
       quality: 0.9,
     });
 
     if (!result.canceled && result.assets[0]) {
-      setCropTargetUri(result.assets[0].uri);
+      const asset = result.assets[0];
+      setCropAssetSize({ width: asset.width, height: asset.height });
+      setCropTargetUri(asset.uri);
       setCropVisible(true);
     }
   }
@@ -1046,8 +1049,10 @@ export default function ProfileScreen() {
         <Modal visible animationType="slide" statusBarTranslucent>
           <CropEditor
             imageUri={cropTargetUri}
+            originalSize={cropAssetSize ?? undefined}
             onCropDone={handleCropDone}
             onCancel={() => { setCropVisible(false); setCropTargetUri(''); }}
+            squareOnly
           />
         </Modal>
       )}

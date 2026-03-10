@@ -20,7 +20,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Audio, Video, ResizeMode } from 'expo-av';
+import { Audio } from 'expo-av';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useGoBack } from '../../src/hooks/useGoBack';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -46,6 +47,39 @@ function isVideoMedia(url?: string | null, mediaType?: string): boolean {
   if (!url) return false;
   const lower = url.toLowerCase();
   return /\.(mp4|mov|avi|webm)(\?|$)/.test(lower) || lower.includes('/video/');
+}
+
+function VideoMediaItem({ uri, style, isMuted, onToggleMute }: { uri: string; style: any; isMuted: boolean; onToggleMute: () => void }) {
+  const player = useVideoPlayer(uri, (p) => {
+    p.loop = true;
+    p.muted = isMuted;
+  });
+
+  useEffect(() => {
+    try { player.play(); } catch {}
+  }, [player]);
+
+  useEffect(() => {
+    try { player.muted = isMuted; } catch {}
+  }, [isMuted, player]);
+
+  return (
+    <View>
+      <VideoView
+        player={player}
+        style={style}
+        contentFit="cover"
+        nativeControls={false}
+      />
+      <TouchableOpacity
+        style={styles.muteBtn}
+        onPress={onToggleMute}
+        activeOpacity={0.8}
+      >
+        <Ionicons name={isMuted ? 'volume-mute' : 'volume-high'} size={18} color="#fff" />
+      </TouchableOpacity>
+    </View>
+  );
 }
 
 export default function PostDetailScreen() {
@@ -144,21 +178,12 @@ export default function PostDetailScreen() {
   const post = isFirestore ? fsPost : dummyPost;
   const likes = likeCount;
 
-  if (!post) {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.center}>
-          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>게시물을 찾을 수 없습니다</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  const authorUid = post.authorUid;
+  const authorUid = post?.authorUid ?? '';
   const isMyPost = user?.uid === authorUid;
 
   // 이미지 리스트 구성: mediaItems 우선, 없으면 단일 imageUrl 사용
   const mediaList: { type: string; url: string }[] = (() => {
+    if (!post) return [];
     if (isFirestore && (fsPost as FirestorePost).mediaItems && (fsPost as FirestorePost).mediaItems!.length > 0) {
       return (fsPost as FirestorePost).mediaItems!.map((url) => ({ type: 'image', url }));
     }
@@ -173,6 +198,16 @@ export default function PostDetailScreen() {
     const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
     setImageIndex(idx);
   }, []);
+
+  if (!post) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.center}>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>게시물을 찾을 수 없습니다</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   async function handleSendComment() {
     const text = inputText.trim();
@@ -326,23 +361,12 @@ export default function PostDetailScreen() {
               renderItem={({ item: mediaItem, index: imgIdx }) => (
                 <View style={{ width: SCREEN_WIDTH, position: 'relative' }}>
                   {isVideoMedia(mediaItem.url, mediaItem.type) ? (
-                    <>
-                      <Video
-                        source={{ uri: mediaItem.url }}
-                        style={[styles.postImage, { backgroundColor: colors.card }]}
-                        resizeMode={ResizeMode.COVER}
-                        shouldPlay
-                        isLooping
-                        isMuted={videoMuted}
-                      />
-                      <TouchableOpacity
-                        style={styles.muteBtn}
-                        onPress={toggleVideoMute}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={{ fontSize: 18 }}>{videoMuted ? '🔇' : '🔊'}</Text>
-                      </TouchableOpacity>
-                    </>
+                    <VideoMediaItem
+                      uri={mediaItem.url}
+                      style={[styles.postImage, { backgroundColor: colors.card }]}
+                      isMuted={videoMuted}
+                      onToggleMute={toggleVideoMute}
+                    />
                   ) : (
                     <Image source={{ uri: mediaItem.url }} style={[styles.postImage, { backgroundColor: colors.card }]} />
                   )}

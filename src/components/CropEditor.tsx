@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import {
   View,
   Image,
@@ -26,29 +26,36 @@ interface CropEditorProps {
   imageUri: string;
   onCropDone: (croppedUri: string) => void;
   onCancel: () => void;
+  squareOnly?: boolean;
+  originalSize?: { width: number; height: number };
 }
 
 export const CropEditor: React.FC<CropEditorProps> = ({
   imageUri,
   onCropDone,
   onCancel,
+  squareOnly = false,
+  originalSize,
 }) => {
   const insets = useSafeAreaInsets();
   const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = useWindowDimensions();
 
   // Image natural size
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
-  // Image display size & offset (fit to screen)
+  // Image display size & offset (canvas-local coords)
   const [displaySize, setDisplaySize] = useState({ width: WINDOW_WIDTH, height: WINDOW_WIDTH });
   const [imageOffset, setImageOffset] = useState({ x: 0, y: 0 });
 
-  // Crop box (screen coords)
+  // Crop box (canvas-local coords)
   const [cropBox, setCropBox] = useState({
     x: WINDOW_WIDTH * 0.1,
     y: 100,
     width: WINDOW_WIDTH * 0.8,
     height: WINDOW_WIDTH * 0.8,
   });
+
+  const cropBoxRef = useRef(cropBox);
+  useEffect(() => { cropBoxRef.current = cropBox; }, [cropBox]);
 
   const [ratio, setRatio] = useState<CropRatio>('free');
   const [processing, setProcessing] = useState(false);
@@ -58,7 +65,10 @@ export const CropEditor: React.FC<CropEditorProps> = ({
   const startPos = useRef({ x: 0, y: 0 });
   const startBox = useRef({ x: 0, y: 0, width: 0, height: 0 });
 
-  // Computed image area bounds
+  const headerH = insets.top + 50;
+  const footerH = 70 + insets.bottom;
+
+  // Image area bounds (canvas-local)
   const imgBounds = useMemo(() => ({
     left: imageOffset.x,
     top: imageOffset.y,
@@ -66,38 +76,51 @@ export const CropEditor: React.FC<CropEditorProps> = ({
     bottom: imageOffset.y + displaySize.height,
   }), [imageOffset, displaySize]);
 
+  // originalSize가 있으면 사용, 없으면 Image.getSize로 측정
+  useEffect(() => {
+    if (originalSize) {
+      setImageSize(originalSize);
+      return;
+    }
+    if (!imageUri) return;
+    Image.getSize(
+      imageUri,
+      (width, height) => {
+        setImageSize({ width, height });
+      },
+      (error) => console.warn('getSize 오류:', error),
+    );
+  }, [imageUri, originalSize]);
+
   const handleImageLoad = (e: { nativeEvent: { source: { width: number; height: number } } }) => {
     const { width, height } = e.nativeEvent.source;
-    setImageSize({ width, height });
 
-    const headerH = insets.top + 50;
-    const footerH = 70 + insets.bottom;
     const availableH = WINDOW_HEIGHT - headerH - footerH;
 
-    const displayW = WINDOW_WIDTH;
-    const displayH = (height / width) * WINDOW_WIDTH;
-    const finalH = Math.min(displayH, availableH);
-    const finalW = displayH > availableH ? (width / height) * finalH : displayW;
+    const imgRatio = width / height;
+    const canvasRatio = WINDOW_WIDTH / availableH;
+
+    let finalW: number, finalH: number;
+    if (imgRatio > canvasRatio) {
+      finalW = WINDOW_WIDTH;
+      finalH = WINDOW_WIDTH / imgRatio;
+    } else {
+      finalH = availableH;
+      finalW = availableH * imgRatio;
+    }
 
     const offsetX = (WINDOW_WIDTH - finalW) / 2;
-    const offsetY = headerH + (availableH - finalH) / 2;
+    const offsetY = (availableH - finalH) / 2;
 
     setDisplaySize({ width: finalW, height: finalH });
     setImageOffset({ x: offsetX, y: offsetY });
 
-    // Initial crop box = full image area
+    const cropSize = Math.min(finalW, finalH) * 0.8;
     setCropBox({
-      x: offsetX,
-      y: offsetY,
-      width: finalW,
-      height: finalH,
-    });
-
-    console.warn('[CropEditor] debug:', {
-      statusBarHeight: StatusBar.currentHeight,
-      insetsTop: insets.top,
-      headerH,
-      imageOffset: { x: offsetX, y: offsetY },
+      x: offsetX + (finalW - cropSize) / 2,
+      y: offsetY + (finalH - cropSize) / 2,
+      width: cropSize,
+      height: cropSize,
     });
   };
 
@@ -116,14 +139,15 @@ export const CropEditor: React.FC<CropEditorProps> = ({
     onMoveShouldSetPanResponder: () => true,
 
     onPanResponderGrant: (e) => {
-      const { pageX, pageY } = e.nativeEvent;
+      const { pageX, pageY: rawPageY } = e.nativeEvent;
+      const pageY = rawPageY - headerH;
+      const cb = cropBoxRef.current;
       startPos.current = { x: pageX, y: pageY };
-      startBox.current = { ...cropBox };
+      startBox.current = { ...cb };
 
-      const { x, y, width: w, height: h } = cropBox;
+      const { x, y, width: w, height: h } = cb;
       const H = HANDLE_SIZE;
 
-      // Detect which part is being dragged
       const inLeft = pageX >= x - H / 2 && pageX <= x + H;
       const inRight = pageX >= x + w - H && pageX <= x + w + H / 2;
       const inTop = pageY >= y - H / 2 && pageY <= y + H;
@@ -146,8 +170,8 @@ export const CropEditor: React.FC<CropEditorProps> = ({
 
     onPanResponderMove: (_e, gesture) => {
       if (!dragType.current) return;
-      const dx = gesture.moveX - startPos.current.x;
-      const dy = gesture.moveY - startPos.current.y;
+      const dx = gesture.dx;
+      const dy = gesture.dy;
       const sb = startBox.current;
 
       let newBox = { ...sb };
@@ -214,8 +238,13 @@ export const CropEditor: React.FC<CropEditorProps> = ({
       if (ratio !== 'free' && dragType.current !== 'move') {
         const [rw, rh] = ratio.split(':').map(Number);
         const aspect = rh / rw;
-        // Adjust height to match width ratio
         newBox.height = newBox.width * aspect;
+      }
+
+      if (squareOnly && dragType.current !== 'move') {
+        const size = Math.min(newBox.width, newBox.height);
+        newBox.width = size;
+        newBox.height = size;
       }
 
       setCropBox(clampBox(newBox));
@@ -225,7 +254,7 @@ export const CropEditor: React.FC<CropEditorProps> = ({
       dragType.current = null;
     },
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [cropBox, ratio, imgBounds]);
+  }), [ratio, imgBounds, squareOnly]);
 
   const handleRatioChange = (newRatio: CropRatio) => {
     setRatio(newRatio);
@@ -377,19 +406,21 @@ export const CropEditor: React.FC<CropEditorProps> = ({
       </View>
 
       {/* Ratio bar */}
-      <View style={[s.ratioBar, { paddingBottom: insets.bottom + 12 }]}>
-        {(['free', '1:1', '4:5', '9:16', '16:9'] as const).map((r) => (
-          <TouchableOpacity
-            key={r}
-            onPress={() => handleRatioChange(r)}
-            style={[s.ratioBtn, ratio === r && s.ratioBtnActive]}
-          >
-            <Text style={[s.ratioBtnText, ratio === r && s.ratioBtnTextActive]}>
-              {r === 'free' ? '자유' : r}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      {!squareOnly && (
+        <View style={[s.ratioBar, { paddingBottom: insets.bottom + 12 }]}>
+          {(['free', '1:1', '4:5', '9:16', '16:9'] as const).map((r) => (
+            <TouchableOpacity
+              key={r}
+              onPress={() => handleRatioChange(r)}
+              style={[s.ratioBtn, ratio === r && s.ratioBtnActive]}
+            >
+              <Text style={[s.ratioBtnText, ratio === r && s.ratioBtnTextActive]}>
+                {r === 'free' ? '자유' : r}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
     </View>
   );
 };

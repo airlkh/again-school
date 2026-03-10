@@ -90,7 +90,7 @@ export default function MeetupCreateScreen() {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'] as ImagePicker.MediaType[],
       quality: 0.8,
     });
     if (!result.canceled && result.assets[0]) {

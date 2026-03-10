@@ -258,12 +258,12 @@ export default function ChatRoomScreen() {
       return;
     }
 
-    const mediaTypes =
+    const mediaTypes: ImagePicker.MediaType[] =
       type === 'image'
-        ? ImagePicker.MediaTypeOptions.Images
+        ? ['images']
         : type === 'video'
-          ? ImagePicker.MediaTypeOptions.Videos
-          : ImagePicker.MediaTypeOptions.All;
+          ? ['videos']
+          : ['images', 'videos'];
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes,

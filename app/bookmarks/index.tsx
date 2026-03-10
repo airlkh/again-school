@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { collection, onSnapshot, query, where, getDocs, orderBy, deleteDoc, doc } from 'firebase/firestore';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { db } from '../../src/config/firebase';
@@ -27,6 +27,21 @@ import { getAvatarSource } from '../../src/utils/avatar';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const CELL_SIZE = (SCREEN_WIDTH - 4) / 3;
+
+const isVideoUrl = (url: string) =>
+  !!url?.match(/\.(mp4|mov|avi|webm)/i);
+
+const getThumbnail = (post: any) => {
+  if (post.thumbnailUrl) return post.thumbnailUrl;
+  if (post.imageUrl && !isVideoUrl(post.imageUrl)) return post.imageUrl;
+  const videoUrl = post.videoUrl || post.imageUrl;
+  if (videoUrl) {
+    return videoUrl
+      .replace('/video/upload/', '/video/upload/so_0,w_600/')
+      .replace(/\.(mp4|mov)(\?|$)/i, '.jpg$2');
+  }
+  return null;
+};
 
 interface BookmarkEntry {
   postId: string;
@@ -63,20 +78,28 @@ export default function BookmarksPage() {
   // 동영상 재생 모달 (expo-video)
   const [playingVideo, setPlayingVideo] = useState<string | null>(null);
 
-  const videoPlayer = useVideoPlayer(playingVideo ?? '', (player) => {
-    player.loop = false;
+  const player = useVideoPlayer('', (p) => {
+    p.loop = false;
   });
 
+  // playingVideo 변경 시 source 교체 후 재생
   useEffect(() => {
-    if (playingVideo) {
-      videoPlayer.play();
-    }
-  }, [playingVideo, videoPlayer]);
+    if (!playingVideo) return;
+    try {
+      player.replace(playingVideo);
+      player.play();
+    } catch {}
+  }, [playingVideo]);
 
-  const handleCloseVideo = useCallback(() => {
-    try { videoPlayer.pause(); } catch {}
-    setPlayingVideo(null);
-  }, [videoPlayer]);
+  // 탭 벗어날 때 동영상 정지
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        try { player.pause(); } catch {}
+        setPlayingVideo(null);
+      };
+    }, [player])
+  );
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -180,11 +203,21 @@ export default function BookmarksPage() {
               onPress={() => setSelectedPost(item)}
             >
               {item.imageUrl ? (
-                <Image
-                  source={{ uri: item.imageUrl }}
-                  style={styles.cellImage}
-                  resizeMode="cover"
-                />
+                (() => {
+                  const isVideo = item.mediaType === 'video' || isVideoUrl(item.imageUrl);
+                  const thumbUrl = isVideo ? getThumbnail(item) : item.imageUrl;
+                  return thumbUrl ? (
+                    <Image
+                      source={{ uri: thumbUrl }}
+                      style={styles.cellImage}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={[styles.textCell, { backgroundColor: '#000' }]}>
+                      <Ionicons name="videocam" size={28} color="rgba(255,255,255,0.5)" />
+                    </View>
+                  );
+                })()
               ) : (
                 <View style={[styles.textCell, { backgroundColor: colors.primary }]}>
                   <Text style={styles.textCellContent} numberOfLines={4}>
@@ -230,7 +263,7 @@ export default function BookmarksPage() {
                 setSelectedPost(null);
                 router.push({
                   pathname: '/(tabs)',
-                  params: { scrollToPostId: postId },
+                  params: { postId },
                 });
               }}
             >
@@ -256,16 +289,22 @@ export default function BookmarksPage() {
             </View>
 
             {/* 미디어 */}
-            {selectedPost?.imageUrl && (
-              selectedPost.mediaType === 'video' ? (
+            {(selectedPost?.imageUrl || selectedPost?.videoUrl) && (
+              (selectedPost.mediaType === 'video' || isVideoUrl(selectedPost.videoUrl || selectedPost.imageUrl || '')) ? (
                 <TouchableOpacity
                   activeOpacity={0.85}
-                  onPress={() => setPlayingVideo(selectedPost.videoUrl || selectedPost.imageUrl)}
+                  onPress={() => {
+                    const url = selectedPost.videoUrl || selectedPost.imageUrl;
+                    if (url) setPlayingVideo(url);
+                  }}
                   style={styles.videoPlaceholder}
                 >
-                  {selectedPost.thumbnailUrl ? (
-                    <Image source={{ uri: selectedPost.thumbnailUrl }} style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH * 0.75, position: 'absolute' }} resizeMode="cover" />
-                  ) : null}
+                  {(() => {
+                    const thumb = getThumbnail(selectedPost);
+                    return thumb ? (
+                      <Image source={{ uri: thumb }} style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH * 0.75, position: 'absolute' }} resizeMode="cover" />
+                    ) : null;
+                  })()}
                   <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' }}>
                     <Ionicons name="play" size={32} color="#fff" />
                   </View>
@@ -354,14 +393,27 @@ export default function BookmarksPage() {
       </Modal>
 
       {/* 동영상 전체화면 모달 */}
-      <Modal visible={!!playingVideo} animationType="fade" onRequestClose={handleCloseVideo}>
+      <Modal
+        visible={!!playingVideo}
+        animationType="fade"
+        onRequestClose={() => {
+          try { player.pause(); } catch {}
+          setPlayingVideo(null);
+        }}
+      >
         <View style={{ flex: 1, backgroundColor: '#000' }}>
-          <TouchableOpacity onPress={handleCloseVideo} style={{ position: 'absolute', top: 50, right: 20, zIndex: 10, padding: 10 }}>
+          <TouchableOpacity
+            onPress={() => {
+              try { player.pause(); } catch {}
+              setPlayingVideo(null);
+            }}
+            style={{ position: 'absolute', top: 50, right: 20, zIndex: 10, padding: 10 }}
+          >
             <Ionicons name="close" size={28} color="#fff" />
           </TouchableOpacity>
           {playingVideo && (
             <VideoView
-              player={videoPlayer}
+              player={player}
               style={{ flex: 1 }}
               nativeControls
               contentFit="contain"

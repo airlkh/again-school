@@ -19,7 +19,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Colors } from '../../src/constants/colors';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -157,11 +157,27 @@ function isVideoMedia(url?: string | null, mediaType?: string): boolean {
   return /\.(mp4|mov|avi|webm)(\?|$)/.test(lower) || lower.includes('/video/');
 }
 
+// ─── 동영상 썸네일 추출 ──────────────────────────────────────────────
+function getVideoThumbnail(post: { thumbnailUrl?: string | null; imageUrl?: string | null; videoUrl?: string | null }): string | null {
+  if (post.thumbnailUrl) return post.thumbnailUrl;
+  if (post.imageUrl && !isVideoMedia(post.imageUrl, undefined)) return post.imageUrl;
+  const vUrl = post.videoUrl || post.imageUrl;
+  if (vUrl && vUrl.includes('/video/upload/')) {
+    return vUrl
+      .replace('/video/upload/', '/video/upload/so_0,w_600/')
+      .replace(/\.(mp4|mov)(\?|$)/i, '.jpg$2');
+  }
+  return null;
+}
+
 // ─── 게시물 카드 ───────────────────────────────────────────────────
-function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, videoMuted, toggleVideoMute }: { post: DummyPost | FirestorePost; isFirestore: boolean; onHide?: (id: string) => void; isVisible?: boolean; inlinePlayer?: VideoPlayer | null; videoMuted?: boolean; toggleVideoMute?: () => void }) {
+function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, videoMuted: videoMutedProp, toggleVideoMute: toggleVideoMuteProp }: { post: DummyPost | FirestorePost; isFirestore: boolean; onHide?: (id: string) => void; isVisible?: boolean; inlinePlayer?: VideoPlayer | null; videoMuted?: boolean; toggleVideoMute?: () => void }) {
   const { user } = useAuth();
   const { colors } = useTheme();
   const { isMuted: musicMuted, toggleMute: toggleMusicMute } = useMusic();
+  const { isMuted: videoMutedLocal, toggleMute: toggleVideoMuteLocal } = useMute();
+  const videoMuted = videoMutedProp ?? videoMutedLocal;
+  const toggleVideoMute = toggleVideoMuteProp ?? toggleVideoMuteLocal;
 
   const fsPost = isFirestore ? (post as FirestorePost) : null;
   const dPost = !isFirestore ? (post as DummyPost) : null;
@@ -310,6 +326,12 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
                       onPress={() => setPlayingVideo(uri)}
                       style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }}
                     >
+                      {(() => {
+                        const thumb = getVideoThumbnail({ thumbnailUrl: null, imageUrl: null, videoUrl: uri });
+                        return thumb ? (
+                          <Image source={{ uri: thumb }} style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH, position: 'absolute' }} resizeMode="cover" />
+                        ) : null;
+                      })()}
                       <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' }}>
                         <Ionicons name="play" size={32} color="#fff" />
                       </View>
@@ -359,13 +381,16 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
               />
             ) : (
               <>
-                {(thumbnailUrl || (imageUrl && !isVideoMedia(imageUrl, undefined))) ? (
-                  <Image source={{ uri: thumbnailUrl || imageUrl }} style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH }} resizeMode="cover" />
-                ) : (
-                  <View style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH, alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="videocam" size={48} color="rgba(255,255,255,0.5)" />
-                  </View>
-                )}
+                {(() => {
+                  const thumb = getVideoThumbnail({ thumbnailUrl, imageUrl, videoUrl });
+                  return thumb ? (
+                    <Image source={{ uri: thumb }} style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH }} resizeMode="cover" />
+                  ) : (
+                    <View style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH, alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="videocam" size={48} color="rgba(255,255,255,0.5)" />
+                    </View>
+                  );
+                })()}
               </>
             )}
             <View style={styles.videoBadge}>
@@ -648,6 +673,8 @@ function MeetupEventCard({ meetup }: { meetup: Meetup }) {
 export default function HomeScreen() {
   const { colors } = useTheme();
   const { user: currentUser } = useAuth();
+  const { postId: scrollToPostId } = useLocalSearchParams<{ postId?: string }>();
+  const flatListRef = useRef<FlatList>(null);
   const [fsPosts, setFsPosts] = useState<FirestorePost[]>([]);
   const [fsStories, setFsStories] = useState<FirestoreStory[]>([]);
   const [fsMeetups, setFsMeetups] = useState<Meetup[]>([]);
@@ -747,10 +774,11 @@ export default function HomeScreen() {
       ...DUMMY_POSTS.map((p) => ({ data: p, isFirestore: false })),
     ];
 
-    // Merge Firestore meetups with dummy meetups
+    // Merge Firestore meetups with dummy meetups (Firestore에 있는 ID는 더미에서 제외)
+    const fsIds = new Set((fsMeetups || []).map((m) => m.id));
     const allMeetups = [
       ...(fsMeetups || []).filter((m) => m && m.status === 'recruiting'),
-      ...DUMMY_MEETUPS.filter((m) => m.status === 'recruiting'),
+      ...DUMMY_MEETUPS.filter((m) => m.status === 'recruiting' && !fsIds.has(m.id)),
     ];
 
     let postIdx = 0;
@@ -778,6 +806,19 @@ export default function HomeScreen() {
 
     return items;
   })();
+
+  // 북마크 "피드에서 보기"에서 넘어온 postId로 스크롤
+  useEffect(() => {
+    if (!scrollToPostId || feedItems.length === 0) return;
+    const index = feedItems.findIndex((item) => item.id === scrollToPostId);
+    if (index === -1) return;
+    // 충분한 딜레이 후 스크롤 (탭 전환 + FlatList 렌더 완료 대기)
+    setTimeout(() => {
+      try {
+        flatListRef.current?.scrollToIndex({ index, animated: false, viewPosition: 0 });
+      } catch {}
+    }, 800);
+  }, [scrollToPostId, feedItems.length]);
 
   // 현재 보이는 게시물의 동영상 URL 찾기
   const visibleVideoUrl = (() => {
@@ -809,6 +850,15 @@ export default function HomeScreen() {
   useEffect(() => {
     try { inlinePlayer.muted = videoMuted; } catch {}
   }, [videoMuted, inlinePlayer]);
+
+  // 탭 벗어날 때 동영상 정지
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        try { inlinePlayer.pause(); } catch {}
+      };
+    }, [inlinePlayer])
+  );
 
   const renderItem = useCallback(({ item }: { item: FeedItem }) => {
     switch (item.type) {
@@ -890,6 +940,7 @@ export default function HomeScreen() {
       </View>
 
       <FlatList
+        ref={flatListRef}
         data={feedItems}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
@@ -897,6 +948,11 @@ export default function HomeScreen() {
         contentContainerStyle={styles.feedContainer}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
+        onScrollToIndexFailed={(info) => {
+          setTimeout(() => {
+            try { flatListRef.current?.scrollToIndex({ index: info.index, animated: false }); } catch {}
+          }, 500);
+        }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
