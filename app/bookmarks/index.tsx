@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -14,9 +14,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { collection, onSnapshot, query, where, getDocs, orderBy, deleteDoc, doc } from 'firebase/firestore';
-import { VideoView, useVideoPlayer } from 'expo-video';
 import { db } from '../../src/config/firebase';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -36,9 +35,14 @@ const getThumbnail = (post: any) => {
   if (post.imageUrl && !isVideoUrl(post.imageUrl)) return post.imageUrl;
   const videoUrl = post.videoUrl || post.imageUrl;
   if (videoUrl) {
-    return videoUrl
-      .replace('/video/upload/', '/video/upload/so_0,w_600/')
-      .replace(/\.(mp4|mov)(\?|$)/i, '.jpg$2');
+    // Cloudinary URL만 변환 시도
+    if (videoUrl.includes('cloudinary.com')) {
+      return videoUrl
+        .replace('/video/upload/', '/video/upload/so_0,w_600/')
+        .replace(/\.(mp4|mov)(\?|$)/i, '.jpg$2');
+    }
+    // Cloudinary 아닌 경우 null 반환 → fallback 아이콘 표시
+    return null;
   }
   return null;
 };
@@ -75,31 +79,6 @@ export default function BookmarksPage() {
   // 댓글 바텀시트
   const [commentPostId, setCommentPostId] = useState<string | null>(null);
 
-  // 동영상 재생 모달 (expo-video)
-  const [playingVideo, setPlayingVideo] = useState<string | null>(null);
-
-  const player = useVideoPlayer('', (p) => {
-    p.loop = false;
-  });
-
-  // playingVideo 변경 시 source 교체 후 재생
-  useEffect(() => {
-    if (!playingVideo) return;
-    try {
-      player.replace(playingVideo);
-      player.play();
-    } catch {}
-  }, [playingVideo]);
-
-  // 탭 벗어날 때 동영상 정지
-  useFocusEffect(
-    useCallback(() => {
-      return () => {
-        try { player.pause(); } catch {}
-        setPlayingVideo(null);
-      };
-    }, [player])
-  );
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -257,18 +236,7 @@ export default function BookmarksPage() {
               <Ionicons name="arrow-back" size={22} color={colors.text} />
             </TouchableOpacity>
             <Text style={[styles.modalHeaderTitle, { color: colors.text }]}>게시물</Text>
-            <TouchableOpacity
-              onPress={() => {
-                const postId = selectedPost?.id;
-                setSelectedPost(null);
-                router.push({
-                  pathname: '/(tabs)',
-                  params: { postId },
-                });
-              }}
-            >
-              <Text style={styles.feedLink}>피드에서 보기</Text>
-            </TouchableOpacity>
+            <View style={{ width: 22 }} />
           </View>
 
           <ScrollView>
@@ -294,8 +262,8 @@ export default function BookmarksPage() {
                 <TouchableOpacity
                   activeOpacity={0.85}
                   onPress={() => {
-                    const url = selectedPost.videoUrl || selectedPost.imageUrl;
-                    if (url) setPlayingVideo(url);
+                    setSelectedPost(null);
+                    router.push(`/post/${selectedPost.id}`);
                   }}
                   style={styles.videoPlaceholder}
                 >
@@ -392,36 +360,6 @@ export default function BookmarksPage() {
         </SafeAreaView>
       </Modal>
 
-      {/* 동영상 전체화면 모달 */}
-      <Modal
-        visible={!!playingVideo}
-        animationType="fade"
-        onRequestClose={() => {
-          try { player.pause(); } catch {}
-          setPlayingVideo(null);
-        }}
-      >
-        <View style={{ flex: 1, backgroundColor: '#000' }}>
-          <TouchableOpacity
-            onPress={() => {
-              try { player.pause(); } catch {}
-              setPlayingVideo(null);
-            }}
-            style={{ position: 'absolute', top: 50, right: 20, zIndex: 10, padding: 10 }}
-          >
-            <Ionicons name="close" size={28} color="#fff" />
-          </TouchableOpacity>
-          {playingVideo && (
-            <VideoView
-              player={player}
-              style={{ flex: 1 }}
-              nativeControls
-              contentFit="contain"
-            />
-          )}
-        </View>
-      </Modal>
-
       {/* 댓글 바텀시트 */}
       {commentPostId && (
         <CommentBottomSheet
@@ -496,12 +434,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
-  feedLink: {
-    fontSize: 13,
-    color: '#e8313a',
-    fontWeight: '600',
-  },
-
   authorRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -194,6 +194,7 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
   // useVideoPlayer는 source 변경 시 자동으로 이전 player release + 새 player 생성
   const videoPlayer = useVideoPlayer(playingVideo ?? '', (player) => {
     player.loop = false;
+    player.muted = true;
   });
 
   useEffect(() => {
@@ -816,6 +817,7 @@ export default function HomeScreen() {
     setTimeout(() => {
       try {
         flatListRef.current?.scrollToIndex({ index, animated: false, viewPosition: 0 });
+        setVisiblePostId(scrollToPostId);
       } catch {}
     }, 800);
   }, [scrollToPostId, feedItems.length]);

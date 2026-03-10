@@ -45,6 +45,26 @@ const SCHOOL_TYPES: SchoolEntry['schoolType'][] = ['초등학교', '중학교', 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const GRID_SIZE = Math.floor(SCREEN_WIDTH / 3);
 
+const getVideoThumbnail = (post: any): string | null => {
+  if (post.thumbnailUrl) return post.thumbnailUrl as string;
+  if (post.imageUrl &&
+      !post.imageUrl.endsWith('.mp4') &&
+      !post.imageUrl.endsWith('.mov')) {
+    return post.imageUrl as string;
+  }
+  const vUrl: string | undefined = post.videoUrl || post.imageUrl;
+  if (vUrl && vUrl.includes('cloudinary.com')) {
+    const parts = vUrl.split('/video/upload/');
+    if (parts.length === 2) {
+      const withJpg = parts[1]
+        .replace('.mp4', '.jpg')
+        .replace('.mov', '.jpg');
+      return parts[0] + '/video/upload/w_600/' + withJpg;
+    }
+  }
+  return null;
+};
+
 // ─── 게시물 그리드 (React.memo로 분리 — 부모 리렌더링 차단) ───
 const PostGrid = React.memo(function PostGrid({
   posts,
@@ -63,16 +83,24 @@ const PostGrid = React.memo(function PostGrid({
   headerComponent: React.ReactElement;
   footerComponent: React.ReactElement;
 }) {
-  const renderPostItem = useCallback(({ item: post }: { item: FirestorePost }) => (
-    <TouchableOpacity style={styles.postGridItem} onPress={() => router.push(`/post/${post.id}`)}>
-      <Image source={{ uri: post.imageUrl }} style={styles.postGridImage} resizeMode="cover" fadeDuration={0} />
-      {post.mediaItems && post.mediaItems.length > 1 && (
-        <View style={styles.multiImageIcon}>
-          <Ionicons name="copy-outline" size={14} color="#fff" />
-        </View>
-      )}
-    </TouchableOpacity>
-  ), []);
+  const renderPostItem = useCallback(({ item: post }: { item: FirestorePost }) => {
+    const thumbUri = getVideoThumbnail(post);
+    return (
+      <TouchableOpacity style={styles.postGridItem} onPress={() => router.push(`/post/${post.id}`)}>
+        <Image source={thumbUri ? { uri: thumbUri } : undefined} style={styles.postGridImage} resizeMode="cover" fadeDuration={0} />
+        {post.mediaItems && post.mediaItems.length > 1 && (
+          <View style={styles.multiImageIcon}>
+            <Ionicons name="copy-outline" size={14} color="#fff" />
+          </View>
+        )}
+        {(post.mediaType === 'video' || post.videoUrl) && (
+          <View style={styles.videoIcon}>
+            <Ionicons name="play-circle" size={20} color="#fff" />
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  }, []);
 
   return (
     <FlatList
@@ -1188,6 +1216,11 @@ const styles = StyleSheet.create({
   multiImageIcon: {
     position: 'absolute',
     top: 6,
+    right: 6,
+  },
+  videoIcon: {
+    position: 'absolute',
+    bottom: 6,
     right: 6,
   },
   skeletonGrid: {

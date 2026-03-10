@@ -311,7 +311,9 @@ export default function UploadScreen() {
 
         // Cloudinary 동영상 썸네일: 확장자를 .jpg로 변경
         const videoThumbnail = firstIsVideo && firstResult?.url
-          ? firstResult.url.replace(/\.(mp4|mov|avi|webm)($|\?)/, '.jpg$2')
+          ? firstResult.url
+              .replace('/video/upload/', '/video/upload/f_jpg,w_600/')
+              .replace(/\.(mp4|mov|avi|webm)(\?|$)/i, '.jpg$2')
           : undefined;
 
         await createPost({

@@ -1,6 +1,7 @@
 import { Alert } from 'react-native';
 import { CLOUDINARY_CONFIG } from '../config/cloudinary';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { getThumbnailAsync } from 'expo-video-thumbnails';
 
 export type MediaType = 'image' | 'video';
 
@@ -124,11 +125,24 @@ export async function uploadVideo(
       }
     });
 
-    xhr.addEventListener('load', () => {
+    xhr.addEventListener('load', async () => {
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           const data = JSON.parse(xhr.responseText);
-          const thumbnailUrl = data.secure_url.replace(/\.\w+$/, '.jpg');
+
+          // 썸네일 추출 후 이미지로 업로드
+          let thumbnailUrl: string | undefined;
+          try {
+            const thumbnail = await getThumbnailAsync(uri, { time: 1000 });
+            const thumbResult = await uploadImage(thumbnail.uri);
+            thumbnailUrl = thumbResult.url;
+          } catch {
+            // 썸네일 추출 실패 시 Cloudinary URL 변환 fallback
+            thumbnailUrl = data.secure_url
+              .replace('/video/upload/', '/video/upload/f_jpg,w_600/')
+              .replace(/\.(mp4|mov)(\?|$)/i, '.jpg$2');
+          }
+
           resolve({ url: data.secure_url, thumbnailUrl, type: 'video' });
         } catch {
           reject(new Error('서버 응답을 처리할 수 없습니다.'));
