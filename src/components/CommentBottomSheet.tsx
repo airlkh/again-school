@@ -25,8 +25,11 @@ import {
   addComment,
   subscribeComments,
 } from '../services/postService';
+import { sendPushNotification } from '../services/notificationService';
 import { getAvatarSource } from '../utils/avatar';
 import { NameWithBadge } from '../utils/badge';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../config/firebase';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
@@ -128,6 +131,22 @@ export function CommentBottomSheet({ visible, postId, onClose }: Props) {
         text,
       });
       setInputText('');
+
+      // 댓글 푸시 알림 (본인 게시물 제외)
+      try {
+        const postSnap = await getDoc(doc(db, 'posts', postId));
+        const authorUid = postSnap.data()?.authorUid;
+        if (authorUid && authorUid !== user.uid) {
+          const senderName = displayName || '사용자';
+          const bodyText = text.length > 20 ? text.slice(0, 20) + '...' : text;
+          sendPushNotification(
+            authorUid,
+            `${senderName}님이 댓글을 남겼어요`,
+            bodyText,
+            { type: 'comment', postId },
+          ).catch(() => {});
+        }
+      } catch {}
     } catch {
       Alert.alert('오류', '댓글 등록에 실패했습니다.');
     } finally {

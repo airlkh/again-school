@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
@@ -40,8 +40,13 @@ export async function registerPushToken(uid: string): Promise<void> {
   }
 }
 
+let responseSub: Notifications.Subscription | null = null;
+
 /** 알림 핸들러 설정 */
 export function setupNotificationHandlers(): void {
+  // 이전 리스너 정리 (중복 등록 방지)
+  responseSub?.remove();
+
   // 앱이 포그라운드일 때 알림 표시 방식
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -54,7 +59,7 @@ export function setupNotificationHandlers(): void {
   });
 
   // 알림 클릭 시 해당 화면으로 이동
-  Notifications.addNotificationResponseReceivedListener((response) => {
+  responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
     const data = response.notification.request.content.data;
 
     if (data?.chatRoomId && data?.otherUid) {
@@ -92,6 +97,35 @@ export function setupNotificationHandlers(): void {
   }
 
   console.log('[Push] 알림 핸들러 설정 완료');
+}
+
+/** Expo Push API로 알림 발송 */
+export async function sendPushNotification(
+  toUid: string,
+  title: string,
+  body: string,
+  data?: Record<string, string>,
+): Promise<void> {
+  try {
+    const userSnap = await getDoc(doc(db, 'users', toUid));
+    if (!userSnap.exists()) return;
+
+    const pushToken = userSnap.data()?.pushToken;
+    if (!pushToken) return;
+
+    await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: pushToken,
+        title,
+        body,
+        data: data ?? {},
+      }),
+    });
+  } catch (e) {
+    console.warn('[Push] 알림 발송 실패:', e);
+  }
 }
 
 /**

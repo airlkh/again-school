@@ -3,17 +3,15 @@ import {
   View,
   Image,
   PanResponder,
-  Dimensions,
   TouchableOpacity,
   Text,
   StyleSheet,
   ActivityIndicator,
   StatusBar,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImageManipulator from 'expo-image-manipulator';
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const MIN_CROP = 60;
 const HANDLE_SIZE = 36;
 
@@ -36,19 +34,20 @@ export const CropEditor: React.FC<CropEditorProps> = ({
   onCancel,
 }) => {
   const insets = useSafeAreaInsets();
+  const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = useWindowDimensions();
 
   // Image natural size
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
   // Image display size & offset (fit to screen)
-  const [displaySize, setDisplaySize] = useState({ width: SCREEN_WIDTH, height: SCREEN_WIDTH });
+  const [displaySize, setDisplaySize] = useState({ width: WINDOW_WIDTH, height: WINDOW_WIDTH });
   const [imageOffset, setImageOffset] = useState({ x: 0, y: 0 });
 
   // Crop box (screen coords)
   const [cropBox, setCropBox] = useState({
-    x: SCREEN_WIDTH * 0.1,
+    x: WINDOW_WIDTH * 0.1,
     y: 100,
-    width: SCREEN_WIDTH * 0.8,
-    height: SCREEN_WIDTH * 0.8,
+    width: WINDOW_WIDTH * 0.8,
+    height: WINDOW_WIDTH * 0.8,
   });
 
   const [ratio, setRatio] = useState<CropRatio>('free');
@@ -73,14 +72,14 @@ export const CropEditor: React.FC<CropEditorProps> = ({
 
     const headerH = insets.top + 50;
     const footerH = 70 + insets.bottom;
-    const availableH = SCREEN_HEIGHT - headerH - footerH;
+    const availableH = WINDOW_HEIGHT - headerH - footerH;
 
-    const displayW = SCREEN_WIDTH;
-    const displayH = (height / width) * SCREEN_WIDTH;
+    const displayW = WINDOW_WIDTH;
+    const displayH = (height / width) * WINDOW_WIDTH;
     const finalH = Math.min(displayH, availableH);
     const finalW = displayH > availableH ? (width / height) * finalH : displayW;
 
-    const offsetX = (SCREEN_WIDTH - finalW) / 2;
+    const offsetX = (WINDOW_WIDTH - finalW) / 2;
     const offsetY = headerH + (availableH - finalH) / 2;
 
     setDisplaySize({ width: finalW, height: finalH });
@@ -92,6 +91,13 @@ export const CropEditor: React.FC<CropEditorProps> = ({
       y: offsetY,
       width: finalW,
       height: finalH,
+    });
+
+    console.warn('[CropEditor] debug:', {
+      statusBarHeight: StatusBar.currentHeight,
+      insetsTop: insets.top,
+      headerH,
+      imageOffset: { x: offsetX, y: offsetY },
     });
   };
 
@@ -249,10 +255,17 @@ export const CropEditor: React.FC<CropEditorProps> = ({
       const scaleX = imageSize.width / displaySize.width;
       const scaleY = imageSize.height / displaySize.height;
 
-      const originX = Math.max(0, (cropBox.x - imageOffset.x) * scaleX);
-      const originY = Math.max(0, (cropBox.y - imageOffset.y) * scaleY);
-      const cropW = Math.min(cropBox.width * scaleX, imageSize.width - originX);
-      const cropH = Math.min(cropBox.height * scaleY, imageSize.height - originY);
+      let originX = (cropBox.x - imageOffset.x) * scaleX;
+      let originY = (cropBox.y - imageOffset.y) * scaleY;
+      let cropW = cropBox.width * scaleX;
+      let cropH = cropBox.height * scaleY;
+
+      // 음수 보정
+      if (originX < 0) { cropW += originX; originX = 0; }
+      if (originY < 0) { cropH += originY; originY = 0; }
+      // 이미지 범위 초과 보정
+      if (originX + cropW > imageSize.width) cropW = imageSize.width - originX;
+      if (originY + cropH > imageSize.height) cropH = imageSize.height - originY;
 
       const result = await ImageManipulator.manipulateAsync(
         imageUri,
@@ -319,9 +332,9 @@ export const CropEditor: React.FC<CropEditorProps> = ({
 
         {/* Dark overlay outside crop */}
         {/* Top */}
-        <View style={[s.overlay, { left: 0, top: 0, width: SCREEN_WIDTH, height: cropBox.y }]} />
+        <View style={[s.overlay, { left: 0, top: 0, width: WINDOW_WIDTH, height: cropBox.y }]} />
         {/* Bottom */}
-        <View style={[s.overlay, { left: 0, top: cropBox.y + cropBox.height, width: SCREEN_WIDTH, bottom: 0 }]} />
+        <View style={[s.overlay, { left: 0, top: cropBox.y + cropBox.height, width: WINDOW_WIDTH, bottom: 0 }]} />
         {/* Left */}
         <View style={[s.overlay, { left: 0, top: cropBox.y, width: cropBox.x, height: cropBox.height }]} />
         {/* Right */}

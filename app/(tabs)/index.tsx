@@ -42,7 +42,7 @@ import { useMute } from '../../src/contexts/MuteContext';
 import { getAvatarSource } from '../../src/utils/avatar';
 import { NameWithBadge } from '../../src/utils/badge';
 import { CommentBottomSheet } from '../../src/components/CommentBottomSheet';
-import { VideoView, useVideoPlayer } from 'expo-video';
+import { VideoView, useVideoPlayer, type VideoPlayer } from 'expo-video';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../src/config/firebase';
 
@@ -158,11 +158,10 @@ function isVideoMedia(url?: string | null, mediaType?: string): boolean {
 }
 
 // ─── 게시물 카드 ───────────────────────────────────────────────────
-function PostCard({ post, isFirestore, onHide, isVisible = true }: { post: DummyPost | FirestorePost; isFirestore: boolean; onHide?: (id: string) => void; isVisible?: boolean }) {
+function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, videoMuted, toggleVideoMute }: { post: DummyPost | FirestorePost; isFirestore: boolean; onHide?: (id: string) => void; isVisible?: boolean; inlinePlayer?: VideoPlayer | null; videoMuted?: boolean; toggleVideoMute?: () => void }) {
   const { user } = useAuth();
   const { colors } = useTheme();
   const { isMuted: musicMuted, toggleMute: toggleMusicMute } = useMusic();
-  const { isMuted: videoMuted, toggleMute: toggleVideoMute } = useMute();
 
   const fsPost = isFirestore ? (post as FirestorePost) : null;
   const dPost = !isFirestore ? (post as DummyPost) : null;
@@ -227,6 +226,8 @@ function PostCard({ post, isFirestore, onHide, isVisible = true }: { post: Dummy
   const videoUrl = isFirestore ? fsPost?.videoUrl : dPost?.videoUrl;
   const thumbnailUrl = isFirestore ? fsPost?.thumbnailUrl : dPost?.thumbnailUrl;
   const authorPhotoURL = isFirestore ? fsPost?.authorPhotoURL : dPost?.authorPhotoURL;
+
+  const isVideoPost = isVideoMedia(videoUrl || imageUrl, mediaType) || imgLoadFailed;
   const commentCount = isFirestore ? (fsPost?.commentCount ?? 0) : (dPost?.commentCount ?? 0);
   const schoolName = isFirestore ? (fsPost?.schoolName ?? '') : (dPost?.schoolName ?? '');
 
@@ -346,20 +347,36 @@ function PostCard({ post, isFirestore, onHide, isVisible = true }: { post: Dummy
             </Animated.View>
           </View>
         </TouchableOpacity>
-      ) : (isVideoMedia(videoUrl || imageUrl, mediaType) || imgLoadFailed) && (videoUrl || imageUrl) ? (
-        <TouchableOpacity activeOpacity={1} onPress={() => setPlayingVideo((videoUrl || imageUrl)!)}>
-          <View style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }}>
-            {(thumbnailUrl || (imageUrl && !isVideoMedia(imageUrl, undefined))) ? (
-              <Image source={{ uri: thumbnailUrl || imageUrl }} style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH, position: 'absolute' }} resizeMode="cover" />
-            ) : null}
-            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="play" size={32} color="#fff" />
-            </View>
-            <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 8 }}>탭하여 재생</Text>
+      ) : isVideoPost && (videoUrl || imageUrl) ? (
+        <TouchableOpacity activeOpacity={1} onPress={handleDoubleTap}>
+          <View style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH, backgroundColor: '#000' }}>
+            {isVisible && inlinePlayer ? (
+              <VideoView
+                player={inlinePlayer}
+                style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH }}
+                contentFit="cover"
+                nativeControls={false}
+              />
+            ) : (
+              <>
+                {(thumbnailUrl || (imageUrl && !isVideoMedia(imageUrl, undefined))) ? (
+                  <Image source={{ uri: thumbnailUrl || imageUrl }} style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH }} resizeMode="cover" />
+                ) : (
+                  <View style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH, alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="videocam" size={48} color="rgba(255,255,255,0.5)" />
+                  </View>
+                )}
+              </>
+            )}
             <View style={styles.videoBadge}>
               <Ionicons name="play" size={10} color="#fff" />
               <Text style={styles.videoBadgeText}>동영상</Text>
             </View>
+            {isVisible && inlinePlayer && toggleVideoMute && (
+              <TouchableOpacity style={styles.muteBtn} onPress={toggleVideoMute}>
+                <Ionicons name={videoMuted ? 'volume-mute' : 'volume-high'} size={18} color="#fff" />
+              </TouchableOpacity>
+            )}
             {yearTag && (
               <View style={styles.yearBadge}>
                 <Text style={styles.yearBadgeText}>{yearTag}년</Text>
@@ -636,8 +653,9 @@ export default function HomeScreen() {
   const [fsMeetups, setFsMeetups] = useState<Meetup[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [hiddenPostIds, setHiddenPostIds] = useState<Set<string>>(new Set());
-  const [visiblePostIds, setVisiblePostIds] = useState<Set<string>>(new Set());
+  const [visiblePostId, setVisiblePostId] = useState<string | null>(null);
   const [unreadChat, setUnreadChat] = useState(0);
+  const { isMuted: videoMuted, toggleMute: toggleVideoMute } = useMute();
 
   // 읽지 않은 채팅 수 구독
   useEffect(() => {
@@ -664,7 +682,8 @@ export default function HomeScreen() {
   }, [currentUser]);
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: Array<{ key: string }> }) => {
-    setVisiblePostIds(new Set(viewableItems.map((item) => item.key)));
+    const postItems = viewableItems.filter((v) => v.key !== 'stories' && !v.key.startsWith('recommend-'));
+    setVisiblePostId(postItems.length > 0 ? postItems[0].key : null);
   }).current;
 
   useEffect(() => {
@@ -760,13 +779,54 @@ export default function HomeScreen() {
     return items;
   })();
 
+  // 현재 보이는 게시물의 동영상 URL 찾기
+  const visibleVideoUrl = (() => {
+    if (!visiblePostId) return '';
+    const item = feedItems.find((f) => f.id === visiblePostId);
+    if (!item || item.type !== 'photo_post') return '';
+    const post = item.data;
+    const vUrl = 'videoUrl' in post ? post.videoUrl : undefined;
+    const iUrl = post.imageUrl;
+    const mType = 'mediaType' in post ? post.mediaType : undefined;
+    if (isVideoMedia(vUrl || iUrl, mType)) return vUrl || iUrl || '';
+    return '';
+  })();
+
+  // 상위 레벨에서 단 1개의 인라인 비디오 플레이어만 생성
+  const inlinePlayer = useVideoPlayer(visibleVideoUrl, (player) => {
+    player.loop = true;
+    player.muted = videoMuted;
+  });
+
+  useEffect(() => {
+    if (!visibleVideoUrl) {
+      try { inlinePlayer.pause(); } catch {}
+      return;
+    }
+    try { inlinePlayer.play(); } catch {}
+  }, [visibleVideoUrl, inlinePlayer]);
+
+  useEffect(() => {
+    try { inlinePlayer.muted = videoMuted; } catch {}
+  }, [videoMuted, inlinePlayer]);
+
   const renderItem = useCallback(({ item }: { item: FeedItem }) => {
     switch (item.type) {
       case 'story_bar':
         return <StoryBar fsStories={fsStories} />;
       case 'photo_post':
         if (hiddenPostIds.has(item.data.id)) return null;
-        return <PostCard post={item.data} isFirestore={item.isFirestore} onHide={hidePost} isVisible={visiblePostIds.has(item.id)} />;
+        return (
+          <PostCard
+            post={item.data}
+            isFirestore={item.isFirestore}
+            onHide={hidePost}
+            isVisible={item.id === visiblePostId}
+            inlinePlayer={item.id === visiblePostId ? inlinePlayer : null}
+            videoMuted={videoMuted}
+            toggleVideoMute={toggleVideoMute}
+          />
+        );
       case 'classmate_recommend':
         return <ClassmateRecommendCard />;
       case 'meetup_event':
@@ -774,7 +834,7 @@ export default function HomeScreen() {
       default:
         return null;
     }
-  }, [fsStories, hiddenPostIds, hidePost, visiblePostIds]);
+  }, [fsStories, hiddenPostIds, hidePost, visiblePostId, inlinePlayer, videoMuted, toggleVideoMute]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>

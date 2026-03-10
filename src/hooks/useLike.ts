@@ -3,6 +3,7 @@ import { doc, onSnapshot, getDoc, updateDoc, arrayUnion, arrayRemove, writeBatch
 import { Alert } from 'react-native';
 import { db } from '../config/firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { sendPushNotification } from '../services/notificationService';
 
 /**
  * 더미 ID인지 판별 (Firestore에 없는 로컬 데이터)
@@ -62,6 +63,18 @@ export function useLike(postId: string) {
         await updateDoc(docRef, { likedBy: arrayRemove(user.uid) });
       } else {
         await updateDoc(docRef, { likedBy: arrayUnion(user.uid) });
+        // 좋아요 푸시 알림 (본인 게시물 제외)
+        const postData = snap.data();
+        const authorUid = postData?.authorUid;
+        if (authorUid && authorUid !== user.uid) {
+          const senderName = user.displayName || '사용자';
+          sendPushNotification(
+            authorUid,
+            `${senderName}님이 좋아요를 눌렀어요`,
+            '회원님의 게시물을 좋아합니다',
+            { type: 'like', postId },
+          ).catch(() => {});
+        }
       }
     } catch {
       // onSnapshot이 상태를 복원함
