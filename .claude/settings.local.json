@@ -15,7 +15,8 @@
       "Bash(npx expo:*)",
       "Bash(/c/Users/airlk/AppData/Local/Android/Sdk/platform-tools/adb.exe:*)",
       "Bash(ls:*)",
-      "Bash(cmd.exe:*)"
+      "Bash(cmd.exe:*)",
+      "Bash(eas build:*)"
     ]
   }
 }

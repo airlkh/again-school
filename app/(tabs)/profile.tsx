@@ -846,7 +846,7 @@ export default function ProfileScreen() {
           onPress={() => router.push('/settings/notifications' as any)} />
         <SettingItem icon="eye-outline" label="공개 범위 설정"
           detail={privacySettings?.showSchools && privacySettings?.showWorkplace ? '전체 공개' : '일부 비공개'}
-          onPress={() => Alert.alert('개인정보 공개 설정', '위의 "개인정보 공개 설정" 섹션에서 변경할 수 있습니다.')} />
+          onPress={() => router.push('/settings/visibility' as any)} />
         <SettingItem icon="document-text-outline" label="이용약관"
           onPress={() => Alert.alert('이용약관', 'Again School 이용약관입니다.')} />
         <SettingItem icon="shield-checkmark-outline" label="개인정보처리방침"

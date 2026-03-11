@@ -45,6 +45,7 @@ import { CommentBottomSheet } from '../../src/components/CommentBottomSheet';
 import { VideoView, useVideoPlayer, type VideoPlayer } from 'expo-video';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../src/config/firebase';
+import { useUnreadNotifications } from '../../src/hooks/useUnreadNotifications';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -699,6 +700,7 @@ export default function HomeScreen() {
   const [hiddenPostIds, setHiddenPostIds] = useState<Set<string>>(new Set());
   const [visiblePostId, setVisiblePostId] = useState<string | null>(null);
   const [unreadChat, setUnreadChat] = useState(0);
+  const unreadNotif = useUnreadNotifications(currentUser?.uid);
   const { isMuted: videoMuted, toggleMute: toggleVideoMute } = useMute();
 
   // 읽지 않은 채팅 수 구독
@@ -926,6 +928,27 @@ export default function HomeScreen() {
             onPress={() => router.push('/notifications')}
           >
             <Ionicons name="notifications-outline" size={24} color={colors.text} />
+            {unreadNotif > 0 && (
+              <View style={{
+                position: 'absolute',
+                top: 2, right: 2,
+                backgroundColor: '#e8313a',
+                borderRadius: 10,
+                minWidth: 18,
+                height: 18,
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingHorizontal: 4,
+              }}>
+                <Text style={{
+                  color: '#fff',
+                  fontSize: 11,
+                  fontWeight: '700',
+                }}>
+                  {unreadNotif > 99 ? '99+' : unreadNotif}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.iconButton}

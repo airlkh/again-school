@@ -14,6 +14,8 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { UserProfile, SchoolEntry, ConnectionRequest } from '../types/auth';
+import { sendPushNotification } from './notificationService';
+import { saveNotification } from './notificationStoreService';
 
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {
   const docRef = doc(db, 'users', uid);
@@ -131,6 +133,23 @@ export async function updateUserProfile(
   }
 
   await updateDoc(docRef, updateData);
+}
+
+/** 기본 공개범위 저장 */
+export async function saveDefaultVisibility(
+  uid: string,
+  type: 'post' | 'story',
+  visibility: string,
+  visibilitySchools?: { schoolId: string; schoolName: string; schoolType: string; graduationYear: string; level: string }[],
+): Promise<void> {
+  const docRef = doc(db, 'users', uid);
+  const key = type === 'post' ? 'defaultPostVisibility' : 'defaultStoryVisibility';
+  const schoolsKey = type === 'post' ? 'defaultPostVisibilitySchools' : 'defaultStoryVisibilitySchools';
+  await updateDoc(docRef, {
+    [key]: visibility,
+    [schoolsKey]: visibilitySchools ?? [],
+    updatedAt: Date.now(),
+  });
 }
 
 /** 사용자 프로필 실시간 구독 */
@@ -256,6 +275,15 @@ export async function sendConnectionRequest(
     status: 'pending',
     createdAt: Date.now(),
   });
+
+  // 연결 요청 알림 발송
+  try {
+    sendPushNotification(toUid, '동창 연결 요청', `${fromName}님이 동창 연결을 요청했습니다`, { profileUid: fromUid });
+    saveNotification(toUid, { type: 'connection', fromUid, fromName, profileUid: fromUid });
+  } catch (e) {
+    console.warn('[firestoreService] 연결 요청 알림 실패:', e);
+  }
+
   return docRef.id;
 }
 

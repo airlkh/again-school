@@ -11,10 +11,13 @@ import {
   arrayUnion,
   Unsubscribe,
   getDocs,
+  getDoc,
   writeBatch,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { ChatRoom, ChatMessage } from '../types/auth';
+import { sendPushNotification } from './notificationService';
+import { saveNotification } from './notificationStoreService';
 
 /** 채팅방 ID 생성 (두 UID를 정렬하여 고유 ID 생성) */
 export function getChatRoomId(uid1: string, uid2: string): string {
@@ -101,6 +104,28 @@ export async function sendMessage(
     lastSenderUid: senderUid,
     unreadCount,
   });
+
+  // 채팅 알림 발송
+  try {
+    const senderSnap = await getDoc(doc(db, 'users', senderUid));
+    const senderName = senderSnap.data()?.displayName || '알 수 없음';
+
+    roomSnap.forEach((d) => {
+      const data = d.data() as ChatRoom;
+      data.participants.forEach((uid) => {
+        if (uid !== senderUid) {
+          sendPushNotification(uid, senderName, lastMessage, {
+            chatRoomId: roomId,
+            otherUid: senderUid,
+            otherName: senderName,
+          });
+          saveNotification(uid, { type: 'chat', fromUid: senderUid, fromName: senderName, chatRoomId: roomId });
+        }
+      });
+    });
+  } catch (e) {
+    console.warn('[chatService] 채팅 알림 실패:', e);
+  }
 }
 
 /** 메시지 실시간 구독 */

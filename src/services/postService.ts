@@ -11,9 +11,12 @@ import {
   increment,
   arrayUnion,
   arrayRemove,
+  getDoc,
   Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { sendPushNotification } from './notificationService';
+import { saveNotification } from './notificationStoreService';
 
 export interface TextOverlay {
   text: string;
@@ -136,6 +139,7 @@ export async function togglePostLike(
   postId: string,
   uid: string,
   isLiked: boolean,
+  displayName?: string,
 ): Promise<void> {
   const docRef = doc(db, 'posts', postId);
   if (isLiked) {
@@ -148,6 +152,19 @@ export async function togglePostLike(
       likes: increment(1),
       likedBy: arrayUnion(uid),
     });
+
+    // 좋아요 알림 발송
+    try {
+      const postSnap = await getDoc(docRef);
+      const authorUid = postSnap.data()?.authorUid;
+      if (authorUid && authorUid !== uid) {
+        const name = displayName || '누군가';
+        sendPushNotification(authorUid, '새 좋아요', `${name}님이 회원님의 게시물을 좋아합니다`, { postId });
+        saveNotification(authorUid, { type: 'like', fromUid: uid, fromName: name, postId });
+      }
+    } catch (e) {
+      console.warn('[postService] 좋아요 알림 실패:', e);
+    }
   }
 }
 
@@ -165,6 +182,18 @@ export async function addComment(
   // 게시물의 commentCount 증가
   const postRef = doc(db, 'posts', postId);
   await updateDoc(postRef, { commentCount: increment(1) });
+
+  // 댓글 알림 발송
+  try {
+    const postSnap = await getDoc(postRef);
+    const authorUid = postSnap.data()?.authorUid;
+    if (authorUid && authorUid !== comment.uid) {
+      sendPushNotification(authorUid, '새 댓글', `${comment.name}: ${comment.text}`, { postId });
+      saveNotification(authorUid, { type: 'comment', fromUid: comment.uid, fromName: comment.name, postId });
+    }
+  } catch (e) {
+    console.warn('[postService] 댓글 알림 실패:', e);
+  }
 
   return docRef.id;
 }

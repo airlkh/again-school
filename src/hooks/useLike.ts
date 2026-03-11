@@ -4,6 +4,7 @@ import { Alert } from 'react-native';
 import { db } from '../config/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { sendPushNotification } from '../services/notificationService';
+import { saveNotification } from '../services/notificationStoreService';
 
 /**
  * 더미 ID인지 판별 (Firestore에 없는 로컬 데이터)
@@ -74,6 +75,7 @@ export function useLike(postId: string) {
             '회원님의 게시물을 좋아합니다',
             { type: 'like', postId },
           ).catch(() => {});
+          saveNotification(authorUid, { type: 'like', fromUid: user.uid, fromName: senderName, postId });
         }
       }
     } catch {
