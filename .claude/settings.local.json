@@ -14,7 +14,8 @@
       "Bash(/c/Users/airlk/AppData/Local/Android/Sdk/platform-tools/adb.exe devices:*)",
       "Bash(npx expo:*)",
       "Bash(/c/Users/airlk/AppData/Local/Android/Sdk/platform-tools/adb.exe:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(cmd.exe:*)"
     ]
   }
 }

@@ -29,6 +29,16 @@ export interface PostMusic {
   volume: number;
 }
 
+export type PostVisibility = 'public' | 'school' | 'grade' | 'connections' | 'private';
+
+export interface VisibilitySchool {
+  schoolId: string;
+  schoolName: string;
+  schoolType: string;
+  graduationYear: string;
+  level: 'school' | 'grade';
+}
+
 export interface FirestorePost {
   id: string;
   authorUid: string;
@@ -46,6 +56,8 @@ export interface FirestorePost {
   yearTag?: number;
   memoryTag?: string;
   schoolName?: string;
+  visibility?: PostVisibility;
+  visibilitySchools?: VisibilitySchool[];
   likes: number;
   likedBy: string[];
   commentCount: number;
@@ -73,6 +85,8 @@ export async function createPost(
   );
   const docRef = await addDoc(colRef, {
     ...cleanData,
+    visibility: data.visibility ?? 'public',
+    visibilitySchools: data.visibilitySchools ?? [],
     likes: 0,
     likedBy: [],
     commentCount: 0,

@@ -208,7 +208,7 @@ export default function ProfileDetailScreen() {
           <View style={styles.nameRow}>
             <NameWithBadge
               name={displayName}
-              isAdmin={verified}
+              isAdmin={false}
               trustCount={trustCount}
               nameStyle={[styles.displayName, { color: colors.text }]}
               size="medium"
@@ -227,7 +227,7 @@ export default function ProfileDetailScreen() {
                 paddingHorizontal: 12,
                 paddingVertical: 6,
                 marginTop: 8,
-                alignSelf: 'flex-start',
+                alignSelf: 'center',
               }}
             >
               <View

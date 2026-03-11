@@ -91,7 +91,9 @@ const PostGrid = React.memo(function PostGrid({
   loadingPosts,
   isDark,
   colors,
-  onEndReached,
+  hasMore,
+  loadingMore,
+  onLoadMore,
   headerComponent,
   footerComponent,
 }: {
@@ -99,7 +101,9 @@ const PostGrid = React.memo(function PostGrid({
   loadingPosts: boolean;
   isDark: boolean;
   colors: any;
-  onEndReached: () => void;
+  hasMore: boolean;
+  loadingMore: boolean;
+  onLoadMore: () => void;
   headerComponent: React.ReactElement;
   footerComponent: React.ReactElement;
 }) {
@@ -144,9 +148,29 @@ const PostGrid = React.memo(function PostGrid({
           </View>
         )
       }
-      ListFooterComponent={footerComponent}
-      onEndReached={onEndReached}
-      onEndReachedThreshold={0.5}
+      ListFooterComponent={
+        <>
+          {hasMore ? (
+            <TouchableOpacity
+              onPress={onLoadMore}
+              style={{
+                alignItems: 'center',
+                paddingVertical: 16,
+                marginBottom: 8,
+              }}
+            >
+              {loadingMore ? (
+                <ActivityIndicator color={colors.text} />
+              ) : (
+                <Text style={{ color: colors.text, fontSize: 14, fontWeight: '600' }}>
+                  더보기
+                </Text>
+              )}
+            </TouchableOpacity>
+          ) : null}
+          {footerComponent}
+        </>
+      }
       removeClippedSubviews={true}
       maxToRenderPerBatch={6}
       windowSize={5}
@@ -860,7 +884,9 @@ export default function ProfileScreen() {
         loadingPosts={loadingPosts}
         isDark={isDark}
         colors={colors}
-        onEndReached={handleLoadMore}
+        hasMore={hasMoreRef.current}
+        loadingMore={loadingPosts}
+        onLoadMore={handleLoadMore}
         headerComponent={listHeader}
         footerComponent={listFooter}
       />

@@ -67,6 +67,7 @@ export default function ProfileEditScreen() {
       await updateUserProfile(user.uid, {
         displayName: displayName.trim(),
         job: job.trim(),
+        workplace: job.trim(),
         region: { sido, sigungu },
       });
       Alert.alert('완료', '프로필이 저장되었습니다.', [

@@ -13,6 +13,8 @@ import {
   Animated,
   PanResponder,
   Keyboard,
+  Pressable,
+  BackHandler,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,7 +29,7 @@ import {
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useCurrentUser } from '../../src/hooks/useCurrentUser';
 import { createStory } from '../../src/services/storyService';
-import { createPost } from '../../src/services/postService';
+import { createPost, PostVisibility, VisibilitySchool } from '../../src/services/postService';
 import { CLOUDINARY_CONFIG } from '../../src/config/cloudinary';
 
 const { width: SW, height: SH } = Dimensions.get('window');
@@ -61,11 +63,12 @@ export default function UploadScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
-  const { uid, displayName, avatarImg, photoURL } = useCurrentUser();
+  const { uid, displayName, avatarImg, photoURL, profile } = useCurrentUser();
   const params = useLocalSearchParams();
 
   // 단계
   const [step, setStep] = useState<Step>('gallery');
+  const stepRef = useRef<Step>('gallery');
 
   // 미디어
   const [mediaList, setMediaList] = useState<MediaItem[]>([]);
@@ -103,6 +106,24 @@ export default function UploadScreen() {
   // 합성 이미지 URI (edit → share 전환 시 캡처)
   const [compositeUri, setCompositeUri] = useState<string | null>(null);
 
+  // 공개범위
+  const [visibility, setVisibility] = useState<PostVisibility>('public');
+  const [visibilitySchools, setVisibilitySchools] = useState<VisibilitySchool[]>([]);
+  const [showVisibilityModal, setShowVisibilityModal] = useState(false);
+  const showVisibilityModalRef = useRef(false);
+  const [showSchoolPicker, setShowSchoolPicker] = useState(false);
+  const [pendingVisibility, setPendingVisibility] = useState<PostVisibility>('public');
+
+  const getVisibilityLabel = (v: PostVisibility): string => {
+    switch(v) {
+      case 'public': return '🌍 전체 공개';
+      case 'school': return '🏫 같은 학교';
+      case 'grade': return '🎓 같은 학년';
+      case 'connections': return '👥 동창만';
+      case 'private': return '🔒 나만 보기';
+    }
+  };
+
   // 공유 설정
   const [caption, setCaption] = useState('');
   const [uploadTarget, setUploadTarget] = useState<UploadTarget>(
@@ -128,6 +149,38 @@ export default function UploadScreen() {
   // 갤러리 로드
   useEffect(() => {
     loadGallery();
+  }, []);
+
+  useEffect(() => {
+    showVisibilityModalRef.current = showVisibilityModal;
+    console.log('[visibility] showVisibilityModal 변경됨:', showVisibilityModal);
+  }, [showVisibilityModal]);
+
+  useEffect(() => {
+    stepRef.current = step;
+    console.log('[visibility] step 변경됨:', step);
+  }, [step]);
+
+  useEffect(() => {
+    const onBackPress = () => {
+      console.log('[back] 눌림, showVisibilityModalRef:', showVisibilityModalRef.current, 'step:', stepRef.current);
+      if (showVisibilityModalRef.current) {
+        setShowVisibilityModal(false);
+        setShowSchoolPicker(false);
+        return true;
+      }
+      if (stepRef.current === 'share') {
+        setStep('edit');
+        return true;
+      }
+      if (stepRef.current === 'edit') {
+        setStep('gallery');
+        return true;
+      }
+      return false;
+    };
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
   }, []);
 
   const loadGallery = async () => {
@@ -335,6 +388,8 @@ export default function UploadScreen() {
           thumbnailUrl: videoThumbnail,
           mediaItems: results.map((r) => r.url),
           caption: caption || '',
+          visibility,
+          visibilitySchools,
         });
       }
 
@@ -1056,7 +1111,10 @@ export default function UploadScreen() {
   const shareThumbUri = compositeUri || selectedMedia[0]?.uri;
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View
+      style={{ flex: 1, backgroundColor: colors.background }}
+      onLayout={() => console.log('[visibility] share View 렌더링됨')}
+    >
       {/* 헤더 */}
       <View
         style={{
@@ -1149,6 +1207,28 @@ export default function UploadScreen() {
           <Ionicons name="chevron-forward" size={18} color={colors.inactive} />
         </TouchableOpacity>
 
+        <TouchableOpacity
+          onPress={() => {
+            console.log('[visibility] 버튼 탭됨, showVisibilityModal:', showVisibilityModal);
+            setShowVisibilityModal(true);
+          }}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 16,
+            paddingVertical: 14,
+            borderBottomWidth: 0.5,
+            borderBottomColor: colors.border,
+          }}
+        >
+          <Ionicons name="eye-outline" size={22} color={colors.text} />
+          <Text style={{ flex: 1, marginLeft: 12, fontSize: 15, color: colors.text }}>
+            공개범위
+          </Text>
+          <Text style={{ fontSize: 14, color: colors.primary }}>{getVisibilityLabel(visibility)}</Text>
+          <Ionicons name="chevron-forward" size={16} color={colors.inactive} style={{ marginLeft: 4 }} />
+        </TouchableOpacity>
+
         {/* 구분선 */}
         <View style={{ height: 8, backgroundColor: colors.border + '33' }} />
 
@@ -1235,6 +1315,168 @@ export default function UploadScreen() {
           )}
         </TouchableOpacity>
       </View>
+
+      {/* 공개범위 선택 */}
+      {showVisibilityModal && (
+        <>
+          {/* 배경 딤 레이어 - 탭하면 닫힘 */}
+          <Pressable
+            onPress={() => {
+              console.log('[visibility] 딤 레이어 탭됨');
+              setShowVisibilityModal(false);
+              setShowSchoolPicker(false);
+            }}
+            style={{
+              position: 'absolute',
+              top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: 'rgba(0,0,0,0.5)',
+              zIndex: 9998,
+              elevation: 9998,
+            }}
+          />
+          {/* 콘텐츠 - 별도 View로 분리 */}
+          <View
+            style={{
+              position: 'absolute',
+              bottom: 0, left: 0, right: 0,
+              backgroundColor: colors.background,
+              borderTopLeftRadius: 16,
+              borderTopRightRadius: 16,
+              paddingTop: 20,
+              paddingHorizontal: 20,
+              paddingBottom: 40,
+              maxHeight: '80%',
+              zIndex: 9999,
+              elevation: 9999,
+            }}
+          >
+            {!showSchoolPicker ? (
+              <>
+                <Text style={{ fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: 16 }}>
+                  공개범위 설정
+                </Text>
+                {(['public', 'school', 'grade', 'connections', 'private'] as PostVisibility[]).map((v) => (
+                  <TouchableOpacity
+                    key={v}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      if (v === 'school' || v === 'grade') {
+                        console.log('[visibility] pendingVisibility:', v);
+                        setPendingVisibility(v);
+                        setShowSchoolPicker(true);
+                      } else {
+                        setVisibility(v);
+                        setVisibilitySchools([]);
+                        setShowVisibilityModal(false);
+                      }
+                    }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingVertical: 14,
+                      borderBottomWidth: 0.5,
+                      borderBottomColor: colors.border,
+                    }}
+                  >
+                    <Text style={{ flex: 1, fontSize: 15, color: colors.text }}>
+                      {getVisibilityLabel(v)}
+                    </Text>
+                    {visibility === v && (
+                      <Ionicons name="checkmark" size={20} color={colors.primary} />
+                    )}
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  onPress={(e) => { e.stopPropagation(); setShowVisibilityModal(false); }}
+                  style={{ marginTop: 12, alignItems: 'center', paddingVertical: 12 }}
+                >
+                  <Text style={{ color: colors.inactive, fontSize: 15 }}>취소</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: 4 }}>
+                  학교 선택
+                </Text>
+                <Text style={{ fontSize: 13, color: colors.inactive, marginBottom: 16 }}>
+                  {pendingVisibility === 'school'
+                    ? '선택한 학교의 모든 졸업생에게 공개됩니다'
+                    : '선택한 학교의 같은 졸업년도 학생에게만 공개됩니다'}
+                </Text>
+                <ScrollView style={{ flex: 1, maxHeight: 200 }}>
+                  {(profile?.schools ?? []).map((school) => {
+                    const isSelected = visibilitySchools.some((s) => s.schoolName === school.schoolName);
+                    return (
+                      <TouchableOpacity
+                        key={school.schoolName}
+                        onPress={() => {
+                          if (isSelected) {
+                            setVisibilitySchools((prev) => prev.filter((s) => s.schoolName !== school.schoolName));
+                          } else {
+                            setVisibilitySchools((prev) => [
+                              ...prev,
+                              {
+                                schoolId: school.schoolName,
+                                schoolName: school.schoolName,
+                                schoolType: school.schoolType,
+                                graduationYear: String(school.graduationYear),
+                                level: pendingVisibility === 'grade' ? 'grade' : 'school',
+                              },
+                            ]);
+                          }
+                        }}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingVertical: 14,
+                          borderBottomWidth: 0.5,
+                          borderBottomColor: colors.border,
+                        }}
+                      >
+                        <Text style={{ flex: 1, fontSize: 15, color: colors.text }}>
+                          {school.schoolType} · {school.schoolName}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: colors.inactive }}>
+                          {pendingVisibility === 'school'
+                            ? '전체 졸업생 공개'
+                            : `${school.graduationYear}년 졸업생만 공개`}
+                        </Text>
+                        {isSelected && <Ionicons name="checkmark" size={20} color={colors.primary} />}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+                <TouchableOpacity
+                  onPress={() => {
+                    if (visibilitySchools.length === 0) {
+                      Alert.alert('학교를 1개 이상 선택해주세요');
+                      return;
+                    }
+                    setVisibility(pendingVisibility);
+                    setShowSchoolPicker(false);
+                    setShowVisibilityModal(false);
+                  }}
+                  style={{
+                    marginTop: 12,
+                    backgroundColor: colors.primary,
+                    borderRadius: 10,
+                    paddingVertical: 14,
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>확인</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setShowSchoolPicker(false)}
+                  style={{ marginTop: 8, alignItems: 'center', paddingVertical: 12, paddingBottom: 20, marginBottom: 20 }}
+                >
+                  <Text style={{ color: colors.inactive, fontSize: 15 }}>뒤로</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </>
+      )}
     </View>
   );
 }
