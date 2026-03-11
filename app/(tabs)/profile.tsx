@@ -46,22 +46,42 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 const GRID_SIZE = Math.floor(SCREEN_WIDTH / 3);
 
 const getVideoThumbnail = (post: any): string | null => {
+  console.log('[thumb] post.id:', post.id);
+  console.log('[thumb] thumbnailUrl:', post.thumbnailUrl);
+  console.log('[thumb] imageUrl:', post.imageUrl);
+  console.log('[thumb] videoUrl:', post.videoUrl);
+  console.log('[thumb] mediaItems:', JSON.stringify(post.mediaItems?.slice(0, 1)));
+
+  // 1순위: 저장된 썸네일
   if (post.thumbnailUrl) return post.thumbnailUrl as string;
+
+  // 2순위: mediaItems 배열에서 첫번째 썸네일 or 이미지
+  if (post.mediaItems && post.mediaItems.length > 0) {
+    const first = post.mediaItems[0];
+    if (first.thumbnailUrl) return first.thumbnailUrl as string;
+    if (first.url && !first.url.endsWith('.mp4') && !first.url.endsWith('.mov')) {
+      return first.url as string;
+    }
+  }
+
+  // 3순위: imageUrl이 이미지면 그대로 사용
   if (post.imageUrl &&
       !post.imageUrl.endsWith('.mp4') &&
       !post.imageUrl.endsWith('.mov')) {
     return post.imageUrl as string;
   }
+
+  // 4순위: Cloudinary 동영상 URL → 썸네일 변환
   const vUrl: string | undefined = post.videoUrl || post.imageUrl;
-  if (vUrl && vUrl.includes('cloudinary.com')) {
-    const parts = vUrl.split('/video/upload/');
-    if (parts.length === 2) {
-      const withJpg = parts[1]
-        .replace('.mp4', '.jpg')
-        .replace('.mov', '.jpg');
-      return parts[0] + '/video/upload/w_600/' + withJpg;
+  if (vUrl && vUrl.includes('res.cloudinary.com')) {
+    if (vUrl.includes('/video/upload/')) {
+      const base = vUrl.replace(/\/video\/upload\/[^\/]*\//, '/video/upload/');
+      return base
+        .replace('/video/upload/', '/video/upload/f_jpg,q_70,w_600/')
+        .replace(/\.(mp4|mov|avi|webm)(\?.*)?$/i, '.jpg');
     }
   }
+
   return null;
 };
 
@@ -87,7 +107,7 @@ const PostGrid = React.memo(function PostGrid({
     const thumbUri = getVideoThumbnail(post);
     return (
       <TouchableOpacity style={styles.postGridItem} onPress={() => router.push(`/post/${post.id}`)}>
-        <Image source={thumbUri ? { uri: thumbUri } : undefined} style={styles.postGridImage} resizeMode="cover" fadeDuration={0} />
+        <Image key={thumbUri ?? post.id} source={thumbUri ? { uri: thumbUri, cache: 'reload' } : undefined} style={styles.postGridImage} resizeMode="cover" fadeDuration={0} />
         {post.mediaItems && post.mediaItems.length > 1 && (
           <View style={styles.multiImageIcon}>
             <Ionicons name="copy-outline" size={14} color="#fff" />
@@ -152,6 +172,7 @@ function getItemLayout(_: any, index: number) {
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
   const { colors, isDark, mode, setMode } = useTheme();
+
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [connections, setConnections] = useState<ConnectionRequest[]>([]);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);

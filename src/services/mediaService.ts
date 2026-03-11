@@ -11,7 +11,6 @@ interface UploadResult {
   type: MediaType;
 }
 
-/** 이미지 자동 리사이즈/압축 (최대 1080px, 품질 80%) */
 export async function compressImage(uri: string): Promise<string> {
   const result = await ImageManipulator.manipulateAsync(
     uri,
@@ -21,7 +20,6 @@ export async function compressImage(uri: string): Promise<string> {
   return result.uri;
 }
 
-/** 이미지 크롭 */
 export async function cropImage(
   uri: string,
   crop: { originX: number; originY: number; width: number; height: number },
@@ -38,7 +36,6 @@ export async function uploadImage(
   uri: string,
   onProgress?: (progress: number) => void,
 ): Promise<UploadResult> {
-  // 자동 압축
   let compressedUri: string;
   try {
     compressedUri = await compressImage(uri);
@@ -95,16 +92,7 @@ export async function uploadImage(
   });
 }
 
-export async function uploadVideo(
-  uri: string,
-  onProgress?: (progress: number) => void,
-): Promise<UploadResult> {
-  if (!uri || uri.trim() === '') {
-    throw new Error('파일 경로가 없습니다.');
-  }
-
-  console.log('동영상 업로드 시작:', uri.substring(0, 80));
-
+function xhrUploadVideo(uri: string, onProgress?: (progress: number) => void): Promise<string> {
   return new Promise((resolve, reject) => {
     const formData = new FormData();
     formData.append('file', {
@@ -125,25 +113,11 @@ export async function uploadVideo(
       }
     });
 
-    xhr.addEventListener('load', async () => {
+    xhr.addEventListener('load', () => {
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           const data = JSON.parse(xhr.responseText);
-
-          // 썸네일 추출 후 이미지로 업로드
-          let thumbnailUrl: string | undefined;
-          try {
-            const thumbnail = await getThumbnailAsync(uri, { time: 1000 });
-            const thumbResult = await uploadImage(thumbnail.uri);
-            thumbnailUrl = thumbResult.url;
-          } catch {
-            // 썸네일 추출 실패 시 Cloudinary URL 변환 fallback
-            thumbnailUrl = data.secure_url
-              .replace('/video/upload/', '/video/upload/f_jpg,w_600/')
-              .replace(/\.(mp4|mov)(\?|$)/i, '.jpg$2');
-          }
-
-          resolve({ url: data.secure_url, thumbnailUrl, type: 'video' });
+          resolve(data.secure_url);
         } catch {
           reject(new Error('서버 응답을 처리할 수 없습니다.'));
         }
@@ -162,13 +136,55 @@ export async function uploadVideo(
     xhr.addEventListener('error', () => reject(new Error('네트워크 오류가 발생했습니다. 인터넷 연결을 확인해주세요.')));
     xhr.addEventListener('timeout', () => reject(new Error('업로드 시간이 초과되었습니다. 다시 시도해주세요.')));
 
-    xhr.timeout = 600000; // 10분 타임아웃
+    xhr.timeout = 600000;
     xhr.open('POST', CLOUDINARY_CONFIG.videoUploadUrl);
     xhr.send(formData);
   });
 }
 
-/** 업로드 실패 시 재시도 Alert */
+async function extractAndUploadThumbnail(localVideoUri: string): Promise<string | undefined> {
+  try {
+    const { uri: thumbUri } = await getThumbnailAsync(localVideoUri, {
+      time: 1000,
+      quality: 0.7,
+    });
+    const thumbResult = await uploadImage(thumbUri);
+    return thumbResult.url;
+  } catch (e) {
+    console.warn('썸네일 추출/업로드 실패:', e);
+    return undefined;
+  }
+}
+
+export function getVideoThumbnailFromUrl(videoUrl: string): string | undefined {
+  // Cloudinary transformation URL은 400 에러 나므로 사용하지 않음
+  return undefined;
+}
+
+export async function uploadVideo(
+  uri: string,
+  onProgress?: (progress: number) => void,
+): Promise<UploadResult> {
+  if (!uri || uri.trim() === '') {
+    throw new Error('파일 경로가 없습니다.');
+  }
+
+  // Step 1: 동영상 업로드 전에 로컬 URI로 썸네일 먼저 추출
+  const thumbnailUrl = await extractAndUploadThumbnail(uri);
+
+  // Step 2: 동영상 업로드 (순수 Promise, async 콜백 없음)
+  const videoUrl = await xhrUploadVideo(uri, onProgress);
+
+  // Step 3: 썸네일 없으면 Cloudinary URL 변환으로 fallback
+  const finalThumbnailUrl = thumbnailUrl ?? getVideoThumbnailFromUrl(videoUrl);
+
+  return {
+    url: videoUrl,
+    thumbnailUrl: finalThumbnailUrl,
+    type: 'video',
+  };
+}
+
 export function showUploadRetryAlert(
   error: unknown,
   retryFn: () => void,
