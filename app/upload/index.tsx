@@ -70,9 +70,11 @@ export default function UploadScreen() {
   // 미디어
   const [mediaList, setMediaList] = useState<MediaItem[]>([]);
   const [selectedMedia, setSelectedMedia] = useState<MediaItem[]>([]);
+  const [isMultiSelect, setIsMultiSelect] = useState(false);
   const [imageHeight, setImageHeight] = useState(SW);
 
   // 편집
+  const [editIndex, setEditIndex] = useState(0);
   const [overlayText, setOverlayText] = useState('');
   const [textColor, setTextColor] = useState('#ffffff');
   const [textSize, setTextSize] = useState(24);
@@ -151,6 +153,12 @@ export default function UploadScreen() {
 
   // 미디어 선택/해제
   const toggleSelect = (item: MediaItem) => {
+    if (!isMultiSelect) {
+      // 단일 선택: 탭한 항목 1개만 선택
+      setSelectedMedia([item]);
+      return;
+    }
+    // 다중 선택
     const exists = selectedMedia.find((m) => m.uri === item.uri);
     if (exists) {
       setSelectedMedia((prev) => prev.filter((m) => m.uri !== item.uri));
@@ -409,14 +417,14 @@ export default function UploadScreen() {
               <Ionicons name="image-outline" size={48} color="#555" />
               <Text style={{ color: '#555', fontSize: 15, marginTop: 12 }}>사진을 선택하세요</Text>
             </View>
-          ) : selectedMedia[0].type === 'video' ? (
+          ) : selectedMedia[selectedMedia.length - 1].type === 'video' ? (
             <View style={{ width: SW, height: SW, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }}>
               <Text style={{ fontSize: 60 }}>🎬</Text>
               <Text style={{ color: '#fff', marginTop: 8, fontSize: 14 }}>동영상 선택됨</Text>
             </View>
           ) : (
             <Image
-              source={{ uri: selectedMedia[0].uri }}
+              source={{ uri: selectedMedia[selectedMedia.length - 1].uri }}
               style={{ width: SW, height: SW }}
               resizeMode="contain"
               onLoad={(e) => {
@@ -448,8 +456,13 @@ export default function UploadScreen() {
           {/* 다중선택 토글 */}
           <TouchableOpacity
             onPress={() => {
-              if (selectedMedia.length > 1) {
-                setSelectedMedia([selectedMedia[selectedMedia.length - 1]]);
+              if (isMultiSelect) {
+                setIsMultiSelect(false);
+                if (selectedMedia.length > 1) {
+                  setSelectedMedia([selectedMedia[selectedMedia.length - 1]]);
+                }
+              } else {
+                setIsMultiSelect(true);
               }
             }}
             style={{
@@ -459,7 +472,7 @@ export default function UploadScreen() {
               width: 36,
               height: 36,
               borderRadius: 18,
-              backgroundColor: selectedMedia.length > 1 ? '#0095f6' : 'rgba(255,255,255,0.2)',
+              backgroundColor: isMultiSelect ? '#0095f6' : 'rgba(255,255,255,0.2)',
               alignItems: 'center',
               justifyContent: 'center',
             }}
@@ -554,7 +567,7 @@ export default function UploadScreen() {
   // 2단계: 편집
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   if (step === 'edit') {
-    const currentMedia = selectedMedia[0];
+    const currentMedia = selectedMedia[editIndex] ?? selectedMedia[0];
     const isVideo = currentMedia?.type === 'video';
     const VSLIDER_H = 200;
     const sizeNorm = (textSize - 16) / 48; // 0~1
@@ -597,82 +610,187 @@ export default function UploadScreen() {
 
         {/* ── 미디어 영역 ── */}
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          {isVideo ? (
-            /* 동영상: Video 컴포넌트 크래시 방지 — 편집 없이 안내만 표시 */
-            <View style={{
-              flex: 1,
-              backgroundColor: '#000',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-              <Text style={{ color: '#fff', fontSize: 16 }}>
-                🎬 동영상이 선택되었습니다
-              </Text>
-              <Text style={{ color: '#999', fontSize: 13, marginTop: 8 }}>
-                다음을 눌러 업로드하세요
-              </Text>
-            </View>
-          ) : (
-            /* 이미지: ViewShot으로 텍스트 합성 */
-            <ViewShot
-              ref={viewShotRef}
-              options={{ format: 'jpg', quality: 0.95 }}
-              style={{ width: SW, height: imageHeight, backgroundColor: '#000' }}
-            >
-              <Image
-                source={{ uri: currentMedia?.uri }}
-                style={{ width: SW, height: imageHeight }}
-                resizeMode="contain"
-                onLoad={(e) => {
-                  const { width, height } = e.nativeEvent.source;
-                  const ratio = height / width;
-                  setImageHeight(Math.min(Math.max(SW * ratio, 300), SH * 0.6));
-                }}
-              />
+          {selectedMedia.length <= 1 ? (
+            // 단일 미디어
+            isVideo ? (
+              <View style={{
+                flex: 1,
+                backgroundColor: '#000',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <Text style={{ color: '#fff', fontSize: 16 }}>
+                  🎬 동영상이 선택되었습니다
+                </Text>
+                <Text style={{ color: '#999', fontSize: 13, marginTop: 8 }}>
+                  다음을 눌러 업로드하세요
+                </Text>
+              </View>
+            ) : (
+              <ViewShot
+                ref={viewShotRef}
+                options={{ format: 'jpg', quality: 0.95 }}
+                style={{ width: SW, height: imageHeight, backgroundColor: '#000' }}
+              >
+                <Image
+                  source={{ uri: currentMedia?.uri }}
+                  style={{ width: SW, height: imageHeight }}
+                  resizeMode="contain"
+                  onLoad={(e) => {
+                    const { width, height } = e.nativeEvent.source;
+                    const ratio = height / width;
+                    setImageHeight(Math.min(Math.max(SW * ratio, 300), SH * 0.6));
+                  }}
+                />
 
-              {/* 텍스트 오버레이 — PanGestureHandler 드래그 (입력 모드 아닐 때만) */}
-              {overlayText.trim().length > 0 && !showTextInput && (
-                <PanGestureHandler
-                  onGestureEvent={onTextGestureEvent}
-                  onHandlerStateChange={onTextHandlerStateChange}
-                >
-                  <Animated.View
-                    style={{
-                      position: 'absolute',
-                      alignSelf: 'center',
-                      left: SW / 2 - 60,
-                      top: imageHeight / 2 - textSize / 2,
-                      maxWidth: SW * 0.85,
-                      zIndex: 10,
-                      transform: pan.getTranslateTransform(),
-                    }}
+                {overlayText.trim().length > 0 && !showTextInput && (
+                  <PanGestureHandler
+                    onGestureEvent={onTextGestureEvent}
+                    onHandlerStateChange={onTextHandlerStateChange}
                   >
-                    <View
+                    <Animated.View
                       style={{
-                        backgroundColor: getTextBg(),
-                        borderRadius: 6,
-                        paddingHorizontal: bgStyle !== 'none' ? 10 : 0,
-                        paddingVertical: bgStyle !== 'none' ? 4 : 0,
+                        position: 'absolute',
+                        alignSelf: 'center',
+                        left: SW / 2 - 60,
+                        top: imageHeight / 2 - textSize / 2,
+                        maxWidth: SW * 0.85,
+                        zIndex: 10,
+                        transform: pan.getTranslateTransform(),
                       }}
                     >
-                      <Text
+                      <View
                         style={{
-                          color: textColor,
-                          fontSize: textSize,
-                          fontWeight: '700',
-                          textAlign: 'center',
-                          textShadowColor: 'rgba(0,0,0,0.6)',
-                          textShadowOffset: { width: 1, height: 1 },
-                          textShadowRadius: 3,
+                          backgroundColor: getTextBg(),
+                          borderRadius: 6,
+                          paddingHorizontal: bgStyle !== 'none' ? 10 : 0,
+                          paddingVertical: bgStyle !== 'none' ? 4 : 0,
                         }}
                       >
-                        {overlayText}
-                      </Text>
-                    </View>
-                  </Animated.View>
-                </PanGestureHandler>
-              )}
-            </ViewShot>
+                        <Text
+                          style={{
+                            color: textColor,
+                            fontSize: textSize,
+                            fontWeight: '700',
+                            textAlign: 'center',
+                            textShadowColor: 'rgba(0,0,0,0.6)',
+                            textShadowOffset: { width: 1, height: 1 },
+                            textShadowRadius: 3,
+                          }}
+                        >
+                          {overlayText}
+                        </Text>
+                      </View>
+                    </Animated.View>
+                  </PanGestureHandler>
+                )}
+              </ViewShot>
+            )
+          ) : (
+            // 다중 미디어: 스와이프
+            <View style={{ flex: 1 }}>
+              <FlatList
+                data={selectedMedia}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                keyExtractor={(_, i) => String(i)}
+                onMomentumScrollEnd={(e) => {
+                  const idx = Math.round(e.nativeEvent.contentOffset.x / SW);
+                  setEditIndex(idx);
+                }}
+                renderItem={({ item: mediaItem }) => (
+                  <View style={{ width: SW, justifyContent: 'center', alignItems: 'center' }}>
+                    {mediaItem.type === 'video' ? (
+                      <View style={{
+                        width: SW,
+                        height: imageHeight,
+                        backgroundColor: '#000',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}>
+                        <Text style={{ color: '#fff', fontSize: 16 }}>
+                          🎬 동영상
+                        </Text>
+                      </View>
+                    ) : (
+                      <ViewShot
+                        ref={viewShotRef}
+                        options={{ format: 'jpg', quality: 0.95 }}
+                        style={{ width: SW, height: imageHeight, backgroundColor: '#000' }}
+                      >
+                        <Image
+                          source={{ uri: mediaItem.uri }}
+                          style={{ width: SW, height: imageHeight }}
+                          resizeMode="contain"
+                          onLoad={(e) => {
+                            const { width, height } = e.nativeEvent.source;
+                            const ratio = height / width;
+                            setImageHeight(Math.min(Math.max(SW * ratio, 300), SH * 0.6));
+                          }}
+                        />
+
+                        {overlayText.trim().length > 0 && !showTextInput && (
+                          <PanGestureHandler
+                            onGestureEvent={onTextGestureEvent}
+                            onHandlerStateChange={onTextHandlerStateChange}
+                          >
+                            <Animated.View
+                              style={{
+                                position: 'absolute',
+                                alignSelf: 'center',
+                                left: SW / 2 - 60,
+                                top: imageHeight / 2 - textSize / 2,
+                                maxWidth: SW * 0.85,
+                                zIndex: 10,
+                                transform: pan.getTranslateTransform(),
+                              }}
+                            >
+                              <View
+                                style={{
+                                  backgroundColor: getTextBg(),
+                                  borderRadius: 6,
+                                  paddingHorizontal: bgStyle !== 'none' ? 10 : 0,
+                                  paddingVertical: bgStyle !== 'none' ? 4 : 0,
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    color: textColor,
+                                    fontSize: textSize,
+                                    fontWeight: '700',
+                                    textAlign: 'center',
+                                    textShadowColor: 'rgba(0,0,0,0.6)',
+                                    textShadowOffset: { width: 1, height: 1 },
+                                    textShadowRadius: 3,
+                                  }}
+                                >
+                                  {overlayText}
+                                </Text>
+                              </View>
+                            </Animated.View>
+                          </PanGestureHandler>
+                        )}
+                      </ViewShot>
+                    )}
+                  </View>
+                )}
+              />
+              {/* 페이지 인디케이터 */}
+              <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 5, paddingVertical: 8 }}>
+                {selectedMedia.map((_, i) => (
+                  <View
+                    key={i}
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: 3,
+                      backgroundColor: i === editIndex ? '#fff' : 'rgba(255,255,255,0.35)',
+                    }}
+                  />
+                ))}
+              </View>
+            </View>
           )}
         </View>
 

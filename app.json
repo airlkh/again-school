@@ -66,7 +66,8 @@
         }
       ],
       "@react-native-community/datetimepicker",
-      "expo-video"
+      "expo-video",
+      "expo-audio"
     ],
     "extra": {
       "router": {},

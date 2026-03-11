@@ -13,7 +13,8 @@
       "Read(//c/Users/airlk/AppData/Local/Android/Sdk/platform-tools/**)",
       "Bash(/c/Users/airlk/AppData/Local/Android/Sdk/platform-tools/adb.exe devices:*)",
       "Bash(npx expo:*)",
-      "Bash(/c/Users/airlk/AppData/Local/Android/Sdk/platform-tools/adb.exe:*)"
+      "Bash(/c/Users/airlk/AppData/Local/Android/Sdk/platform-tools/adb.exe:*)",
+      "Bash(ls:*)"
     ]
   }
 }

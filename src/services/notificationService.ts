@@ -40,10 +40,10 @@ export async function registerPushToken(uid: string): Promise<void> {
   }
 }
 
-let responseSub: Notifications.Subscription | null = null;
+let responseSub: Notifications.Subscription | undefined = undefined;
 
 /** 알림 핸들러 설정 */
-export function setupNotificationHandlers(): void {
+export function setupNotificationHandlers(): () => void {
   // 이전 리스너 정리 (중복 등록 방지)
   responseSub?.remove();
 
@@ -97,6 +97,11 @@ export function setupNotificationHandlers(): void {
   }
 
   console.log('[Push] 알림 핸들러 설정 완료');
+
+  return () => {
+    responseSub?.remove();
+    responseSub = undefined;
+  };
 }
 
 /** Expo Push API로 알림 발송 */

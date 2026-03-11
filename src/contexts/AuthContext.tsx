@@ -23,6 +23,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     console.log('[AuthContext] onAuthStateChanged 리스너 등록');
+    let notificationCleanup: (() => void) | null = null;
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       console.log('[AuthContext] onAuthStateChanged 호출됨:', firebaseUser ? `uid=${firebaseUser.uid}` : 'null (로그아웃)');
       setUser(firebaseUser);
@@ -35,7 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // 푸시 알림 등록
           if (completed) {
             registerPushToken(firebaseUser.uid).catch(() => {});
-            setupNotificationHandlers();
+            notificationCleanup = setupNotificationHandlers();
           }
         } catch (error: any) {
           console.warn('[AuthContext] checkOnboardingCompleted 에러:', error?.code, error?.message);
@@ -47,7 +48,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('[AuthContext] setIsLoading(false) 호출');
       setIsLoading(false);
     });
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      notificationCleanup?.();
+    };
   }, []);
 
   return (
