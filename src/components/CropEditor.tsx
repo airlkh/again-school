@@ -28,6 +28,11 @@ interface CropEditorProps {
   onCancel: () => void;
   squareOnly?: boolean;
   originalSize?: { width: number; height: number };
+  defaultRatio?: CropRatio;
+  currentIndex?: number;
+  totalCount?: number;
+  onNext?: () => void;
+  onPrev?: () => void;
 }
 
 export const CropEditor: React.FC<CropEditorProps> = ({
@@ -36,6 +41,11 @@ export const CropEditor: React.FC<CropEditorProps> = ({
   onCancel,
   squareOnly = false,
   originalSize,
+  defaultRatio,
+  currentIndex,
+  totalCount,
+  onNext,
+  onPrev,
 }) => {
   const insets = useSafeAreaInsets();
   const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = useWindowDimensions();
@@ -57,7 +67,8 @@ export const CropEditor: React.FC<CropEditorProps> = ({
   const cropBoxRef = useRef(cropBox);
   useEffect(() => { cropBoxRef.current = cropBox; }, [cropBox]);
 
-  const [ratio, setRatio] = useState<CropRatio>('free');
+  const swipeLock = useRef(true);
+  const [ratio, setRatio] = useState<CropRatio>(defaultRatio ?? 'free');
   const [processing, setProcessing] = useState(false);
 
   // Drag refs
@@ -80,6 +91,7 @@ export const CropEditor: React.FC<CropEditorProps> = ({
   useEffect(() => {
     if (originalSize) {
       setImageSize(originalSize);
+      setTimeout(() => { swipeLock.current = false; }, 500);
       return;
     }
     if (!imageUri) return;
@@ -87,6 +99,7 @@ export const CropEditor: React.FC<CropEditorProps> = ({
       imageUri,
       (width, height) => {
         setImageSize({ width, height });
+        setTimeout(() => { swipeLock.current = false; }, 500);
       },
       (error) => console.warn('getSize 오류:', error),
     );
@@ -256,6 +269,32 @@ export const CropEditor: React.FC<CropEditorProps> = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [ratio, imgBounds, squareOnly]);
 
+  const swipeResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_e, gesture) =>
+      Math.abs(gesture.dx) > 5 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5,
+    onPanResponderRelease: (_e, gesture) => {
+      console.log('[crop swipe] dx:', gesture.dx, 'dy:', gesture.dy);
+      // 오른쪽 스와이프
+      if (gesture.dx > 50 && Math.abs(gesture.dy) < Math.abs(gesture.dx)) {
+        console.log('[crop swipe] 오른쪽 스와이프, onPrev:', !!onPrev);
+        if (swipeLock.current) return;
+        swipeLock.current = true;
+        setTimeout(() => { swipeLock.current = false; }, 800);
+        onPrev?.();
+        return;
+      }
+      // 왼쪽 스와이프 (lock 적용)
+      if (swipeLock.current) return;
+      swipeLock.current = true;
+      setTimeout(() => { swipeLock.current = false; }, 800);
+      if (gesture.dx < -50 && Math.abs(gesture.dy) < Math.abs(gesture.dx) && !(currentIndex !== undefined && totalCount !== undefined && currentIndex >= totalCount)) {
+        console.log('[crop swipe] handleCrop 호출 시도, dx:', gesture.dx);
+        handleCrop();
+      }
+    },
+  }), [currentIndex, totalCount, onPrev]);
+
   const handleRatioChange = (newRatio: CropRatio) => {
     setRatio(newRatio);
     if (newRatio === 'free') return;
@@ -277,7 +316,13 @@ export const CropEditor: React.FC<CropEditorProps> = ({
   };
 
   const handleCrop = async () => {
-    if (imageSize.width === 0 || processing) return;
+    console.log('[crop] handleCrop 호출됨');
+    console.log('[crop] imageSize:', imageSize.width, imageSize.height, 'processing:', processing);
+    if (processing) return;
+    if (imageSize.width === 0) {
+      onCropDone(imageUri);
+      return;
+    }
     setProcessing(true);
 
     try {
@@ -296,14 +341,26 @@ export const CropEditor: React.FC<CropEditorProps> = ({
       if (originX + cropW > imageSize.width) cropW = imageSize.width - originX;
       if (originY + cropH > imageSize.height) cropH = imageSize.height - originY;
 
+      // 최솟값 보정
+      originX = Math.max(0, Math.round(originX));
+      originY = Math.max(0, Math.round(originY));
+      cropW = Math.max(1, Math.round(cropW));
+      cropH = Math.max(1, Math.round(cropH));
+      // 최댓값 보정 (핵심!)
+      if (originX + cropW > imageSize.width) cropW = imageSize.width - originX;
+      if (originY + cropH > imageSize.height) cropH = imageSize.height - originY;
+      // 최종 안전장치
+      cropW = Math.max(1, cropW);
+      cropH = Math.max(1, cropH);
+
       const result = await ImageManipulator.manipulateAsync(
         imageUri,
         [{
           crop: {
-            originX: Math.round(originX),
-            originY: Math.round(originY),
-            width: Math.round(Math.max(1, cropW)),
-            height: Math.round(Math.max(1, cropH)),
+            originX,
+            originY,
+            width: cropW,
+            height: cropH,
           },
         }],
         { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG },
@@ -317,7 +374,7 @@ export const CropEditor: React.FC<CropEditorProps> = ({
   };
 
   return (
-    <View style={s.container}>
+    <View style={s.container} {...swipeResponder.panHandlers}>
       <StatusBar barStyle="light-content" backgroundColor="#000000" translucent={false} />
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
@@ -338,7 +395,13 @@ export const CropEditor: React.FC<CropEditorProps> = ({
           {processing ? (
             <ActivityIndicator size="small" color="#4FC3F7" />
           ) : (
-            <Text style={s.headerDone}>완료</Text>
+            <Text style={s.headerDone}>
+              {!totalCount || totalCount <= 1
+                ? '완료'
+                : currentIndex! < totalCount
+                  ? `(${currentIndex}/${totalCount})`
+                  : `(${totalCount}/${totalCount}) 완료`}
+            </Text>
           )}
         </TouchableOpacity>
       </View>
@@ -404,6 +467,20 @@ export const CropEditor: React.FC<CropEditorProps> = ({
           </View>
         </View>
       </View>
+
+      {/* 스와이프 힌트 */}
+      {totalCount != null && totalCount >= 2 && (
+        <View style={{
+          position: 'absolute',
+          bottom: 160,
+          left: 0, right: 0,
+          alignItems: 'center',
+        }}>
+          <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13 }}>
+            ← 스와이프하여 다음 이미지로
+          </Text>
+        </View>
+      )}
 
       {/* Ratio bar */}
       {!squareOnly && (

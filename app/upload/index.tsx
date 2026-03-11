@@ -26,6 +26,7 @@ import {
   PanGestureHandler,
   State,
 } from 'react-native-gesture-handler';
+import { CropEditor } from '../../src/components/CropEditor';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useCurrentUser } from '../../src/hooks/useCurrentUser';
 import { createStory } from '../../src/services/storyService';
@@ -103,6 +104,13 @@ export default function UploadScreen() {
     }
   };
 
+  // 크롭 큐
+  const [cropQueue, setCropQueue] = useState<string[]>([]);
+  const [croppedMedia, setCroppedMedia] = useState<MediaItem[]>([]);
+  const cropQueueRef = useRef<string[]>([]);
+  const [originalMedia, setOriginalMedia] = useState<MediaItem[]>([]);
+  const originalMediaRef = useRef<MediaItem[]>([]);
+
   // 합성 이미지 URI (edit → share 전환 시 캡처)
   const [compositeUri, setCompositeUri] = useState<string | null>(null);
 
@@ -162,6 +170,14 @@ export default function UploadScreen() {
   }, [step]);
 
   useEffect(() => {
+    cropQueueRef.current = cropQueue;
+  }, [cropQueue]);
+
+  useEffect(() => {
+    originalMediaRef.current = originalMedia;
+  }, [originalMedia]);
+
+  useEffect(() => {
     const onBackPress = () => {
       console.log('[back] 눌림, showVisibilityModalRef:', showVisibilityModalRef.current, 'step:', stepRef.current);
       if (showVisibilityModalRef.current) {
@@ -169,13 +185,31 @@ export default function UploadScreen() {
         setShowSchoolPicker(false);
         return true;
       }
+      if (cropQueueRef.current.length > 0) {
+        setCropQueue([]);
+        setCroppedMedia([]);
+        return true;
+      }
       if (stepRef.current === 'share') {
         setStep('edit');
         return true;
       }
       if (stepRef.current === 'edit') {
+        const sourceList = originalMediaRef.current.length > 0
+          ? originalMediaRef.current
+          : selectedMedia;
+        const imageItems = sourceList.filter(m => m.type !== 'video');
+        console.log('[crop back] originalMedia:', originalMediaRef.current.map(m => m.uri.slice(-20)));
+        console.log('[crop back] selectedMedia:', selectedMedia.map(m => m.uri.slice(-20)));
+        console.log('[crop back] imageItems:', imageItems.map(m => m.uri.slice(-20)));
+        setCroppedMedia([]);
+        setCropQueue(imageItems.map(m => m.uri));
+        console.log('[crop back] originalMediaRef:', originalMediaRef.current.map(m => m.uri.slice(-20)));
         setStep('gallery');
         return true;
+      }
+      if (stepRef.current === 'gallery') {
+        return false;
       }
       return false;
     };
@@ -425,7 +459,7 @@ export default function UploadScreen() {
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   if (step === 'gallery') {
     return (
-      <View style={{ flex: 1, backgroundColor: '#000' }}>
+      <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#000' }}>
         {/* 헤더 */}
         <View
           style={{
@@ -449,7 +483,15 @@ export default function UploadScreen() {
                 Alert.alert('알림', '미디어를 선택해주세요');
                 return;
               }
-              setStep('edit');
+              const images = selectedMedia.filter(m => m.type !== 'video');
+              const videos = selectedMedia.filter(m => m.type === 'video');
+              if (images.length === 0) {
+                setStep('edit');
+                return;
+              }
+              setOriginalMedia([...selectedMedia]);
+              setCroppedMedia(videos);
+              setCropQueue(images.map(m => m.uri));
             }}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
@@ -466,7 +508,7 @@ export default function UploadScreen() {
         </View>
 
         {/* 미리보기 */}
-        <View style={{ width: SW, height: SW, backgroundColor: '#111' }}>
+        <View style={{ width: SW, height: SW, backgroundColor: '#111', overflow: 'hidden' }}>
           {selectedMedia.length === 0 ? (
             <View style={{ width: SW, height: SW, alignItems: 'center', justifyContent: 'center' }}>
               <Ionicons name="image-outline" size={48} color="#555" />
@@ -481,11 +523,7 @@ export default function UploadScreen() {
             <Image
               source={{ uri: selectedMedia[selectedMedia.length - 1].uri }}
               style={{ width: SW, height: SW }}
-              resizeMode="contain"
-              onLoad={(e) => {
-                const { width, height } = e.nativeEvent.source;
-                setImageHeight(Math.min((height / width) * SW, SW));
-              }}
+              resizeMode="cover"
             />
           )}
 
@@ -614,7 +652,59 @@ export default function UploadScreen() {
             );
           }}
         />
-      </View>
+
+        {/* CropEditor 오버레이 */}
+        {cropQueue.length > 0 && (
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+            <CropEditor
+              key={cropQueue[0]}
+              imageUri={cropQueue[0]}
+              defaultRatio="4:5"
+              currentIndex={croppedMedia.length + 1}
+              totalCount={originalMedia.length > 0
+                ? originalMedia.filter(m => m.type !== 'video').length
+                : selectedMedia.filter(m => m.type !== 'video').length}
+              onCropDone={(croppedUri) => {
+                const sourceMedia = originalMedia.length > 0 ? originalMedia : selectedMedia;
+                const original = sourceMedia.find(m => m.uri === cropQueue[0]);
+                const newCropped = [...croppedMedia, { ...original!, uri: croppedUri }];
+                const remaining = cropQueue.slice(1);
+                if (remaining.length === 0) {
+                  const sourceList = originalMedia.length > 0 ? originalMedia : selectedMedia;
+                  const finalMedia: MediaItem[] = [];
+                  let cropIdx = 0;
+                  for (const m of sourceList) {
+                    if (m.type === 'video') {
+                      finalMedia.push(m);
+                    } else {
+                      finalMedia.push(newCropped[cropIdx++] ?? m);
+                    }
+                  }
+                  setSelectedMedia(finalMedia);
+                  setCroppedMedia([]);
+                  setCropQueue([]);
+                  setStep('edit');
+                } else {
+                  setCroppedMedia(newCropped);
+                  setCropQueue(remaining);
+                }
+              }}
+              onCancel={() => {
+                setCropQueue([]);
+                setCroppedMedia([]);
+              }}
+              onPrev={() => {
+                if (croppedMedia.length === 0) return;
+                const sourceMedia = originalMedia.length > 0 ? originalMedia : selectedMedia;
+                const imageItems = sourceMedia.filter(m => m.type !== 'video');
+                const prevUri = imageItems[croppedMedia.length - 1]?.uri;
+                setCroppedMedia(prev => prev.slice(0, -1));
+                setCropQueue(prev => [prevUri ?? cropQueue[0], ...prev.slice(1)]);
+              }}
+            />
+          </View>
+        )}
+      </GestureHandlerRootView>
     );
   }
 
@@ -641,7 +731,19 @@ export default function UploadScreen() {
               paddingBottom: 12,
             }}
           >
-            <TouchableOpacity onPress={() => setStep('gallery')}>
+            <TouchableOpacity onPress={() => {
+              const sourceList = originalMediaRef.current.length > 0
+                ? originalMediaRef.current
+                : selectedMedia;
+              const imageItems = sourceList.filter(m => m.type !== 'video');
+              console.log('[crop back] originalMedia:', originalMediaRef.current.map(m => m.uri.slice(-20)));
+              console.log('[crop back] selectedMedia:', selectedMedia.map(m => m.uri.slice(-20)));
+              console.log('[crop back] imageItems:', imageItems.map(m => m.uri.slice(-20)));
+              setCroppedMedia([]);
+              setCropQueue(imageItems.map(m => m.uri));
+              console.log('[crop back] originalMediaRef:', originalMediaRef.current.map(m => m.uri.slice(-20)));
+              setStep('gallery');
+            }}>
               <Text style={{ color: '#fff', fontSize: 22 }}>←</Text>
             </TouchableOpacity>
             <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>
