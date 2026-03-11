@@ -374,12 +374,23 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
         <TouchableOpacity activeOpacity={1} onPress={handleDoubleTap}>
           <View style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH, backgroundColor: '#000' }}>
             {isVisible && inlinePlayer ? (
-              <VideoView
-                player={inlinePlayer}
-                style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH }}
-                contentFit="cover"
-                nativeControls={false}
-              />
+              <View style={{ position: 'relative' }}>
+                <VideoView
+                  player={inlinePlayer}
+                  style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH }}
+                  contentFit="cover"
+                  nativeControls={false}
+                />
+                <TouchableOpacity
+                  style={{
+                    position: 'absolute',
+                    top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: 'transparent',
+                  }}
+                  onPress={handleDoubleTap}
+                  activeOpacity={1}
+                />
+              </View>
             ) : (
               <>
                 {(() => {

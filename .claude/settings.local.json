@@ -5,7 +5,15 @@
       "Bash(grep:*)",
       "Bash(npm install:*)",
       "Bash(node:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(npx eas:*)",
+      "Bash(timeout 90 bash:*)",
+      "Bash(adb devices:*)",
+      "Bash(where adb)",
+      "Read(//c/Users/airlk/AppData/Local/Android/Sdk/platform-tools/**)",
+      "Bash(/c/Users/airlk/AppData/Local/Android/Sdk/platform-tools/adb.exe devices:*)",
+      "Bash(npx expo:*)",
+      "Bash(/c/Users/airlk/AppData/Local/Android/Sdk/platform-tools/adb.exe:*)"
     ]
   }
 }

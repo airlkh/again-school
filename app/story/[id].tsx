@@ -19,7 +19,7 @@ import { DUMMY_STORIES, DummyStory } from '../../src/data/dummyClassmates';
 import { subscribeUserStories, FirestoreStory, markStoryViewed } from '../../src/services/storyService';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { getAvatarSource } from '../../src/utils/avatar';
-import { Video, ResizeMode } from 'expo-av';
+import { VideoView, useVideoPlayer } from 'expo-video';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PROGRESS_DURATION = 5000;
@@ -77,6 +77,17 @@ export default function StoryViewerScreen() {
   const currentImage = isFirestore
     ? fsStories[currentIndex]?.mediaUrl
     : dummyStory?.images[currentIndex];
+
+  const isCurrentVideo = isFirestore && fsStories[currentIndex]?.mediaType === 'video';
+  const storyVideoPlayer = useVideoPlayer(isCurrentVideo ? (currentImage ?? null) : null, (p) => {
+    p.loop = true;
+  });
+
+  useEffect(() => {
+    if (isCurrentVideo && storyVideoPlayer) {
+      try { storyVideoPlayer.play(); } catch {}
+    }
+  }, [isCurrentVideo, storyVideoPlayer]);
 
   const currentCaption = isFirestore
     ? fsStories[currentIndex]?.caption
@@ -181,14 +192,12 @@ export default function StoryViewerScreen() {
         activeOpacity={1}
         onPress={(e) => handleTap(e.nativeEvent.locationX)}
       >
-        {isFirestore && fsStories[currentIndex]?.mediaType === 'video' ? (
-          <Video
-            source={{ uri: currentImage! }}
+        {isCurrentVideo && storyVideoPlayer ? (
+          <VideoView
+            player={storyVideoPlayer}
             style={styles.storyImage}
-            resizeMode={ResizeMode.COVER}
-            shouldPlay
-            isLooping
-            isMuted={false}
+            contentFit="cover"
+            nativeControls={false}
           />
         ) : (
           <Image

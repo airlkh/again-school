@@ -18,7 +18,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Video, ResizeMode } from 'expo-av';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -84,7 +84,21 @@ export default function ChatRoomScreen() {
   const [cropTargetUri, setCropTargetUri] = useState('');
   const [imageHeights, setImageHeights] = useState<Record<string, number>>({});
   const flatListRef = useRef<FlatList>(null);
-  const videoRef = useRef<Video>(null);
+  const chatVideoPlayer = useVideoPlayer(null, (p) => {
+    p.loop = false;
+  });
+  useEffect(() => {
+    if (previewMedia?.type === 'video' && previewMedia.url) {
+      const load = async () => {
+        try {
+          await chatVideoPlayer.replaceAsync({ uri: previewMedia.url });
+          chatVideoPlayer.play();
+        } catch {}
+      };
+      load();
+    }
+  }, [previewMedia, chatVideoPlayer]);
+
   const [isOnline, setIsOnline] = useState(online === '1');
   const avatarImg = Number(avatar) || 1;
 
@@ -367,10 +381,7 @@ export default function ChatRoomScreen() {
   // 영상 모달 닫기 (크래시 방지)
   async function handleClosePreview() {
     try {
-      if (videoRef.current) {
-        await videoRef.current.stopAsync();
-        await videoRef.current.unloadAsync();
-      }
+      chatVideoPlayer.pause();
     } catch (e) {
       console.warn('영상 정리 오류:', e);
     }
@@ -395,15 +406,7 @@ export default function ChatRoomScreen() {
           activeOpacity={0.85}
           onPress={() => setPreviewMedia({ url, type: 'video' })}
         >
-          <View style={[styles.mediaBubble, { width: MAX_BUBBLE_IMAGE_WIDTH, height: 180 }]}>
-            <Video
-              source={{ uri: url }}
-              style={StyleSheet.absoluteFill}
-              resizeMode={ResizeMode.COVER}
-              shouldPlay={false}
-              isMuted
-              onError={(e) => console.warn('채팅 영상 썸네일 오류:', e)}
-            />
+          <View style={[styles.mediaBubble, { width: MAX_BUBBLE_IMAGE_WIDTH, height: 180, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }]}>
             <View style={styles.videoPlayOverlay}>
               <Ionicons name="play-circle" size={48} color="rgba(255,255,255,0.9)" />
             </View>
@@ -616,15 +619,11 @@ export default function ChatRoomScreen() {
             <Ionicons name="close" size={28} color="#fff" />
           </TouchableOpacity>
           {previewMedia?.type === 'video' ? (
-            <Video
-              ref={videoRef}
-              source={{ uri: previewMedia.url }}
+            <VideoView
+              player={chatVideoPlayer}
               style={styles.fullscreenImage}
-              resizeMode={ResizeMode.CONTAIN}
-              shouldPlay
-              useNativeControls
-              isLooping={false}
-              onError={(e) => console.warn('채팅 전체화면 영상 오류:', e)}
+              contentFit="contain"
+              nativeControls
             />
           ) : previewMedia ? (
             <Image
