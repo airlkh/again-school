@@ -310,13 +310,11 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
             pagingEnabled
             showsHorizontalScrollIndicator={false}
             keyExtractor={(_, i) => String(i)}
-            snapToInterval={SCREEN_WIDTH}
-            snapToAlignment="start"
-            decelerationRate="fast"
+            decelerationRate="normal"
             getItemLayout={(_, i) => ({ length: SCREEN_WIDTH, offset: SCREEN_WIDTH * i, index: i })}
-            initialNumToRender={3}
-            maxToRenderPerBatch={3}
-            windowSize={5}
+            initialNumToRender={2}
+            maxToRenderPerBatch={2}
+            windowSize={3}
             removeClippedSubviews={false}
             onMomentumScrollEnd={(e) => {
               const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
