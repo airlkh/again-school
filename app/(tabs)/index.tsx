@@ -303,73 +303,80 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
 
       {/* Multi-image swipe or single image */}
       {isFirestore && fsPost?.mediaItems && fsPost.mediaItems.length > 1 ? (
-        <TouchableOpacity activeOpacity={1} onPress={handleDoubleTap}>
-          <View>
-            <FlatList
-              data={fsPost.mediaItems}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              keyExtractor={(_, i) => String(i)}
-              snapToInterval={SCREEN_WIDTH}
-              snapToAlignment="start"
-              decelerationRate="fast"
-              getItemLayout={(_, i) => ({ length: SCREEN_WIDTH, offset: SCREEN_WIDTH * i, index: i })}
-              onMomentumScrollEnd={(e) => {
-                const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
-                setImgIndex(idx);
-              }}
-              renderItem={({ item: uri, index: idx }) => (
-                <View style={{ width: SCREEN_WIDTH }}>
-                  {isVideoMedia(uri, undefined) ? (
-                    <TouchableOpacity
-                      activeOpacity={0.9}
-                      onPress={() => setPlayingVideo(uri)}
-                      style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }}
-                    >
-                      {(() => {
-                        const thumb = getVideoThumbnail({ thumbnailUrl: null, imageUrl: null, videoUrl: uri });
-                        return thumb ? (
-                          <Image source={{ uri: thumb }} style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH, position: 'absolute' }} resizeMode="cover" />
-                        ) : null;
-                      })()}
-                      <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' }}>
-                        <Ionicons name="play" size={32} color="#fff" />
-                      </View>
-                      <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 8 }}>탭하여 재생</Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <Image
-                      source={{ uri }}
-                      style={{ width: SCREEN_WIDTH, height: multiImgHeights[idx] || SCREEN_WIDTH, backgroundColor: colors.card }}
-                      resizeMode="cover"
-                      onLoad={(e) => {
-                        const { width: w, height: h } = e.nativeEvent.source;
-                        const ratio = h / w;
-                        const calculated = Math.min(Math.max(SCREEN_WIDTH * ratio, 300), SCREEN_WIDTH * 1.25);
-                        setMultiImgHeights((prev) => ({ ...prev, [idx]: calculated }));
-                      }}
-                    />
-                  )}
-                </View>
-              )}
-            />
-            <View style={styles.feedDotRow}>
-              {fsPost.mediaItems.map((_, i) => (
-                <View key={i} style={[styles.feedDot, { backgroundColor: i === imgIndex ? colors.primary : colors.border }]} />
-              ))}
-            </View>
-            {yearTag && (
-              <View style={styles.yearBadge}>
-                <Text style={styles.yearBadgeText}>{yearTag}년</Text>
-                {memoryTag && <Text style={styles.memoryBadgeText}> · {memoryTag}</Text>}
-              </View>
+        <View style={{ position: 'relative' }}>
+          <FlatList
+            data={fsPost.mediaItems}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(_, i) => String(i)}
+            snapToInterval={SCREEN_WIDTH}
+            snapToAlignment="start"
+            decelerationRate="fast"
+            getItemLayout={(_, i) => ({ length: SCREEN_WIDTH, offset: SCREEN_WIDTH * i, index: i })}
+            initialNumToRender={3}
+            maxToRenderPerBatch={3}
+            windowSize={5}
+            removeClippedSubviews={false}
+            onMomentumScrollEnd={(e) => {
+              const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+              setImgIndex(idx);
+            }}
+            renderItem={({ item: uri, index: idx }) => (
+              <TouchableOpacity
+                activeOpacity={1}
+                onPress={handleDoubleTap}
+                style={{ width: SCREEN_WIDTH }}
+              >
+                {isVideoMedia(uri, undefined) ? (
+                  <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={() => setPlayingVideo(uri)}
+                    style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    {(() => {
+                      const thumb = getVideoThumbnail({ thumbnailUrl: null, imageUrl: null, videoUrl: uri });
+                      return thumb ? (
+                        <Image source={{ uri: thumb }} style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH, position: 'absolute' }} resizeMode="cover" />
+                      ) : null;
+                    })()}
+                    <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="play" size={32} color="#fff" />
+                    </View>
+                    <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 8 }}>탭하여 재생</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <Image
+                    source={{ uri }}
+                    style={{ width: SCREEN_WIDTH, height: multiImgHeights[idx] || SCREEN_WIDTH, backgroundColor: '#000' }}
+                    resizeMode="cover"
+                    fadeDuration={0}
+                    onLoad={(e) => {
+                      const { width: w, height: h } = e.nativeEvent.source;
+                      const ratio = h / w;
+                      const calculated = Math.min(Math.max(SCREEN_WIDTH * ratio, 300), SCREEN_WIDTH * 1.25);
+                      setMultiImgHeights((prev) => ({ ...prev, [idx]: calculated }));
+                    }}
+                  />
+                )}
+              </TouchableOpacity>
             )}
-            <Animated.View pointerEvents="none" style={[styles.heartOverlay, { opacity: heartOpacity, transform: [{ scale: heartScale }] }]}>
-              <Ionicons name="heart" size={80} color={heartColor} style={{ textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 10 }} />
-            </Animated.View>
+          />
+          <View style={styles.feedDotRow}>
+            {fsPost.mediaItems.map((_, i) => (
+              <View key={i} style={[styles.feedDot, { backgroundColor: i === imgIndex ? colors.primary : colors.border }]} />
+            ))}
           </View>
-        </TouchableOpacity>
+          {yearTag && (
+            <View style={styles.yearBadge}>
+              <Text style={styles.yearBadgeText}>{yearTag}년</Text>
+              {memoryTag && <Text style={styles.memoryBadgeText}> · {memoryTag}</Text>}
+            </View>
+          )}
+          <Animated.View pointerEvents="none" style={[styles.heartOverlay, { opacity: heartOpacity, transform: [{ scale: heartScale }] }]}>
+            <Ionicons name="heart" size={80} color={heartColor} style={{ textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 10 }} />
+          </Animated.View>
+        </View>
       ) : isVideoPost && (videoUrl || imageUrl) ? (
         <TouchableOpacity activeOpacity={1} onPress={handleDoubleTap}>
           <View style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH, backgroundColor: '#000' }}>
