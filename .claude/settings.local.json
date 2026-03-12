@@ -16,7 +16,18 @@
       "Bash(/c/Users/airlk/AppData/Local/Android/Sdk/platform-tools/adb.exe:*)",
       "Bash(ls:*)",
       "Bash(cmd.exe:*)",
-      "Bash(eas build:*)"
+      "Bash(eas build:*)",
+      "Bash(adb:*)",
+      "Bash(where adb.exe)",
+      "Read(//c/Program Files \\(x86\\)/Android/android-sdk/platform-tools/**)",
+      "Bash(\"$ADB\":*)",
+      "Bash(ANDROID_HOME=\"/c/Users/airlk/AppData/Local/Android/Sdk\" npx expo:*)",
+      "Bash(ANDROID_HOME=\"C:\\\\Users\\\\airlk\\\\AppData\\\\Local\\\\Android\\\\Sdk\" npx expo:*)",
+      "Bash(rm:*)",
+      "Bash(eas build:list:*)",
+      "Bash(netstat:*)",
+      "Bash(taskkill:*)",
+      "Bash(git:*)"
     ]
   }
 }

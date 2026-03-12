@@ -89,8 +89,9 @@ export const CropEditor: React.FC<CropEditorProps> = ({
 
   // originalSize가 있으면 사용, 없으면 Image.getSize로 측정
   useEffect(() => {
-    if (originalSize) {
-      setImageSize(originalSize);
+    if (originalSize && originalSize.width > 0 && originalSize.height > 0) {
+      console.log('[crop] originalSize 사용:', originalSize.width, originalSize.height);
+      setImageSize({ width: originalSize.width, height: originalSize.height });
       setTimeout(() => { swipeLock.current = false; }, 500);
       return;
     }
@@ -98,6 +99,7 @@ export const CropEditor: React.FC<CropEditorProps> = ({
     Image.getSize(
       imageUri,
       (width, height) => {
+        console.log('[crop] Image.getSize 결과:', width, height);
         setImageSize({ width, height });
         setTimeout(() => { swipeLock.current = false; }, 500);
       },
@@ -318,7 +320,13 @@ export const CropEditor: React.FC<CropEditorProps> = ({
   const handleCrop = async () => {
     console.log('[crop] handleCrop 호출됨');
     console.log('[crop] imageSize:', imageSize.width, imageSize.height, 'processing:', processing);
+    console.log('[crop] displaySize:', displaySize.width, displaySize.height);
+    console.log('[crop] imageOffset:', imageOffset.x, imageOffset.y);
     if (processing) return;
+    console.log('[crop] cropBox:', cropBox.x, cropBox.y, cropBox.width, cropBox.height);
+    console.log('[crop] imageUri:', imageUri);
+    console.log('[crop] 최종 originX:', Math.max(0, Math.round((cropBox.x - imageOffset.x) * (imageSize.width / displaySize.width))));
+    console.log('[crop] 최종 originY:', Math.max(0, Math.round((cropBox.y - imageOffset.y) * (imageSize.height / displaySize.height))));
     if (imageSize.width === 0) {
       onCropDone(imageUri);
       return;

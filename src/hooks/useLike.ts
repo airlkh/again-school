@@ -6,6 +6,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { sendPushNotification } from '../services/notificationService';
 import { saveNotification } from '../services/notificationStoreService';
 
+console.log('[useLike] 모듈 로드됨');
+
 /**
  * 더미 ID인지 판별 (Firestore에 없는 로컬 데이터)
  */
@@ -43,6 +45,7 @@ export function useLike(postId: string) {
   }, [postId, user?.uid]);
 
   const toggleLike = useCallback(async () => {
+    console.log('[useLike] toggleLike 호출됨, user:', user?.uid, 'postId:', postId);
     if (loading || !user) return;
 
     // 더미 게시물은 좋아요 불가
@@ -68,14 +71,28 @@ export function useLike(postId: string) {
         const postData = snap.data();
         const authorUid = postData?.authorUid;
         if (authorUid && authorUid !== user.uid) {
-          const senderName = user.displayName || '사용자';
+          const userSnap = await getDoc(doc(db, 'users', user.uid));
+          console.log('[useLike] user.uid:', user.uid);
+          console.log('[useLike] userSnap.exists:', userSnap.exists());
+          console.log('[useLike] userSnap.data:', JSON.stringify(userSnap.data()));
+          console.log('[useLike] postData:', JSON.stringify(snap.data()));
+          const senderName = userSnap.exists() ? (userSnap.data().displayName || user.displayName || '사용자') : (user.displayName || '사용자');
+          const senderPhoto = userSnap.exists() ? (userSnap.data().photoURL ?? null) : null;
+          const thumbnailUrl = postData?.thumbnailUrl || postData?.imageUrl || null;
           sendPushNotification(
             authorUid,
             `${senderName}님이 좋아요를 눌렀어요`,
             '회원님의 게시물을 좋아합니다',
             { type: 'like', postId },
           ).catch(() => {});
-          saveNotification(authorUid, { type: 'like', fromUid: user.uid, fromName: senderName, postId });
+          saveNotification(authorUid, {
+            type: 'like',
+            fromUid: user.uid,
+            fromName: senderName,
+            fromPhotoURL: senderPhoto,
+            postId,
+            thumbnailUrl,
+          });
         }
       }
     } catch {

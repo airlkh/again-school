@@ -46,6 +46,7 @@ import { VideoView, useVideoPlayer, type VideoPlayer } from 'expo-video';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../src/config/firebase';
 import { useUnreadNotifications } from '../../src/hooks/useUnreadNotifications';
+import { useScrollToTop } from '@react-navigation/native';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -233,6 +234,23 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
     }
     lastTap.current = now;
   }, [liked, toggleLike, heartScale, heartOpacity]);
+  useEffect(() => {
+    if (!isVisible || !isFirestore || !post.id || !user?.uid) return;
+    if (post.id.startsWith('post-') || post.id.startsWith('dummy')) return;
+    const timer = setTimeout(async () => {
+      try {
+        const { db } = await import('../../src/config/firebase');
+        const { doc, getDoc, setDoc, updateDoc, increment } = await import('firebase/firestore');
+        const viewRef = doc(db, 'posts', post.id, 'views', user.uid);
+        const viewSnap = await getDoc(viewRef);
+        if (viewSnap.exists()) return;
+        await setDoc(viewRef, { viewedAt: Date.now() });
+        await updateDoc(doc(db, 'posts', post.id), { viewCount: increment(1) });
+      } catch {}
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [isVisible, isFirestore, post.id, user?.uid]);
+
   const authorName = post.authorName;
   const authorUid = post.authorUid;
   const authorAvatarImg = post.authorAvatarImg;
@@ -246,6 +264,34 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
   const authorPhotoURL = isFirestore ? fsPost?.authorPhotoURL : dPost?.authorPhotoURL;
 
   const isVideoPost = isVideoMedia(videoUrl || imageUrl, mediaType) || imgLoadFailed;
+  const textOverlay = isFirestore ? (fsPost as any)?.textOverlay : undefined;
+  console.log('[PostCard] textOverlay:', JSON.stringify(textOverlay), 'post.id:', post.id);
+  const taggedUsers = isFirestore ? (fsPost?.taggedUsers ?? []) : [];
+  const postLocation = isFirestore ? fsPost?.location : undefined;
+  const hasAudio = !!(isVideoPost || (isFirestore && (fsPost as any)?.music?.url));
+  const handleTap = useCallback(() => {
+    const now = Date.now();
+    if (now - lastTap.current < 300) {
+      // 더블탭 → 좋아요만
+      toggleLike();
+      setHeartColor(liked ? '#ffffff' : Colors.primary);
+      heartScale.setValue(0);
+      heartOpacity.setValue(1);
+      Animated.sequence([
+        Animated.spring(heartScale, { toValue: 1, friction: 3, tension: 40, useNativeDriver: true }),
+        Animated.timing(heartOpacity, { toValue: 0, duration: 400, delay: 200, useNativeDriver: true }),
+      ]).start();
+      lastTap.current = 0; // 리셋하여 추가 탭 방지
+    } else {
+      lastTap.current = now;
+      setTimeout(() => {
+        if (lastTap.current === now) {
+          // 단일탭 확정 → 음소거 토글
+          if (hasAudio && toggleVideoMute) toggleVideoMute();
+        }
+      }, 300);
+    }
+  }, [liked, toggleLike, heartScale, heartOpacity, hasAudio, toggleVideoMute]);
   const commentCount = isFirestore ? (fsPost?.commentCount ?? 0) : (dPost?.commentCount ?? 0);
   const schoolName = isFirestore ? (fsPost?.schoolName ?? '') : (dPost?.schoolName ?? '');
 
@@ -283,14 +329,38 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
           style={{ padding: 8 }}
           onPress={() => {
             if (Platform.OS === 'ios') {
-              const opts = [bookmarked ? '북마크 해제' : '북마크 저장', '공유하기', '숨기기', '신고하기', '취소'];
+              const isMyPost = authorUid === user?.uid;
+              const opts = isMyPost
+                ? [bookmarked ? '북마크 해제' : '북마크 저장', '공유하기', '수정하기', '삭제하기', '취소']
+                : [bookmarked ? '북마크 해제' : '북마크 저장', '공유하기', '숨기기', '신고하기', '취소'];
               ActionSheetIOS.showActionSheetWithOptions(
-                { options: opts, cancelButtonIndex: 4, destructiveButtonIndex: 3 },
+                { options: opts, cancelButtonIndex: 4, destructiveButtonIndex: isMyPost ? 3 : 3 },
                 (i) => {
                   if (i === 0) toggleBookmark();
                   else if (i === 1) Share.share({ message: `againschool://post/${post.id}` }).catch(() => {});
-                  else if (i === 2) { onHide?.(post.id); }
-                  else if (i === 3) Alert.alert('신고', '신고가 접수되었습니다.');
+                  else if (i === 2) {
+                    if (isMyPost) {
+                      router.push({ pathname: '/post/edit', params: { id: post.id } });
+                    }
+                    // 타인: 숨기기 (기존 로직 유지)
+                  }
+                  else if (i === 3) {
+                    if (isMyPost) {
+                      Alert.alert('삭제', '게시물을 삭제할까요?', [
+                        { text: '취소', style: 'cancel' },
+                        { text: '삭제', style: 'destructive', onPress: async () => {
+                          try {
+                            const { deletePost } = await import('../../src/services/postService');
+                            await deletePost(post.id);
+                          } catch (e) {
+                            Alert.alert('오류', '삭제에 실패했습니다.');
+                          }
+                        }},
+                      ]);
+                    } else {
+                      Alert.alert('신고', '신고가 접수되었습니다.');
+                    }
+                  }
                 },
               );
             } else {
@@ -301,6 +371,21 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
           <Ionicons name="ellipsis-horizontal" size={20} color={colors.inactive} />
         </TouchableOpacity>
       </View>
+
+      {postLocation && (
+        <TouchableOpacity
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 16, paddingBottom: 6 }}
+          onPress={() => {
+            const url = `https://maps.google.com/?q=${postLocation.latitude},${postLocation.longitude}`;
+            import('react-native').then(({ Linking }) => Linking.openURL(url));
+          }}
+        >
+          <Ionicons name="location-outline" size={13} color={colors.textSecondary} />
+          <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
+            {[postLocation.district, postLocation.city].filter(Boolean).join(', ') || postLocation.address || '위치'}
+          </Text>
+        </TouchableOpacity>
+      )}
 
       {/* Multi-image swipe or single image */}
       {isFirestore && fsPost?.mediaItems && fsPost.mediaItems.length > 1 ? (
@@ -324,7 +409,7 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
             renderItem={({ item: uri, index: idx }) => (
               <TouchableOpacity
                 activeOpacity={1}
-                onPress={handleDoubleTap}
+                onPress={handleTap}
                 style={{ width: SCREEN_WIDTH }}
               >
                 {isVideoMedia(uri, undefined) ? (
@@ -345,18 +430,52 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
                     <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 8 }}>탭하여 재생</Text>
                   </TouchableOpacity>
                 ) : (
-                  <Image
-                    source={{ uri }}
-                    style={{ width: SCREEN_WIDTH, height: multiImgHeights[idx] || SCREEN_WIDTH, backgroundColor: '#000' }}
-                    resizeMode="cover"
-                    fadeDuration={0}
-                    onLoad={(e) => {
-                      const { width: w, height: h } = e.nativeEvent.source;
-                      const ratio = h / w;
-                      const calculated = Math.min(Math.max(SCREEN_WIDTH * ratio, 300), SCREEN_WIDTH * 1.25);
-                      setMultiImgHeights((prev) => ({ ...prev, [idx]: calculated }));
-                    }}
-                  />
+                  <View style={{ position: 'relative' }}>
+                    <Image
+                      source={{ uri }}
+                      style={{ width: SCREEN_WIDTH, height: multiImgHeights[idx] || SCREEN_WIDTH, backgroundColor: '#000' }}
+                      resizeMode="cover"
+                      fadeDuration={0}
+                      onLoad={(e) => {
+                        const { width: w, height: h } = e.nativeEvent.source;
+                        const ratio = h / w;
+                        const calculated = Math.min(Math.max(SCREEN_WIDTH * ratio, 300), SCREEN_WIDTH * 1.25);
+                        setMultiImgHeights((prev) => ({ ...prev, [idx]: calculated }));
+                      }}
+                    />
+                    {textOverlay && textOverlay.text ? (
+                      <View
+                        pointerEvents="none"
+                        style={{
+                          position: 'absolute',
+                          left: SCREEN_WIDTH / 2 - 60,
+                          top: (multiImgHeights[idx] || SCREEN_WIDTH) / 2,
+                          backgroundColor:
+                            textOverlay.bgStyle === 'solid'
+                              ? 'rgba(0,0,0,0.7)'
+                              : textOverlay.bgStyle === 'semi'
+                              ? 'rgba(0,0,0,0.4)'
+                              : 'transparent',
+                          paddingHorizontal: 8,
+                          paddingVertical: 4,
+                          borderRadius: 4,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: textOverlay.color || '#fff',
+                            fontSize: textOverlay.fontSize || 16,
+                            fontWeight: 'bold',
+                            textShadowColor: 'rgba(0,0,0,0.8)',
+                            textShadowOffset: { width: 1, height: 1 },
+                            textShadowRadius: 3,
+                          }}
+                        >
+                          {textOverlay.text}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
                 )}
               </TouchableOpacity>
             )}
@@ -377,7 +496,7 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
           </Animated.View>
         </View>
       ) : isVideoPost && (videoUrl || imageUrl) ? (
-        <TouchableOpacity activeOpacity={1} onPress={handleDoubleTap}>
+        <TouchableOpacity activeOpacity={1} onPress={handleTap}>
           <View style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH, backgroundColor: '#000' }}>
             {isVisible && inlinePlayer ? (
               <View style={{ position: 'relative' }}>
@@ -393,7 +512,7 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
                     top: 0, left: 0, right: 0, bottom: 0,
                     backgroundColor: 'transparent',
                   }}
-                  onPress={handleDoubleTap}
+                  onPress={handleTap}
                   activeOpacity={1}
                 />
               </View>
@@ -420,6 +539,28 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
                 <Ionicons name={videoMuted ? 'volume-mute' : 'volume-high'} size={18} color="#fff" />
               </TouchableOpacity>
             )}
+            {textOverlay?.text && (
+              <View style={{
+                position: 'absolute',
+                left: SCREEN_WIDTH / 2 - 60,
+                top: SCREEN_WIDTH / 2,
+                zIndex: 10,
+                backgroundColor: textOverlay.bgStyle === 'solid' ? 'rgba(0,0,0,0.8)' : textOverlay.bgStyle === 'semi' ? 'rgba(0,0,0,0.4)' : 'transparent',
+                borderRadius: 6,
+                paddingHorizontal: textOverlay.bgStyle !== 'none' ? 10 : 0,
+                paddingVertical: textOverlay.bgStyle !== 'none' ? 4 : 0,
+              }}>
+                <Text style={{
+                  color: textOverlay.color ?? '#ffffff',
+                  fontSize: textOverlay.fontSize ?? 24,
+                  fontWeight: '700',
+                  textAlign: 'center',
+                  textShadowColor: 'rgba(0,0,0,0.6)',
+                  textShadowOffset: { width: 1, height: 1 },
+                  textShadowRadius: 3,
+                }}>{textOverlay.text}</Text>
+              </View>
+            )}
             {yearTag && (
               <View style={styles.yearBadge}>
                 <Text style={styles.yearBadgeText}>{yearTag}년</Text>
@@ -432,7 +573,7 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
           </View>
         </TouchableOpacity>
       ) : (
-        <TouchableOpacity activeOpacity={1} onPress={handleDoubleTap}>
+        <TouchableOpacity activeOpacity={1} onPress={handleTap}>
           <View>
             <Image
               source={{ uri: imageUrl }}
@@ -449,6 +590,28 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
                 }
               }}
             />
+            {textOverlay?.text && (
+              <View style={{
+                position: 'absolute',
+                left: SCREEN_WIDTH / 2 - 60,
+                top: imgHeight / 2,
+                zIndex: 10,
+                backgroundColor: textOverlay.bgStyle === 'solid' ? 'rgba(0,0,0,0.8)' : textOverlay.bgStyle === 'semi' ? 'rgba(0,0,0,0.4)' : 'transparent',
+                borderRadius: 6,
+                paddingHorizontal: textOverlay.bgStyle !== 'none' ? 10 : 0,
+                paddingVertical: textOverlay.bgStyle !== 'none' ? 4 : 0,
+              }}>
+                <Text style={{
+                  color: textOverlay.color ?? '#ffffff',
+                  fontSize: textOverlay.fontSize ?? 24,
+                  fontWeight: '700',
+                  textAlign: 'center',
+                  textShadowColor: 'rgba(0,0,0,0.6)',
+                  textShadowOffset: { width: 1, height: 1 },
+                  textShadowRadius: 3,
+                }}>{textOverlay.text}</Text>
+              </View>
+            )}
             {yearTag && (
               <View style={styles.yearBadge}>
                 <Text style={styles.yearBadgeText}>{yearTag}년</Text>
@@ -515,6 +678,19 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
         </Text>
       </View>
 
+      {taggedUsers.length > 0 && (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 16, paddingBottom: 6 }}>
+          {taggedUsers.map((u) => (
+            <TouchableOpacity
+              key={u.uid}
+              onPress={() => router.push(`/profile/${u.uid}`)}
+            >
+              <Text style={{ color: colors.primary, fontSize: 14, fontWeight: '600' }}>@{u.displayName}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
       <TouchableOpacity
         onPress={() => setCommentSheetVisible(true)}
       >
@@ -558,8 +734,26 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
             {[
               { icon: bookmarked ? 'bookmark' as const : 'bookmark-outline' as const, label: bookmarked ? '북마크 해제' : '북마크 저장', onPress: () => toggleBookmark() },
               { icon: 'share-outline' as const, label: '공유하기', onPress: () => Share.share({ message: `againschool://post/${post.id}` }).catch(() => {}) },
-              { icon: 'eye-off-outline' as const, label: '숨기기', onPress: () => onHide?.(post.id) },
-              { icon: 'flag-outline' as const, label: '신고하기', onPress: () => Alert.alert('신고', '신고가 접수되었습니다.'), destructive: true },
+              ...(authorUid === user?.uid
+                ? [
+                    { icon: 'create-outline' as const, label: '수정하기', onPress: () => router.push({ pathname: '/post/edit', params: { id: post.id } }) },
+                    { icon: 'trash-outline' as const, label: '삭제하기', onPress: () => Alert.alert('삭제', '게시물을 삭제할까요?', [
+                      { text: '취소', style: 'cancel' as const },
+                      { text: '삭제', style: 'destructive' as const, onPress: async () => {
+                        try {
+                          const { deletePost } = await import('../../src/services/postService');
+                          await deletePost(post.id);
+                        } catch (e) {
+                          Alert.alert('오류', '삭제에 실패했습니다.');
+                        }
+                      }},
+                    ]), destructive: true },
+                  ]
+                : [
+                    { icon: 'eye-off-outline' as const, label: '숨기기', onPress: () => onHide?.(post.id) },
+                    { icon: 'flag-outline' as const, label: '신고하기', onPress: () => Alert.alert('신고', '신고가 접수되었습니다.'), destructive: true },
+                  ]
+              ),
             ].map((item, i) => (
               <TouchableOpacity
                 key={i}
@@ -693,6 +887,7 @@ export default function HomeScreen() {
   const { user: currentUser } = useAuth();
   const { postId: scrollToPostId } = useLocalSearchParams<{ postId?: string }>();
   const flatListRef = useRef<FlatList>(null);
+  useScrollToTop(flatListRef);
   const [fsPosts, setFsPosts] = useState<FirestorePost[]>([]);
   const [fsStories, setFsStories] = useState<FirestoreStory[]>([]);
   const [fsMeetups, setFsMeetups] = useState<Meetup[]>([]);

@@ -16,7 +16,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '../../src/constants/colors';
@@ -58,9 +58,15 @@ const getVideoThumbnail = (post: any): string | null => {
   // 2순위: mediaItems 배열에서 첫번째 썸네일 or 이미지
   if (post.mediaItems && post.mediaItems.length > 0) {
     const first = post.mediaItems[0];
-    if (first.thumbnailUrl) return first.thumbnailUrl as string;
-    if (first.url && !first.url.endsWith('.mp4') && !first.url.endsWith('.mov')) {
-      return first.url as string;
+    if (typeof first === 'string') {
+      if (!first.endsWith('.mp4') && !first.endsWith('.mov') && !first.endsWith('.avi')) {
+        return first;
+      }
+    } else if (typeof first === 'object') {
+      if (first.thumbnailUrl) return first.thumbnailUrl as string;
+      if (first.url && !first.url.endsWith('.mp4') && !first.url.endsWith('.mov')) {
+        return first.url as string;
+      }
     }
   }
 
@@ -111,7 +117,7 @@ const PostGrid = React.memo(function PostGrid({
     const thumbUri = getVideoThumbnail(post);
     return (
       <TouchableOpacity style={styles.postGridItem} onPress={() => router.push(`/post/${post.id}`)}>
-        <Image key={thumbUri ?? post.id} source={thumbUri ? { uri: thumbUri, cache: 'reload' } : undefined} style={styles.postGridImage} resizeMode="cover" fadeDuration={0} />
+        <Image key={thumbUri ?? post.id} source={thumbUri ? { uri: thumbUri } : undefined} style={styles.postGridImage} resizeMode="cover" fadeDuration={0} />
         {post.mediaItems && post.mediaItems.length > 1 && (
           <View style={styles.multiImageIcon}>
             <Ionicons name="copy-outline" size={14} color="#fff" />
@@ -122,9 +128,17 @@ const PostGrid = React.memo(function PostGrid({
             <Ionicons name="play-circle" size={20} color="#fff" />
           </View>
         )}
+        {((post as any).viewCount ?? 0) > 0 && (
+          <View style={{ position: 'absolute', bottom: 4, left: 4, flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+            <Ionicons name="eye-outline" size={11} color="#fff" />
+            <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600', textShadowColor: 'rgba(0,0,0,0.8)', textShadowRadius: 3 }}>
+              {(post as any).viewCount >= 1000 ? `${((post as any).viewCount / 1000).toFixed(1)}k` : (post as any).viewCount}
+            </Text>
+          </View>
+        )}
       </TouchableOpacity>
     );
-  }, []);
+  }, [colors, isDark]);
 
   return (
     <FlatList
@@ -250,6 +264,7 @@ export default function ProfileScreen() {
     // 최초 로드 시에만 스켈레톤 표시 (reset 시 기존 게시물 유지하여 떨림 방지)
     if (userPosts.length === 0 && !lastPostDoc.current) setLoadingPosts(true);
     try {
+      console.log('[loadPosts] 시작 reset:', reset, 'uid:', user?.uid);
       const postsCol = collection(db, 'posts');
       let q;
       if (reset) {
@@ -262,6 +277,8 @@ export default function ProfileScreen() {
       }
       const snap = await getDocs(q);
       const newPosts = snap.docs.map((d) => ({ id: d.id, ...d.data() } as FirestorePost));
+      console.log('[loadPosts] 불러온 게시물 수:', newPosts.length);
+      console.log('[loadPosts] 게시물 ids:', newPosts.map(p => p.id));
       if (snap.docs.length > 0) {
         lastPostDoc.current = snap.docs[snap.docs.length - 1];
       }
@@ -312,13 +329,14 @@ export default function ProfileScreen() {
   }, [user?.uid]);
 
   // 게시물 최초 로드
-  useEffect(() => {
-    if (!user?.uid) return;
-    lastPostDoc.current = null;
-    hasMoreRef.current = true;
-    loadPosts(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.uid]);
+  useFocusEffect(
+    useCallback(() => {
+      if (!user?.uid) return;
+      lastPostDoc.current = null;
+      hasMoreRef.current = true;
+      loadPosts(true);
+    }, [user?.uid, loadPosts])
+  );
 
   // trustCount + trustVotes 1회 조회
   useEffect(() => {

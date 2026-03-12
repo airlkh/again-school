@@ -15,6 +15,7 @@ import {
   Keyboard,
   Pressable,
   BackHandler,
+  Platform,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,11 +28,16 @@ import {
   State,
 } from 'react-native-gesture-handler';
 import { CropEditor } from '../../src/components/CropEditor';
+import { UserTagSelector } from '../../src/components/UserTagSelector';
+import { LocationSelector } from '../../src/components/LocationSelector';
+import { LocationData } from '../../src/services/locationService';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useCurrentUser } from '../../src/hooks/useCurrentUser';
 import { createStory } from '../../src/services/storyService';
 import { createPost, PostVisibility, VisibilitySchool } from '../../src/services/postService';
 import { CLOUDINARY_CONFIG } from '../../src/config/cloudinary';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import * as VideoThumbnails from 'expo-video-thumbnails';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 
@@ -73,6 +79,9 @@ export default function UploadScreen() {
 
   // 미디어
   const [mediaList, setMediaList] = useState<MediaItem[]>([]);
+  const [hasNextPage, setHasNextPage] = useState(true);
+  const [endCursor, setEndCursor] = useState<string | undefined>(undefined);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<MediaItem[]>([]);
   const [isMultiSelect, setIsMultiSelect] = useState(false);
   const [imageHeight, setImageHeight] = useState(SW);
@@ -88,6 +97,36 @@ export default function UploadScreen() {
   // 텍스트 드래그 (PanGestureHandler + Animated)
   const pan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const lastPan = useRef({ x: 0, y: 0 });
+  const videoPlayerSource = useMemo(() => {
+    if (step !== 'edit') return null;
+    const cm = selectedMedia[editIndex] ?? selectedMedia[0];
+    if (cm && isVideoMedia(cm.uri, cm.type)) return cm.uri;
+    return null;
+  }, [step, selectedMedia, editIndex]);
+  const videoPlayer = useVideoPlayer(videoPlayerSource, (player) => {
+    player.loop = true;
+    player.play();
+  });
+  useEffect(() => {
+    if (videoPlayerSource) {
+      videoPlayer.play();
+    }
+  }, [videoPlayerSource]);
+  const galleryVideoSource = useMemo(() => {
+    if (step !== 'gallery' || selectedMedia.length === 0) return null;
+    const last = selectedMedia[selectedMedia.length - 1];
+    if (last && isVideoMedia(last.uri, last.type)) return last.uri;
+    return null;
+  }, [step, selectedMedia]);
+  const galleryVideoPlayer = useVideoPlayer(galleryVideoSource, (player) => {
+    player.loop = true;
+    player.play();
+  });
+  useEffect(() => {
+    if (galleryVideoSource) {
+      galleryVideoPlayer.play();
+    }
+  }, [galleryVideoSource]);
 
   const onTextGestureEvent = Animated.event(
     [{ nativeEvent: { translationX: pan.x, translationY: pan.y } }],
@@ -145,6 +184,10 @@ export default function UploadScreen() {
 
   // ViewShot ref (텍스트 합성용)
   const viewShotRef = useRef<any>(null);
+  const viewShotRefs = useRef<(ViewShot | null)[]>([]);
+
+  const [taggedUsers, setTaggedUsers] = useState<{ uid: string; displayName: string; photoURL?: string }[]>([]);
+  const [location, setLocation] = useState<LocationData | null>(null);
 
   // 키보드 높이 추적
   const [keyboardH, setKeyboardH] = useState(0);
@@ -217,17 +260,20 @@ export default function UploadScreen() {
     return () => subscription.remove();
   }, []);
 
-  const loadGallery = async () => {
+  const loadGallery = async (cursor?: string) => {
     const { status } = await MediaLibrary.requestPermissionsAsync();
     if (status !== 'granted') return;
 
-    const assets = await MediaLibrary.getAssetsAsync({
+    if (cursor) setLoadingMore(true);
+
+    const result = await MediaLibrary.getAssetsAsync({
       mediaType: [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video],
       first: 100,
+      after: cursor,
       sortBy: [MediaLibrary.SortBy.creationTime],
     });
 
-    const items: MediaItem[] = assets.assets.map((a) => ({
+    const items: MediaItem[] = result.assets.map((a) => ({
       uri: a.uri,
       type: a.mediaType === MediaLibrary.MediaType.video ? 'video' : 'image',
       width: a.width,
@@ -235,17 +281,42 @@ export default function UploadScreen() {
       duration: a.duration,
     }));
 
-    setMediaList(items);
+    if (cursor) {
+      setMediaList(prev => [...prev, ...items]);
+    } else {
+      setMediaList(items);
+    }
+    setHasNextPage(result.hasNextPage);
+    setEndCursor(result.endCursor);
+    if (cursor) setLoadingMore(false);
   };
 
   // 미디어 선택/해제
-  const toggleSelect = (item: MediaItem) => {
+  const toggleSelect = async (item: MediaItem) => {
+    const resolveUri = async (m: MediaItem): Promise<MediaItem> => {
+      if (m.type !== 'video') return m;
+      try {
+        console.log('[toggleSelect] original uri:', m.uri);
+        if (m.uri.startsWith('file://')) {
+          console.log('[toggleSelect] 이미 file://, 변환 불필요');
+          return m;
+        }
+        const asset = await MediaLibrary.getAssetInfoAsync(m.uri);
+        console.log('[toggleSelect] asset:', JSON.stringify(asset));
+        const localUri = asset?.localUri || asset?.uri || m.uri;
+        console.log('[toggleSelect] resolved:', localUri);
+        return { ...m, uri: localUri };
+      } catch (e) {
+        console.warn('[toggleSelect] localUri 실패:', e);
+        return m;
+      }
+    };
+
     if (!isMultiSelect) {
-      // 단일 선택: 탭한 항목 1개만 선택
-      setSelectedMedia([item]);
+      const resolved = await resolveUri(item);
+      setSelectedMedia([resolved]);
       return;
     }
-    // 다중 선택
     const exists = selectedMedia.find((m) => m.uri === item.uri);
     if (exists) {
       setSelectedMedia((prev) => prev.filter((m) => m.uri !== item.uri));
@@ -254,7 +325,8 @@ export default function UploadScreen() {
         Alert.alert('최대 10개까지 선택 가능해요');
         return;
       }
-      setSelectedMedia((prev) => [...prev, item]);
+      const resolved = await resolveUri(item);
+      setSelectedMedia((prev) => [...prev, resolved]);
     }
   };
 
@@ -288,19 +360,8 @@ export default function UploadScreen() {
 
   // edit → share 전환: 이미지면 캡처 후 이동, 동영상이면 바로 이동
   const goToShare = async () => {
-    try {
-      if (isVideoMedia(selectedMedia[0]?.uri, selectedMedia[0]?.type)) {
-        setCompositeUri(null);
-        setStep('share');
-        return;
-      }
-      const uri = await captureComposite();
-      setCompositeUri(uri);
-      setStep('share');
-    } catch (e: any) {
-      console.warn('goToShare 오류:', e);
-      Alert.alert('오류', e?.message || '다시 시도해주세요');
-    }
+    setCompositeUri(null);
+    setStep('share');
   };
 
   // 업로드 함수
@@ -308,10 +369,32 @@ export default function UploadScreen() {
     uri: string,
     type: 'image' | 'video',
     onProgress?: (pct: number) => void,
-  ): Promise<string> => {
+  ): Promise<{ url: string; thumbnailUrl?: string }> => {
     const isVideo = isVideoMedia(uri, type);
 
-    return new Promise((resolve, reject) => {
+    console.log('[uploadMedia] uri:', uri, 'isVideo:', isVideo);
+
+    let thumbnailCloudinaryUrl: string | undefined;
+    if (isVideo) {
+      try {
+        const { uri: thumbUri } = await VideoThumbnails.getThumbnailAsync(uri, { time: 0 });
+        console.log('[uploadMedia] 썸네일 추출:', thumbUri);
+        const thumbForm = new FormData();
+        thumbForm.append('file', { uri: thumbUri, type: 'image/jpeg', name: 'thumb.jpg' } as any);
+        thumbForm.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+        const thumbRes = await fetch(CLOUDINARY_CONFIG.imageUploadUrl, {
+          method: 'POST',
+          body: thumbForm,
+        });
+        const thumbData = await thumbRes.json();
+        thumbnailCloudinaryUrl = thumbData.secure_url;
+        console.log('[uploadMedia] 썸네일 URL:', thumbnailCloudinaryUrl);
+      } catch (e) {
+        console.warn('[uploadMedia] 썸네일 추출 실패:', e);
+      }
+    }
+
+    const videoUrl: string = await new Promise((resolve, reject) => {
       const formData = new FormData();
 
       formData.append('file', {
@@ -357,6 +440,8 @@ export default function UploadScreen() {
       xhr.open('POST', url);
       xhr.send(formData);
     });
+
+    return { url: videoUrl, thumbnailUrl: thumbnailCloudinaryUrl };
   };
 
   // 최종 업로드
@@ -375,18 +460,27 @@ export default function UploadScreen() {
     setUploadStatus('');
 
     try {
-      const results: { url: string; type: 'image' | 'video' }[] = [];
+      const results: { url: string; type: 'image' | 'video'; thumbnailUrl?: string }[] = [];
 
       for (let i = 0; i < selectedMedia.length; i++) {
         const media = selectedMedia[i];
         const isVideo = media.type === 'video';
 
-        // 첫 번째 이미지: 합성 URI 사용 (텍스트 오버레이 포함)
-        let uriToUpload =
-          i === 0 && !isVideo && compositeUri ? compositeUri : media.uri;
+        let uriToUpload = media.uri;
+        if (!isVideo && overlayText.trim()) {
+          try {
+            pan.x.flattenOffset();
+            pan.y.flattenOffset();
+            const ref = viewShotRefs.current[i];
+            const captured = await ref?.capture?.();
+            if (captured) uriToUpload = captured;
+          } catch (e) {
+            console.warn(`[handleShare] 이미지 ${i} 캡처 실패:`, e);
+          }
+        }
 
         setUploadStatus('업로드 중...');
-        const url = await uploadMedia(
+        const { url, thumbnailUrl: thumbUrl } = await uploadMedia(
           uriToUpload,
           isVideo ? 'video' : 'image',
           (pct) => {
@@ -396,7 +490,7 @@ export default function UploadScreen() {
           },
         );
 
-        results.push({ url, type: isVideo ? 'video' : 'image' });
+        results.push({ url, type: isVideo ? 'video' : 'image', thumbnailUrl: thumbUrl });
       }
 
       // 게시물 저장
@@ -404,13 +498,11 @@ export default function UploadScreen() {
         const firstResult = results[0];
         const firstIsVideo = firstResult?.type === 'video';
 
-        // Cloudinary 동영상 썸네일: 확장자를 .jpg로 변경
-        const videoThumbnail = firstIsVideo && firstResult?.url
-          ? firstResult.url
-              .replace('/video/upload/', '/video/upload/f_jpg,w_600/')
-              .replace(/\.(mp4|mov|avi|webm)(\?|$)/i, '.jpg$2')
-          : undefined;
+        const videoThumbnail = firstResult?.thumbnailUrl;
+        console.log('[upload] firstResult.url:', firstResult?.url);
+        console.log('[upload] videoThumbnail:', videoThumbnail);
 
+        console.log('[handleShare] overlayText:', overlayText, 'trim:', overlayText.trim());
         await createPost({
           authorUid: uid,
           authorName: displayName || '사용자',
@@ -422,8 +514,18 @@ export default function UploadScreen() {
           thumbnailUrl: videoThumbnail,
           mediaItems: results.map((r) => r.url),
           caption: caption || '',
+          textOverlay: overlayText.trim() ? {
+            text: overlayText.trim(),
+            color: textColor,
+            fontSize: textSize,
+            bgStyle: bgStyle,
+            x: (pan.x as any)._value ?? 0,
+            y: (pan.y as any)._value ?? 0,
+          } : undefined,
           visibility,
           visibilitySchools,
+          taggedUsers: taggedUsers.length > 0 ? taggedUsers : undefined,
+          location: location ?? undefined,
         });
       }
 
@@ -515,10 +617,12 @@ export default function UploadScreen() {
               <Text style={{ color: '#555', fontSize: 15, marginTop: 12 }}>사진을 선택하세요</Text>
             </View>
           ) : selectedMedia[selectedMedia.length - 1].type === 'video' ? (
-            <View style={{ width: SW, height: SW, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ fontSize: 60 }}>🎬</Text>
-              <Text style={{ color: '#fff', marginTop: 8, fontSize: 14 }}>동영상 선택됨</Text>
-            </View>
+            <VideoView
+              player={galleryVideoPlayer}
+              style={{ width: SW, height: SW }}
+              contentFit="contain"
+              nativeControls
+            />
           ) : (
             <Image
               source={{ uri: selectedMedia[selectedMedia.length - 1].uri }}
@@ -586,7 +690,13 @@ export default function UploadScreen() {
           maxToRenderPerBatch={15}
           windowSize={7}
           initialNumToRender={18}
+          onEndReached={() => {
+            if (hasNextPage && !loadingMore) {
+              loadGallery(endCursor);
+            }
+          }}
           onEndReachedThreshold={0.5}
+          ListFooterComponent={loadingMore ? <ActivityIndicator size="small" color="#999" /> : null}
           renderItem={({ item }) => {
             const selIdx = selectedMedia.findIndex((m) => m.uri === item.uri);
             const isSelected = selIdx >= 0;
@@ -659,6 +769,11 @@ export default function UploadScreen() {
             <CropEditor
               key={cropQueue[0]}
               imageUri={cropQueue[0]}
+              originalSize={(() => {
+                const sourceMedia = originalMedia.length > 0 ? originalMedia : selectedMedia;
+                const original = sourceMedia.find(m => m.uri === cropQueue[0]);
+                return original?.width && original?.height ? { width: original.width, height: original.height } : undefined;
+              })()}
               defaultRatio="4:5"
               currentIndex={croppedMedia.length + 1}
               totalCount={originalMedia.length > 0
@@ -766,26 +881,19 @@ export default function UploadScreen() {
         )}
 
         {/* ── 미디어 영역 ── */}
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', marginBottom: insets.bottom + 8 }}>
           {selectedMedia.length <= 1 ? (
             // 단일 미디어
             isVideo ? (
-              <View style={{
-                flex: 1,
-                backgroundColor: '#000',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-                <Text style={{ color: '#fff', fontSize: 16 }}>
-                  🎬 동영상이 선택되었습니다
-                </Text>
-                <Text style={{ color: '#999', fontSize: 13, marginTop: 8 }}>
-                  다음을 눌러 업로드하세요
-                </Text>
-              </View>
+              <VideoView
+                player={videoPlayer}
+                style={{ width: '100%', height: '100%' }}
+                contentFit="contain"
+                nativeControls
+              />
             ) : (
               <ViewShot
-                ref={viewShotRef}
+                ref={(r) => { viewShotRef.current = r; viewShotRefs.current[editIndex] = r; }}
                 options={{ format: 'jpg', quality: 0.95 }}
                 style={{ width: SW, height: imageHeight, backgroundColor: '#000' }}
               >
@@ -859,20 +967,13 @@ export default function UploadScreen() {
                 renderItem={({ item: mediaItem }) => (
                   <View style={{ width: SW, justifyContent: 'center', alignItems: 'center' }}>
                     {mediaItem.type === 'video' ? (
-                      <View style={{
-                        width: SW,
-                        height: imageHeight,
-                        backgroundColor: '#000',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}>
-                        <Text style={{ color: '#fff', fontSize: 16 }}>
-                          🎬 동영상
-                        </Text>
+                      <View style={{ width: SW, height: imageHeight, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ color: '#fff', fontSize: 16 }}>🎬 동영상</Text>
+                        <Text style={{ color: '#aaa', fontSize: 12, marginTop: 4 }}>탭하여 선택</Text>
                       </View>
                     ) : (
                       <ViewShot
-                        ref={viewShotRef}
+                        ref={(r) => { viewShotRefs.current[selectedMedia.indexOf(mediaItem)] = r; if (selectedMedia.indexOf(mediaItem) === editIndex) viewShotRef.current = r; }}
                         options={{ format: 'jpg', quality: 0.95 }}
                         style={{ width: SW, height: imageHeight, backgroundColor: '#000' }}
                       >
@@ -1273,23 +1374,15 @@ export default function UploadScreen() {
         <View style={{ height: 0.5, backgroundColor: colors.border }} />
 
         {/* 메뉴 항목들 */}
-        <TouchableOpacity
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            paddingHorizontal: 16,
-            paddingVertical: 14,
-            borderBottomWidth: 0.5,
-            borderBottomColor: colors.border,
-          }}
-          onPress={() => Alert.alert('준비 중', '사람 태그 기능 준비 중')}
-        >
-          <Ionicons name="person-outline" size={22} color={colors.text} />
-          <Text style={{ flex: 1, marginLeft: 12, fontSize: 15, color: colors.text }}>
-            사람 태그
-          </Text>
-          <Ionicons name="chevron-forward" size={18} color={colors.inactive} />
-        </TouchableOpacity>
+        <View style={{ paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: colors.border }}>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 10 }}>사람 태그</Text>
+          <UserTagSelector taggedUsers={taggedUsers} onChange={setTaggedUsers} />
+        </View>
+
+        <View style={{ paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: colors.border }}>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 10 }}>위치</Text>
+          <LocationSelector location={location} onChange={setLocation} />
+        </View>
 
         <TouchableOpacity
           style={{

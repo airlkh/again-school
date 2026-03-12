@@ -24,6 +24,7 @@ export interface TextOverlay {
   y: number;
   fontSize: number;
   color: string;
+  bgStyle?: 'none' | 'semi' | 'solid';
 }
 
 export interface PostMusic {
@@ -54,6 +55,14 @@ export interface FirestorePost {
   thumbnailUrl?: string;
   mediaItems?: string[];
   textOverlays?: TextOverlay[];
+  textOverlay?: {
+    text: string;
+    color: string;
+    fontSize: number;
+    bgStyle: 'none' | 'semi' | 'solid';
+    x: number;
+    y: number;
+  };
   music?: PostMusic;
   caption: string;
   yearTag?: number;
@@ -64,7 +73,10 @@ export interface FirestorePost {
   likes: number;
   likedBy: string[];
   commentCount: number;
+  viewCount?: number;
   createdAt: number;
+  taggedUsers?: { uid: string; displayName: string; photoURL?: string }[];
+  location?: { latitude: number; longitude: number; address?: string; city?: string; district?: string };
 }
 
 export interface FirestoreComment {
@@ -101,7 +113,7 @@ export async function createPost(
 /** 게시물 수정 */
 export async function updatePost(
   postId: string,
-  data: Partial<Pick<FirestorePost, 'caption' | 'yearTag' | 'memoryTag' | 'textOverlays' | 'music'>>,
+  data: Partial<Pick<FirestorePost, 'caption' | 'yearTag' | 'memoryTag' | 'textOverlays' | 'music' | 'taggedUsers' | 'location'>>,
 ): Promise<void> {
   const docRef = doc(db, 'posts', postId);
   const cleanData = Object.fromEntries(
@@ -189,7 +201,16 @@ export async function addComment(
     const authorUid = postSnap.data()?.authorUid;
     if (authorUid && authorUid !== comment.uid) {
       sendPushNotification(authorUid, '새 댓글', `${comment.name}: ${comment.text}`, { postId });
-      saveNotification(authorUid, { type: 'comment', fromUid: comment.uid, fromName: comment.name, postId });
+      const postData2 = postSnap.data();
+      saveNotification(authorUid, {
+        type: 'comment',
+        fromUid: comment.uid,
+        fromName: comment.name,
+        fromPhotoURL: comment.photoURL ?? null,
+        postId,
+        commentText: comment.text,
+        thumbnailUrl: postData2?.thumbnailUrl || postData2?.imageUrl || null,
+      });
     }
   } catch (e) {
     console.warn('[postService] 댓글 알림 실패:', e);

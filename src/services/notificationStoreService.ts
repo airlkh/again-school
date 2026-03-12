@@ -5,9 +5,12 @@ export interface NotificationItem {
   type: 'like' | 'comment' | 'chat' | 'connection';
   fromUid: string;
   fromName: string;
+  fromPhotoURL?: string | null;
   postId?: string;
   chatRoomId?: string;
   profileUid?: string;
+  commentText?: string;
+  thumbnailUrl?: string;
   read: boolean;
   createdAt: number;
 }
@@ -19,9 +22,12 @@ export async function saveNotification(
     type: 'like' | 'comment' | 'chat' | 'connection';
     fromUid: string;
     fromName: string;
+    fromPhotoURL?: string | null;
     postId?: string;
     chatRoomId?: string;
     profileUid?: string;
+    commentText?: string;
+    thumbnailUrl?: string;
   },
 ): Promise<void> {
   try {
