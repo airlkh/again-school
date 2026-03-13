@@ -121,6 +121,33 @@ export function CommentBottomSheet({ visible, postId, onClose }: Props) {
     const text = inputText.trim();
     if (!text || !user) return;
 
+    // 댓글 권한 체크
+    try {
+      const postSnap = await getDoc(doc(db, 'posts', postId));
+      const postData = postSnap.data();
+      const visibility = postData?.visibility ?? 'school';
+
+      if (visibility !== 'public') {
+        const userSnap = await getDoc(doc(db, 'users', user.uid));
+        const isAdmin = userSnap.data()?.isAdmin === true;
+
+        if (!isAdmin) {
+          const authorUid = postData?.authorUid;
+          const authorSnap = await getDoc(doc(db, 'users', authorUid));
+          const authorSchools: string[] = authorSnap.data()?.schoolNames ?? [];
+          const mySchools: string[] = userSnap.data()?.schoolNames ?? [];
+          const sameSchool = authorSchools.some(s => mySchools.includes(s));
+
+          if (!sameSchool) {
+            Alert.alert('알림', '같은 학교 동창만 댓글을 달 수 있습니다.');
+            return;
+          }
+        }
+      }
+    } catch {
+      // 권한 체크 실패 시 통과
+    }
+
     setSubmitting(true);
     try {
       await addComment(postId, {

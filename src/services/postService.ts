@@ -28,9 +28,14 @@ export interface TextOverlay {
 }
 
 export interface PostMusic {
+  id?: string;
   name: string;
+  title?: string;
   url: string;
   volume: number;
+  startTime?: number;
+  duration?: number;
+  videoVolume?: number;
 }
 
 export type PostVisibility = 'public' | 'school' | 'grade' | 'connections' | 'private';

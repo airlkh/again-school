@@ -37,7 +37,7 @@ import { useLike } from '../../src/hooks/useLike';
 import { useBookmark } from '../../src/hooks/useBookmark';
 import { subscribeStories, FirestoreStory } from '../../src/services/storyService';
 import { subscribeMeetups } from '../../src/services/meetupService';
-import { useMusic } from '../../src/contexts/MusicContext';
+import { useMusic, resetAudioSession } from '../../src/contexts/MusicContext';
 import { useMute } from '../../src/contexts/MuteContext';
 import { getAvatarSource } from '../../src/utils/avatar';
 import { NameWithBadge } from '../../src/utils/badge';
@@ -264,11 +264,10 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
   const authorPhotoURL = isFirestore ? fsPost?.authorPhotoURL : dPost?.authorPhotoURL;
 
   const isVideoPost = isVideoMedia(videoUrl || imageUrl, mediaType) || imgLoadFailed;
+  const hasAudio = !!(isFirestore && (fsPost as any)?.music?.url);
   const textOverlay = isFirestore ? (fsPost as any)?.textOverlay : undefined;
-  console.log('[PostCard] textOverlay:', JSON.stringify(textOverlay), 'post.id:', post.id);
   const taggedUsers = isFirestore ? (fsPost?.taggedUsers ?? []) : [];
   const postLocation = isFirestore ? fsPost?.location : undefined;
-  const hasAudio = !!(isVideoPost || (isFirestore && (fsPost as any)?.music?.url));
   const handleTap = useCallback(() => {
     const now = Date.now();
     if (now - lastTap.current < 300) {
@@ -284,14 +283,17 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
       lastTap.current = 0; // 리셋하여 추가 탭 방지
     } else {
       lastTap.current = now;
-      setTimeout(() => {
-        if (lastTap.current === now) {
-          // 단일탭 확정 → 음소거 토글
-          if (hasAudio && toggleVideoMute) toggleVideoMute();
-        }
-      }, 300);
+      if (!isVideoPost && hasAudio) {
+        toggleMusicMute();
+      } else {
+        setTimeout(() => {
+          if (lastTap.current === now) {
+            if (isVideoPost && toggleVideoMute) toggleVideoMute();
+          }
+        }, 300);
+      }
     }
-  }, [liked, toggleLike, heartScale, heartOpacity, hasAudio, toggleVideoMute]);
+  }, [liked, toggleLike, heartScale, heartOpacity, hasAudio, toggleVideoMute, toggleMusicMute, isVideoPost]);
   const commentCount = isFirestore ? (fsPost?.commentCount ?? 0) : (dPost?.commentCount ?? 0);
   const schoolName = isFirestore ? (fsPost?.schoolName ?? '') : (dPost?.schoolName ?? '');
 
@@ -574,7 +576,7 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
         </TouchableOpacity>
       ) : (
         <TouchableOpacity activeOpacity={1} onPress={handleTap}>
-          <View>
+          <View style={{ position: 'relative' }}>
             <Image
               source={{ uri: imageUrl }}
               style={{ width: SCREEN_WIDTH, height: imgHeight, backgroundColor: colors.card }}
@@ -621,6 +623,11 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
             <Animated.View pointerEvents="none" style={[styles.heartOverlay, { opacity: heartOpacity, transform: [{ scale: heartScale }] }]}>
               <Ionicons name="heart" size={80} color={heartColor} style={{ textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 10 }} />
             </Animated.View>
+              {hasAudio && (
+                <View style={styles.muteBtn} pointerEvents="none">
+                  <Ionicons name={musicMuted ? 'volume-mute' : 'volume-high'} size={18} color="#fff" />
+                </View>
+              )}
           </View>
         </TouchableOpacity>
       )}
@@ -894,8 +901,10 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [hiddenPostIds, setHiddenPostIds] = useState<Set<string>>(new Set());
   const [visiblePostId, setVisiblePostId] = useState<string | null>(null);
+  const feedItemsRef = useRef<FeedItem[]>([]);
   const [unreadChat, setUnreadChat] = useState(0);
   const unreadNotif = useUnreadNotifications(currentUser?.uid);
+  const { playMusic, stopMusic } = useMusic();
   const { isMuted: videoMuted, toggleMute: toggleVideoMute } = useMute();
 
   // 읽지 않은 채팅 수 구독
@@ -1020,6 +1029,18 @@ export default function HomeScreen() {
 
     return items;
   })();
+  useEffect(() => { feedItemsRef.current = feedItems; }, [feedItems]);
+
+  useEffect(() => {
+    if (!visiblePostId) { stopMusic(); return; }
+    const item = feedItemsRef.current.find((f) => f.id === visiblePostId);
+    const music = (item as any)?.data?.music;
+    if (music?.url) {
+      playMusic(visiblePostId, music);
+    } else {
+      stopMusic();
+    }
+  }, [visiblePostId]);
 
   // 북마크 "피드에서 보기"에서 넘어온 postId로 스크롤
   useEffect(() => {
@@ -1069,10 +1090,19 @@ export default function HomeScreen() {
   // 탭 벗어날 때 동영상 정지
   useFocusEffect(
     useCallback(() => {
+      // 탭 포커스 시 동영상 재생 재시작
+      if (visibleVideoUrl) {
+        try { inlinePlayer.play(); } catch {}
+      }
+      const item = feedItemsRef.current.find((f) => f.id === visiblePostId);
+      const music = (item as any)?.data?.music;
+      if (music?.url && visiblePostId) playMusic(visiblePostId, music);
       return () => {
+        // 탭 벗어날 때 동영상 + 음악 정지
         try { inlinePlayer.pause(); } catch {}
+        stopMusic();
       };
-    }, [inlinePlayer])
+    }, [inlinePlayer, visibleVideoUrl, visiblePostId, playMusic, stopMusic])
   );
 
   const renderItem = useCallback(({ item }: { item: FeedItem }) => {

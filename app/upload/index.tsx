@@ -31,6 +31,9 @@ import { CropEditor } from '../../src/components/CropEditor';
 import { UserTagSelector } from '../../src/components/UserTagSelector';
 import { LocationSelector } from '../../src/components/LocationSelector';
 import { LocationData } from '../../src/services/locationService';
+import { MusicSelector, SelectedMusic } from '../../src/components/MusicSelector';
+import { MusicWaveSelector } from '../../src/components/MusicWaveSelector';
+import { useMusic } from '../../src/contexts/MusicContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useCurrentUser } from '../../src/hooks/useCurrentUser';
 import { createStory } from '../../src/services/storyService';
@@ -71,6 +74,7 @@ export default function UploadScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { uid, displayName, avatarImg, photoURL, profile } = useCurrentUser();
+  const { stopMusic } = useMusic();
   const params = useLocalSearchParams();
 
   // 단계
@@ -188,6 +192,8 @@ export default function UploadScreen() {
 
   const [taggedUsers, setTaggedUsers] = useState<{ uid: string; displayName: string; photoURL?: string }[]>([]);
   const [location, setLocation] = useState<LocationData | null>(null);
+  const [selectedMusic, setSelectedMusic] = useState<SelectedMusic | null>(null);
+  const [showMusicWave, setShowMusicWave] = useState(false);
 
   // 키보드 높이 추적
   const [keyboardH, setKeyboardH] = useState(0);
@@ -364,6 +370,12 @@ export default function UploadScreen() {
     setStep('share');
   };
 
+  function optimizeCloudinaryUrl(url: string): string {
+    if (!url.includes('cloudinary.com')) return url;
+    // /upload/ 뒤에 변환 파라미터 삽입
+    return url.replace('/upload/', '/upload/q_auto:best,f_auto,w_1440,c_limit/');
+  }
+
   // 업로드 함수
   const uploadMedia = async (
     uri: string,
@@ -423,7 +435,7 @@ export default function UploadScreen() {
       xhr.onload = () => {
         if (xhr.status === 200) {
           const res = JSON.parse(xhr.responseText);
-          resolve(res.secure_url);
+          resolve(optimizeCloudinaryUrl(res.secure_url));
         } else {
           console.error('Cloudinary 오류:', xhr.status, xhr.responseText);
           reject(new Error(`업로드 실패: ${xhr.status}`));
@@ -526,6 +538,11 @@ export default function UploadScreen() {
           visibilitySchools,
           taggedUsers: taggedUsers.length > 0 ? taggedUsers : undefined,
           location: location ?? undefined,
+          music: selectedMusic ? {
+            name: selectedMusic.title,
+            url: selectedMusic.url,
+            volume: selectedMusic.volume,
+          } : undefined,
         });
       }
 
@@ -544,6 +561,7 @@ export default function UploadScreen() {
         }
       }
 
+      stopMusic();
       Alert.alert('완료', '업로드 완료!');
       router.replace('/(tabs)');
     } catch (err: any) {
@@ -1052,11 +1070,43 @@ export default function UploadScreen() {
           )}
         </View>
 
-        {/* ── 편집 도구 (텍스트 모드 아닐 때, 이미지만) ── */}
-        {!showTextInput && !isVideo && (
+        {/* ── 편집 도구 (텍스트 모드 아닐 때) ── */}
+        {!showTextInput && (
           <View style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
+            {/* 음악 추가 버튼 (항상 표시) */}
             <TouchableOpacity
-              onPress={() => setShowTextInput(true)}
+              onPress={() => { stopMusic(); setShowMusicWave(true); }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 8,
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+                borderTopWidth: 0.5,
+                borderTopColor: '#333',
+              }}
+            >
+              <Ionicons
+                name={selectedMusic ? 'musical-notes' : 'musical-notes-outline'}
+                size={20}
+                color={selectedMusic ? '#e8313a' : '#fff'}
+              />
+              <Text style={{ color: selectedMusic ? '#e8313a' : '#fff', fontSize: 14, fontWeight: '600', flex: 1 }}>
+                {selectedMusic ? selectedMusic.title : '음악 추가'}
+              </Text>
+              {selectedMusic && (
+                <TouchableOpacity
+                  onPress={() => setSelectedMusic(null)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="close-circle" size={18} color="#888" />
+                </TouchableOpacity>
+              )}
+            </TouchableOpacity>
+            {/* 텍스트 추가 (이미지만) */}
+            {!isVideo && (
+              <TouchableOpacity
+                onPress={() => setShowTextInput(true)}
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -1083,6 +1133,7 @@ export default function UploadScreen() {
                 </View>
               )}
             </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -1304,6 +1355,18 @@ export default function UploadScreen() {
             </View>
           </>
         )}
+      {/* 음악 파형 선택 모달 */}
+      <MusicWaveSelector
+        visible={showMusicWave}
+        selectedMusic={selectedMusic}
+        isVideo={selectedMedia.some(m => m.type === 'video')}
+        onConfirm={(music) => {
+          setSelectedMusic(music);
+          setShowMusicWave(false);
+          stopMusic();
+        }}
+        onCancel={() => { stopMusic(); setShowMusicWave(false); }}
+      />
       </GestureHandlerRootView>
     );
   }
@@ -1382,6 +1445,15 @@ export default function UploadScreen() {
         <View style={{ paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: colors.border }}>
           <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 10 }}>위치</Text>
           <LocationSelector location={location} onChange={setLocation} />
+        </View>
+
+        <View style={{ paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: colors.border }}>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 10 }}>배경음악</Text>
+          <MusicSelector
+            selectedMusic={selectedMusic}
+            onChange={setSelectedMusic}
+            isVideo={selectedMedia.some(m => m.type === 'video')}
+          />
         </View>
 
         <TouchableOpacity
