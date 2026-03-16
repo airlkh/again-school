@@ -149,6 +149,7 @@ export function MusicSelector({ selectedMusic, onChange, isVideo = false }: Prop
       url: item.url,
       startTime: 0,
       duration: Math.min(30, item.duration),
+      totalDuration: item.duration,
       volume: 0.8,
       videoVolume: isVideo ? 0.5 : undefined,
     });

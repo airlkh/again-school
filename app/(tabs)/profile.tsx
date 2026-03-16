@@ -39,6 +39,7 @@ import { doc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs, w
 import { updateProfile } from 'firebase/auth';
 import { db } from '../../src/config/firebase';
 import { getTrustBadge, TRUST_BADGE_INFO } from '../../src/hooks/useTrust';
+import { searchSchools, NeisSchool } from '../../src/services/neisService';
 
 const SCHOOL_TYPES: SchoolEntry['schoolType'][] = ['초등학교', '중학교', '고등학교', '대학교'];
 
@@ -223,6 +224,11 @@ export default function ProfileScreen() {
   const [newIsPublic, setNewIsPublic] = useState(true);
   const [addingSchool, setAddingSchool] = useState(false);
   const [editingSchoolIndex, setEditingSchoolIndex] = useState<number | null>(null);
+  const [schoolSearchQuery, setSchoolSearchQuery] = useState('');
+  const [schoolSearchResults, setSchoolSearchResults] = useState<NeisSchool[]>([]);
+  const [isSchoolSearching, setIsSchoolSearching] = useState(false);
+  const [showSchoolResults, setShowSchoolResults] = useState(false);
+  const schoolSearchTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 직장 편집
   const [workplace, setWorkplace] = useState('');
@@ -504,6 +510,9 @@ export default function ProfileScreen() {
     setNewSchoolType('중학교');
     setNewIsPublic(true);
     setEditingSchoolIndex(null);
+    setSchoolSearchQuery('');
+    setSchoolSearchResults([]);
+    setShowSchoolResults(false);
   }
 
   function handleEditSchool(index: number) {
@@ -939,11 +948,50 @@ export default function ProfileScreen() {
               <Text style={[styles.modalLabel, { color: colors.text }]}>학교명</Text>
               <TextInput
                 style={[styles.modalInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
-                placeholder="예: 한빛중학교"
+                placeholder="학교 이름 검색 (2글자 이상)"
                 placeholderTextColor={colors.inactive}
-                value={newSchoolName}
-                onChangeText={setNewSchoolName}
+                value={schoolSearchQuery}
+                onChangeText={(text) => {
+                  setSchoolSearchQuery(text);
+                  setNewSchoolName(text);
+                  if (schoolSearchTimerRef.current) clearTimeout(schoolSearchTimerRef.current);
+                  if (newSchoolType === '대학교' || text.trim().length < 2) {
+                    setSchoolSearchResults([]);
+                    setShowSchoolResults(false);
+                    return;
+                  }
+                  setIsSchoolSearching(true);
+                  schoolSearchTimerRef.current = setTimeout(async () => {
+                    const results = await searchSchools(text);
+                    setSchoolSearchResults(results);
+                    setShowSchoolResults(results.length > 0);
+                    setIsSchoolSearching(false);
+                  }, 500);
+                }}
               />
+              {isSchoolSearching && (
+                <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 4 }} />
+              )}
+              {showSchoolResults && (
+                <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 12, marginTop: 4, overflow: 'hidden', backgroundColor: colors.card }}>
+                  {schoolSearchResults.map((school, idx) => (
+                    <TouchableOpacity
+                      key={idx}
+                      style={{ paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: colors.border }}
+                      onPress={() => {
+                        setNewSchoolName(school.schoolName);
+                        setSchoolSearchQuery(school.schoolName);
+                        setNewSchoolType(school.schoolType as any);
+                        setShowSchoolResults(false);
+                        setSchoolSearchResults([]);
+                      }}
+                    >
+                      <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text, marginBottom: 2 }}>{school.schoolName}</Text>
+                      <Text style={{ fontSize: 12, color: colors.textSecondary }}>{school.schoolType} · {school.region}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
 
               <Text style={[styles.modalLabel, { color: colors.text }]}>졸업연도</Text>
               <TextInput

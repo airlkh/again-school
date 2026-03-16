@@ -54,10 +54,8 @@ export default function LoginScreen() {
 
   // Google Auth Session
   const [, response, promptAsync] = Google.useAuthRequest({
-    // TODO: Firebase Console > Authentication > Google 로그인 설정 후 Client ID 입력
-    androidClientId: 'YOUR_ANDROID_CLIENT_ID',
-    iosClientId: 'YOUR_IOS_CLIENT_ID',
-    webClientId: 'YOUR_WEB_CLIENT_ID',
+    androidClientId: '414642537109-1rvkvdtma5iv7fh2ti2jgvro0homdt6p.apps.googleusercontent.com',
+    webClientId: '414642537109-4hc2a5k1m3hqrultrdav3r19q36b377o.apps.googleusercontent.com',
   });
 
   useEffect(() => {

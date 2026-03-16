@@ -9,6 +9,7 @@ interface PostMusic {
   title?: string;
   volume?: number;
   startTime?: number;
+  duration?: number;
 }
 
 interface MusicContextType {
@@ -34,6 +35,8 @@ export async function resetAudioSession() {}
 export function MusicProvider({ children }: { children: React.ReactNode }) {
   const [isMuted, setIsMuted] = useState(false);
   const [currentPostId, setCurrentPostId] = useState<string | null>(null);
+  const endTimeRef = useRef<number>(0);
+  const startTimeRef = useRef<number>(0);
   const [musicUrl, setMusicUrl] = useState('');
   const isMutedRef = useRef(false);
   const currentPostIdRef = useRef<string | null>(null);
@@ -56,6 +59,23 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (!musicPlayer) return;
+    musicPlayer.timeUpdateEventInterval = 0.5;
+    const sub = musicPlayer.addListener('timeUpdate', (payload) => {
+      const current = payload.currentTime;
+      const end = endTimeRef.current;
+      const start = startTimeRef.current;
+      if (end > 0 && current >= end) {
+        try {
+          musicPlayer.currentTime = start;
+          if (!isMutedRef.current) musicPlayer.play();
+        } catch {}
+      }
+    });
+    return () => sub.remove();
+  }, [musicPlayer]);
+
+  useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
       if (state !== 'active' && musicPlayer) {
         try { musicPlayer.pause(); } catch {}
@@ -67,22 +87,38 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   }, [musicUrl]);
 
   function playMusic(postId: string, music: PostMusic) {
-    if (currentPostIdRef.current === postId) return;
     currentPostIdRef.current = postId;
     currentMusicRef.current = music;
     setCurrentPostId(postId);
-    setMusicUrl(music.url);
     if (musicPlayer) {
       musicPlayer.volume = music.volume ?? 0.8;
       musicPlayer.muted = isMutedRef.current;
-      if (!isMutedRef.current) {
-        try { musicPlayer.play(); } catch {}
-      }
     }
+    const startTime = music.startTime ?? 0;
+    const duration = music.duration ?? 0;
+    const isPreview = postId === 'preview';
+    startTimeRef.current = startTime;
+    endTimeRef.current = duration > 0 ? startTime + duration : 0;
+    setMusicUrl(music.url);
+    setTimeout(() => {
+      if (musicPlayer) {
+        try {
+          if (startTime > 0) musicPlayer.currentTime = startTime;
+          if (isPreview) {
+            musicPlayer.muted = false;
+            musicPlayer.play();
+          } else if (!isMutedRef.current) {
+            musicPlayer.play();
+          }
+        } catch {}
+      }
+    }, 300);
   }
 
   function stopMusic() {
     currentPostIdRef.current = null;
+    startTimeRef.current = 0;
+    endTimeRef.current = 0;
     currentMusicRef.current = null;
     setCurrentPostId(null);
     setMusicUrl('');

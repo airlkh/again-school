@@ -7,11 +7,13 @@ import {
   StyleSheet,
   Modal,
   FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { SchoolEntry } from '../types/auth';
 import { SCHOOL_TYPES, getGraduationYears } from '../data/schoolTypes';
+import { searchSchools, NeisSchool } from '../services/neisService';
 
 interface SchoolInputProps {
   schools: SchoolEntry[];
@@ -27,8 +29,44 @@ export function SchoolInput({ schools, onSchoolsChange }: SchoolInputProps) {
   const [graduationYear, setGraduationYear] = useState(2010);
   const [showTypePicker, setShowTypePicker] = useState(false);
   const [showYearPicker, setShowYearPicker] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<NeisSchool[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+  const searchTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const activeHighlightBg = isDark ? 'rgba(232,49,58,0.15)' : '#fef2f2';
+
+  function onSearchChange(text: string) {
+    setSearchQuery(text);
+    setSchoolName(text);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    if (schoolType === '대학교') {
+      setSearchResults([]);
+      setShowResults(false);
+      return;
+    }
+    if (text.trim().length < 2) {
+      setSearchResults([]);
+      setShowResults(false);
+      return;
+    }
+    setIsSearching(true);
+    searchTimerRef.current = setTimeout(async () => {
+      const results = await searchSchools(text);
+      setSearchResults(results);
+      setShowResults(results.length > 0);
+      setIsSearching(false);
+    }, 500);
+  }
+
+  function onSelectSchool(school: NeisSchool) {
+    setSchoolName(school.schoolName);
+    setSearchQuery(school.schoolName);
+    setSchoolType(school.schoolType as SchoolEntry['schoolType']);
+    setShowResults(false);
+    setSearchResults([]);
+  }
 
   function handleAddSchool() {
     if (!schoolName.trim()) return;
@@ -41,6 +79,9 @@ export function SchoolInput({ schools, onSchoolsChange }: SchoolInputProps) {
     setSchoolName('');
     setSchoolType('고등학교');
     setGraduationYear(2010);
+    setSearchQuery('');
+    setSearchResults([]);
+    setShowResults(false);
     setIsAdding(false);
   }
 
@@ -98,20 +139,37 @@ export function SchoolInput({ schools, onSchoolsChange }: SchoolInputProps) {
             <Ionicons name="chevron-down" size={20} color={colors.inactive} />
           </TouchableOpacity>
 
-          <TextInput
-            style={[
-              styles.input,
-              {
-                borderColor: colors.border,
-                color: colors.text,
-                backgroundColor: colors.card,
-              },
-            ]}
-            placeholder="학교 이름을 입력하세요"
-            placeholderTextColor={colors.inactive}
-            value={schoolName}
-            onChangeText={setSchoolName}
-          />
+          <View>
+            <TextInput
+              style={[
+                styles.input,
+                { borderColor: colors.border, color: colors.text, backgroundColor: colors.card },
+              ]}
+              placeholder="학교 이름 검색 (2글자 이상)"
+              placeholderTextColor={colors.inactive}
+              value={searchQuery}
+              onChangeText={onSearchChange}
+            />
+            {isSearching && (
+              <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 8 }} />
+            )}
+            {showResults && (
+              <View style={[styles.resultList, { backgroundColor: colors.card, borderColor: colors.border, maxHeight: 200 }]}>
+                {searchResults.map((school, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    style={[styles.resultItem, { borderBottomColor: colors.border }]}
+                    onPress={() => onSelectSchool(school)}
+                  >
+                    <Text style={[styles.resultName, { color: colors.text }]}>{school.schoolName}</Text>
+                    <Text style={[styles.resultSub, { color: colors.textSecondary }]}>
+                      {school.schoolType} · {school.region}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
 
           <TouchableOpacity
             style={[
@@ -347,4 +405,24 @@ const styles = StyleSheet.create({
   },
   modalOptionText: { fontSize: 16 },
   yearList: { maxHeight: 300 },
+  resultList: {
+    borderWidth: 1,
+    borderRadius: 12,
+    marginTop: 4,
+    maxHeight: 200,
+    overflow: 'hidden',
+  },
+  resultItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  resultName: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  resultSub: {
+    fontSize: 13,
+    marginTop: 2,
+  },
 });

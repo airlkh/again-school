@@ -32,7 +32,7 @@ import { UserTagSelector } from '../../src/components/UserTagSelector';
 import { LocationSelector } from '../../src/components/LocationSelector';
 import { LocationData } from '../../src/services/locationService';
 import { MusicSelector, SelectedMusic } from '../../src/components/MusicSelector';
-import { MusicWaveSelector } from '../../src/components/MusicWaveSelector';
+import { MusicTrimmer } from '../../src/components/MusicTrimmer';
 import { useMusic } from '../../src/contexts/MusicContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useCurrentUser } from '../../src/hooks/useCurrentUser';
@@ -74,7 +74,7 @@ export default function UploadScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { uid, displayName, avatarImg, photoURL, profile } = useCurrentUser();
-  const { stopMusic } = useMusic();
+  const { stopMusic, playMusic } = useMusic();
   const params = useLocalSearchParams();
 
   // 단계
@@ -542,6 +542,9 @@ export default function UploadScreen() {
             name: selectedMusic.title,
             url: selectedMusic.url,
             volume: selectedMusic.volume,
+            startTime: selectedMusic.startTime ?? 0,
+            duration: selectedMusic.duration ?? 30,
+            videoVolume: selectedMusic.videoVolume ?? 1,
           } : undefined,
         });
       }
@@ -1356,7 +1359,7 @@ export default function UploadScreen() {
           </>
         )}
       {/* 음악 파형 선택 모달 */}
-      <MusicWaveSelector
+      <MusicTrimmer
         visible={showMusicWave}
         selectedMusic={selectedMusic}
         isVideo={selectedMedia.some(m => m.type === 'video')}
@@ -1364,6 +1367,10 @@ export default function UploadScreen() {
           setSelectedMusic(music);
           setShowMusicWave(false);
           stopMusic();
+        }}
+        onStopBgMusic={stopMusic}
+        onPlayPreview={(url, startTime, volume) => {
+          playMusic('preview', { url, startTime, volume });
         }}
         onCancel={() => { stopMusic(); setShowMusicWave(false); }}
       />

@@ -1,0 +1,42 @@
+const NEIS_API_KEY = '0bb9dbfbdad641a2b029e7eb3380a758';
+const NEIS_BASE_URL = 'https://open.neis.go.kr/hub';
+
+export interface NeisSchool {
+  schoolName: string;
+  schoolType: string;
+  region: string;
+  address: string;
+  officeCode: string;
+  schoolCode: string;
+}
+
+export async function searchSchools(query: string): Promise<NeisSchool[]> {
+  if (!query || query.trim().length < 2) return [];
+  try {
+    const encodedQuery = encodeURIComponent(query.trim());
+    const url = `${NEIS_BASE_URL}/schoolInfo?KEY=${NEIS_API_KEY}&Type=json&pIndex=1&pSize=20&SCHUL_NM=${encodedQuery}`;
+    const res = await fetch(url);
+    const json = await res.json();
+    const rows = json?.schoolInfo?.[1]?.row;
+    if (!rows || !Array.isArray(rows)) return [];
+    return rows.map((r: Record<string, string>) => ({
+      schoolName: r.SCHUL_NM ?? '',
+      schoolType: mapSchoolType(r.SCHUL_KND_SC_NM ?? ''),
+      region: r.LCTN_SC_NM ?? '',
+      address: r.ORG_RDNMA ?? '',
+      officeCode: r.ATPT_OFCDC_SC_CODE ?? '',
+      schoolCode: r.SD_SCHUL_CODE ?? '',
+    }));
+  } catch (e) {
+    console.warn('[neisService] 검색 실패:', e);
+    return [];
+  }
+}
+
+function mapSchoolType(rawType: string): string {
+  if (rawType.includes('초등')) return '초등학교';
+  if (rawType.includes('중학')) return '중학교';
+  if (rawType.includes('고등')) return '고등학교';
+  if (rawType.includes('대학')) return '대학교';
+  return rawType;
+}
