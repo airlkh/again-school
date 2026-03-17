@@ -30,7 +30,7 @@ import {
 WebBrowser.maybeCompleteAuthSession();
 
 // TODO: 각 소셜 로그인 플랫폼의 실제 클라이언트 ID를 입력하세요.
-const KAKAO_CLIENT_ID = 'YOUR_KAKAO_REST_API_KEY';
+const KAKAO_CLIENT_ID = 'f8d17cb22bfe25d76c2347fa4fa7ecd8';
 const KAKAO_REDIRECT_URI =
   'https://again-school-bfea8.firebaseapp.com/auth/kakao/callback';
 const NAVER_CLIENT_ID = 'YOUR_NAVER_CLIENT_ID';
