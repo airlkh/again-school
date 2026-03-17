@@ -8,7 +8,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -17,6 +16,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -27,15 +27,10 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      - name: Expo Prebuild
-        run: npx expo prebuild --platform android --no-install
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-
       - name: Fix Gradle permissions
         run: chmod +x android/gradlew
 
-      - name: Build APK
+      - name: Build Release APK
         run: |
           cd android
           ./gradlew assembleRelease \
@@ -48,12 +43,11 @@ jobs:
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: again-school-apk
+          name: again-school-release-apk
           path: android/app/build/outputs/apk/release/app-release.apk
 
   build-debug:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -62,6 +56,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -71,11 +66,6 @@ jobs:
 
       - name: Install dependencies
         run: npm install --legacy-peer-deps
-
-      - name: Expo Prebuild
-        run: npx expo prebuild --platform android --no-install
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
       - name: Fix Gradle permissions
         run: chmod +x android/gradlew
@@ -95,4 +85,3 @@ jobs:
         with:
           name: again-school-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
-
