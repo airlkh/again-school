@@ -27,8 +27,8 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      - name: Link node_modules into android
-        run: ln -s ${{ github.workspace }}/node_modules ${{ github.workspace }}/android/node_modules
+      - name: Copy google-services.json
+        run: cp android/app/google-services.json google-services.json || true
 
       - name: Fix Gradle permissions
         run: chmod +x android/gradlew
@@ -37,7 +37,7 @@ jobs:
         run: cd android && ./gradlew assembleRelease --no-daemon --warning-mode none -Dorg.gradle.jvmargs="-Xmx4g"
         env:
           NODE_OPTIONS: "--max-old-space-size=4096"
-          EXPO_USE_COMMUNITY_AUTOLINKING: "1"
+          NODE_ENV: "production"
 
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
@@ -66,8 +66,8 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      - name: Link node_modules into android
-        run: ln -s ${{ github.workspace }}/node_modules ${{ github.workspace }}/android/node_modules
+      - name: Copy google-services.json
+        run: cp android/app/google-services.json google-services.json || true
 
       - name: Fix Gradle permissions
         run: chmod +x android/gradlew
@@ -76,7 +76,7 @@ jobs:
         run: cd android && ./gradlew assembleDebug --no-daemon --warning-mode none -Dorg.gradle.jvmargs="-Xmx4g"
         env:
           NODE_OPTIONS: "--max-old-space-size=4096"
-          EXPO_USE_COMMUNITY_AUTOLINKING: "1"
+          NODE_ENV: "development"
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
