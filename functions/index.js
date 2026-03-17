@@ -66,8 +66,8 @@ exports.naverAuth = functions.https.onRequest(async (req, res) => {
   const { code, state } = req.body;
   if (!code) { res.status(400).json({ error: 'code is required' }); return; }
 
-  const NAVER_CLIENT_ID = 'YOUR_NAVER_CLIENT_ID';
-  const NAVER_CLIENT_SECRET = 'YOUR_NAVER_CLIENT_SECRET';
+  const NAVER_CLIENT_ID = '2evSaXfLA187LuaUcJKA';
+  const NAVER_CLIENT_SECRET = 'VQ5iPF7yhK';
 
   try {
     // 1. 네이버 access token 받기

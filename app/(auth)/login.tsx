@@ -33,7 +33,7 @@ WebBrowser.maybeCompleteAuthSession();
 const KAKAO_CLIENT_ID = 'f8d17cb22bfe25d76c2347fa4fa7ecd8';
 const KAKAO_REDIRECT_URI =
   'https://again-school-bfea8.firebaseapp.com/auth/kakao/callback';
-const NAVER_CLIENT_ID = 'YOUR_NAVER_CLIENT_ID';
+const NAVER_CLIENT_ID = '2evSaXfLA187LuaUcJKA';
 const NAVER_REDIRECT_URI =
   'https://again-school-bfea8.firebaseapp.com/auth/naver/callback';
 
