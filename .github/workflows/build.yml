@@ -27,25 +27,13 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      - name: Expo Prebuild
-        run: npx expo prebuild --platform android --clean
-        env:
-          NODE_OPTIONS: "--max-old-space-size=4096"
-
       - name: Fix Gradle permissions
         run: chmod +x android/gradlew
 
       - name: Build Release APK
-        working-directory: android
-        run: |
-          ./gradlew assembleRelease \
-            --no-daemon \
-            --warning-mode none \
-            -Dorg.gradle.jvmargs="-Xmx4g" \
-            -DREACT_NATIVE_CLANG_TOOLCHAIN_VERSION=17
+        run: cd android && ./gradlew assembleRelease --no-daemon --warning-mode none -Dorg.gradle.jvmargs="-Xmx4g"
         env:
           NODE_OPTIONS: "--max-old-space-size=4096"
-          NODE_PATH: "${{ github.workspace }}/node_modules"
 
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
@@ -74,24 +62,13 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      - name: Expo Prebuild
-        run: npx expo prebuild --platform android --clean
-        env:
-          NODE_OPTIONS: "--max-old-space-size=4096"
-
       - name: Fix Gradle permissions
         run: chmod +x android/gradlew
 
       - name: Build Debug APK
-        working-directory: android
-        run: |
-          ./gradlew assembleDebug \
-            --no-daemon \
-            --warning-mode none \
-            -Dorg.gradle.jvmargs="-Xmx4g"
+        run: cd android && ./gradlew assembleDebug --no-daemon --warning-mode none -Dorg.gradle.jvmargs="-Xmx4g"
         env:
           NODE_OPTIONS: "--max-old-space-size=4096"
-          NODE_PATH: "${{ github.workspace }}/node_modules"
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
