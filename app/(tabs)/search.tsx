@@ -43,6 +43,8 @@ interface SearchResult {
   privacySettings?: UserPrivacySettings;
   trustBadge?: TrustBadgeLevel;
   trustCount?: number;
+  isTeacher?: boolean;
+  teacherVerified?: boolean;
 }
 
 const DUMMY_RESULTS: SearchResult[] = [
@@ -106,7 +108,7 @@ const ALL_YEARS = [...new Set(DUMMY_RESULTS.flatMap((r) => r.schools.map((s) => 
 const ALL_REGIONS = [...new Set(DUMMY_RESULTS.map((r) => r.region.split(' ')[0]))];
 
 // ─── 필터 타입 ─────────────────────────────────────────────────
-type FilterType = 'school' | 'year' | 'region';
+type FilterType = 'school' | 'year' | 'region' | 'teacher';
 
 interface ActiveFilter {
   type: FilterType;
@@ -155,6 +157,7 @@ export default function SearchScreen() {
       const schoolFilter = filters.find((f) => f.type === 'school')?.value;
       const yearFilter = filters.find((f) => f.type === 'year')?.value;
       const regionFilter = filters.find((f) => f.type === 'region')?.value;
+        const teacherFilter = filters.find((f) => f.type === 'teacher')?.value === 'true';
 
       // Firestore 검색
       let firestoreResults: SearchResult[] = [];
@@ -178,6 +181,8 @@ export default function SearchScreen() {
             privacySettings: p.privacySettings,
             trustBadge: (p as any).trustBadge || 'none',
             trustCount: (p as any).trustCount || 0,
+            isTeacher: (p as any).isTeacher || false,
+            teacherVerified: (p as any).teacherVerified || false,
           }));
         } catch {}
       }
@@ -208,6 +213,10 @@ export default function SearchScreen() {
           r.region.includes(regionFilter),
         );
       }
+        if (teacherFilter) {
+          firestoreResults = firestoreResults.filter((r) => r.teacherVerified === true);
+          dummyFiltered = [];
+        }
 
       // Firestore 결과 우선, 중복 제거 후 더미 추가
       const seen = new Set(firestoreResults.map((r) => r.uid));
@@ -373,6 +382,7 @@ export default function SearchScreen() {
                 <NameWithBadge
                   name={item.displayName}
                   isAdmin={item.verified}
+                  isTeacher={item.teacherVerified === true}
                   trustCount={item.trustCount ?? 0}
                   nameStyle={[styles.name, { color: colors.text }]}
                   numberOfLines={1}
@@ -511,6 +521,33 @@ export default function SearchScreen() {
             onPress={() => setExpandedFilter(expandedFilter === 'region' ? null : 'region')}
             onClear={() => removeFilter('region')}
           />
+            {/* 선생님 필터 */}
+            <TouchableOpacity
+              style={[
+                styles.filterChip,
+                { backgroundColor: colors.card, borderColor: colors.border },
+                activeFilters.find(f => f.type === 'teacher') && { backgroundColor: '#7C3AED18', borderColor: '#7C3AED' },
+              ]}
+              onPress={() => {
+                const exists = activeFilters.find(f => f.type === 'teacher');
+                if (exists) {
+                  setActiveFilters(prev => prev.filter(f => f.type !== 'teacher'));
+                } else {
+                  setActiveFilters(prev => [...prev, { type: 'teacher', value: 'true' }]);
+                }
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={{ fontSize: 14 }}>👩‍🏫</Text>
+              <Text style={[
+                styles.filterChipText,
+                { color: colors.textSecondary },
+                activeFilters.find(f => f.type === 'teacher') && { color: '#7C3AED', fontWeight: '600' },
+              ]}>선생님</Text>
+              {activeFilters.find(f => f.type === 'teacher') && (
+                <Ionicons name="checkmark-circle" size={16} color="#7C3AED" />
+              )}
+            </TouchableOpacity>
         </ScrollView>
       </View>
 

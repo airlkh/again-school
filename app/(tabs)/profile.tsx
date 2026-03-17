@@ -42,6 +42,7 @@ import { getTrustBadge, TRUST_BADGE_INFO } from '../../src/hooks/useTrust';
 import { searchSchools, NeisSchool } from '../../src/services/neisService';
 
 const SCHOOL_TYPES: SchoolEntry['schoolType'][] = ['초등학교', '중학교', '고등학교', '대학교'];
+const ADMIN_UIDS = ['UB6PuD56uHaImgqqC3q1AFFk8kj1'];
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const GRID_SIZE = Math.floor(SCREEN_WIDTH / 3);
@@ -871,6 +872,12 @@ export default function ProfileScreen() {
           ])} />
         <SettingItem icon="notifications-outline" label="알림 설정"
           onPress={() => router.push('/settings/notifications' as any)} />
+        <SettingItem icon="school-outline" label="선생님 인증 신청"
+          onPress={() => router.push('/profile/teacher-apply' as any)} />
+        {user && ADMIN_UIDS.includes(user.uid) && (
+          <SettingItem icon="shield-checkmark-outline" label="선생님 인증 관리 (관리자)"
+            onPress={() => router.push('/admin/teacher-requests' as any)} />
+        )}
         <SettingItem icon="eye-outline" label="공개 범위 설정"
           detail={privacySettings?.showSchools && privacySettings?.showWorkplace ? '전체 공개' : '일부 비공개'}
           onPress={() => router.push('/settings/visibility' as any)} />

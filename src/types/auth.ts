@@ -26,6 +26,9 @@ export interface UserProfile {
   job?: string;
   workplace?: string;
   privacySettings?: UserPrivacySettings;
+  isTeacher?: boolean;
+  teacherVerified?: boolean;
+  teacherAppliedAt?: number;
   onboardingCompleted: boolean;
   createdAt: number;
   updatedAt: number;
