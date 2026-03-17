@@ -5,6 +5,10 @@ on:
     branches: [ master ]
   workflow_dispatch:
 
+env:
+  NODE_OPTIONS: "--max-old-space-size=4096"
+  EXPO_USE_COMMUNITY_AUTOLINKING: "1"
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -27,16 +31,21 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      - name: Copy google-services.json
-        run: cp android/app/google-services.json google-services.json || true
-
       - name: Fix Gradle permissions
         run: chmod +x android/gradlew
 
+      - name: Generate package list
+        run: npx react-native config > /dev/null 2>&1 || true
+
       - name: Build Release APK
-        run: cd android && ./gradlew assembleRelease --no-daemon --warning-mode none -Dorg.gradle.jvmargs="-Xmx4g"
+        run: |
+          export ANDROID_HOME=$ANDROID_SDK_ROOT
+          cd android && ./gradlew assembleRelease \
+            --no-daemon \
+            --warning-mode none \
+            -Dorg.gradle.jvmargs="-Xmx4g" \
+            -Preact.internal.publishingGroup=com.facebook
         env:
-          NODE_OPTIONS: "--max-old-space-size=4096"
           NODE_ENV: "production"
 
       - name: Upload Release APK
@@ -66,16 +75,20 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      - name: Copy google-services.json
-        run: cp android/app/google-services.json google-services.json || true
-
       - name: Fix Gradle permissions
         run: chmod +x android/gradlew
 
+      - name: Generate package list
+        run: npx react-native config > /dev/null 2>&1 || true
+
       - name: Build Debug APK
-        run: cd android && ./gradlew assembleDebug --no-daemon --warning-mode none -Dorg.gradle.jvmargs="-Xmx4g"
+        run: |
+          export ANDROID_HOME=$ANDROID_SDK_ROOT
+          cd android && ./gradlew assembleDebug \
+            --no-daemon \
+            --warning-mode none \
+            -Dorg.gradle.jvmargs="-Xmx4g"
         env:
-          NODE_OPTIONS: "--max-old-space-size=4096"
           NODE_ENV: "development"
 
       - name: Upload Debug APK
