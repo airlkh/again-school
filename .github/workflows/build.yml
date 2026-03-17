@@ -34,8 +34,11 @@ jobs:
       - name: Fix Gradle permissions
         run: chmod +x android/gradlew
 
-      - name: Generate package list
-        run: npx react-native config > /dev/null 2>&1 || true
+      - name: Debug react-native config
+        run: |
+          npx react-native config 2>&1 | head -50 || true
+          echo "---"
+          cat package.json | grep -A5 '"android"' || true
 
       - name: Build Release APK
         run: |
@@ -78,8 +81,11 @@ jobs:
       - name: Fix Gradle permissions
         run: chmod +x android/gradlew
 
-      - name: Generate package list
-        run: npx react-native config > /dev/null 2>&1 || true
+      - name: Debug react-native config
+        run: |
+          npx react-native config 2>&1 | head -50 || true
+          echo "---"
+          cat package.json | grep -A5 '"android"' || true
 
       - name: Build Debug APK
         run: |
