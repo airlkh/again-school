@@ -39,6 +39,7 @@ import { doc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs, w
 import { updateProfile } from 'firebase/auth';
 import { db } from '../../src/config/firebase';
 import { getTrustBadge, TRUST_BADGE_INFO } from '../../src/hooks/useTrust';
+import { NameWithBadge } from '../../src/utils/badge';
 import { searchSchools, NeisSchool } from '../../src/services/neisService';
 
 const SCHOOL_TYPES: SchoolEntry['schoolType'][] = ['초등학교', '중학교', '고등학교', '대학교'];
@@ -669,7 +670,12 @@ export default function ProfileScreen() {
 
       {/* 프로필 정보 */}
       <View style={styles.profileInfo}>
-        <Text style={[styles.displayName, { color: colors.text }]}>{displayName}</Text>
+        <NameWithBadge
+            name={displayName}
+            uid={user?.uid}
+            nameStyle={[styles.displayName, { color: colors.text }]}
+            size="medium"
+          />
         {trustCount > 0 && (
           <View style={{ alignItems: 'center', marginTop: 2 }}>
             <Text style={{ fontSize: 12, color: TRUST_BADGE_INFO[getTrustBadge(trustCount)].color }}>
@@ -902,7 +908,12 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{displayName}</Text>
+        <NameWithBadge
+            name={displayName}
+            uid={user?.uid}
+            nameStyle={[styles.headerTitle, { color: colors.text }]}
+            size="small"
+          />
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <TouchableOpacity onPress={() => router.push('/upload')}>
             <Ionicons name="add-circle-outline" size={26} color={colors.text} />

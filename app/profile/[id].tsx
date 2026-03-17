@@ -209,6 +209,7 @@ export default function ProfileDetailScreen() {
             <NameWithBadge
               name={displayName}
               isAdmin={false}
+              uid={id ?? undefined}
               trustCount={trustCount}
               nameStyle={[styles.displayName, { color: colors.text }]}
               size="medium"
