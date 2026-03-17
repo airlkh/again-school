@@ -27,17 +27,11 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
+      - name: Link node_modules into android
+        run: ln -s ${{ github.workspace }}/node_modules ${{ github.workspace }}/android/node_modules
+
       - name: Fix Gradle permissions
         run: chmod +x android/gradlew
-
-      - name: Debug node path
-        run: |
-          which node
-          node --version
-          ls node_modules/.bin/react-native || echo "react-native not found"
-          ls node_modules/react-native/package.json || echo "react-native package not found"
-          ls node_modules/expo/package.json || echo "expo package not found"
-          cat android/settings.gradle | head -35
 
       - name: Build Release APK
         run: cd android && ./gradlew assembleRelease --no-daemon --warning-mode none -Dorg.gradle.jvmargs="-Xmx4g"
@@ -70,6 +64,9 @@ jobs:
 
       - name: Install dependencies
         run: npm install --legacy-peer-deps
+
+      - name: Link node_modules into android
+        run: ln -s ${{ github.workspace }}/node_modules ${{ github.workspace }}/android/node_modules
 
       - name: Fix Gradle permissions
         run: chmod +x android/gradlew
