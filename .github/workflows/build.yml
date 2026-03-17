@@ -41,6 +41,7 @@ jobs:
           ./gradlew assembleRelease \
             --no-daemon \
             --warning-mode none \
+            --stacktrace \
             -Dorg.gradle.jvmargs="-Xmx4g"
         env:
           NODE_OPTIONS: "--max-old-space-size=4096"
@@ -86,6 +87,7 @@ jobs:
           ./gradlew assembleDebug \
             --no-daemon \
             --warning-mode none \
+            --stacktrace \
             -Dorg.gradle.jvmargs="-Xmx4g"
         env:
           NODE_OPTIONS: "--max-old-space-size=4096"
