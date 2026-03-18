@@ -44,8 +44,8 @@ service cloud.firestore {
     match /posts/{postId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && (resource.data.authorId == request.auth.uid || isAdmin());
-      allow delete: if isAuthenticated() && (resource.data.authorId == request.auth.uid || isAdmin());
+      allow update: if isAuthenticated() && (resource.data.authorUid == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.authorUid == request.auth.uid || isAdmin());
     }
 
     // chatRooms 컬렉션
@@ -138,24 +138,24 @@ service cloud.firestore {
     match /stories/{storyId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && (resource.data.authorId == request.auth.uid || isAdmin());
-      allow delete: if isAuthenticated() && (resource.data.authorId == request.auth.uid || isAdmin());
+      allow update: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
     }
 
     // meetups 컬렉션
     match /meetups/{meetupId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && (resource.data.authorId == request.auth.uid || isAdmin());
-      allow delete: if isAuthenticated() && (resource.data.authorId == request.auth.uid || isAdmin());
+      allow update: if isAuthenticated() && (resource.data.hostUid == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.hostUid == request.auth.uid || isAdmin());
     }
 
     // jobs 컬렉션
     match /jobs/{jobId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && (resource.data.authorId == request.auth.uid || isAdmin());
-      allow delete: if isAuthenticated() && (resource.data.authorId == request.auth.uid || isAdmin());
+      allow update: if isAuthenticated() && (resource.data.authorUid == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.authorUid == request.auth.uid || isAdmin());
     }
 
     // connections 컬렉션
@@ -163,7 +163,7 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
       allow update: if isAuthenticated();
-      allow delete: if isAuthenticated() && (resource.data.fromId == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.fromUid == request.auth.uid || isAdmin());
     }
 
     // verificationRequests 컬렉션
