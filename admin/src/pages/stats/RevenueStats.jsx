@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import {
-  LineChart, Line, BarChart, Bar,
+  LineChart, Line, BarChart, Bar, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 
@@ -171,9 +171,6 @@ export default function RevenueStats() {
     </div>
   );
 }
-
-// Need Cell import for individual bar colors
-import { Cell } from 'recharts';
 
 const styles = {
   container: { padding: 32, maxWidth: 1200, margin: '0 auto' },
