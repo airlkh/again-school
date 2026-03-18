@@ -40,3 +40,26 @@ function mapSchoolType(rawType: string): string {
   if (rawType.includes('대학')) return '대학교';
   return rawType;
 }
+
+// schools 마스터 컬렉션에서 학교 검색 (관리자가 등록한 학교 우선)
+export async function searchSchoolsFromMaster(query: string): Promise<NeisSchool[]> {
+  if (!query || query.trim().length < 2) return [];
+  try {
+    const { collection, getDocs, query: fsQuery, where, limit: fsLimit } = await import('firebase/firestore');
+    const { db } = await import('../config/firebase');
+    const q = fsQuery(
+      collection(db, 'schools'),
+      where('isActive', '==', true),
+      fsLimit(100)
+    );
+    const snapshot = await getDocs(q);
+    const lower = query.toLowerCase();
+    return snapshot.docs
+      .map(d => d.data() as NeisSchool)
+      .filter(s => s.schoolName?.toLowerCase().includes(lower))
+      .slice(0, 20);
+  } catch (e) {
+    console.warn('[neisService] 마스터 검색 실패:', e);
+    return [];
+  }
+}

@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { SchoolEntry } from '../types/auth';
 import { SCHOOL_TYPES, getGraduationYears } from '../data/schoolTypes';
-import { searchSchools, NeisSchool } from '../services/neisService';
+import { searchSchools, searchSchoolsFromMaster, NeisSchool } from '../services/neisService';
 
 interface SchoolInputProps {
   schools: SchoolEntry[];
@@ -53,9 +53,15 @@ export function SchoolInput({ schools, onSchoolsChange }: SchoolInputProps) {
     }
     setIsSearching(true);
     searchTimerRef.current = setTimeout(async () => {
-      const results = await searchSchools(text);
-      setSearchResults(results);
-      setShowResults(results.length > 0);
+      const [masterResults, neisResults] = await Promise.all([
+        searchSchoolsFromMaster(text).catch(() => [] as NeisSchool[]),
+        searchSchools(text),
+      ]);
+      // 마스터 우선, 중복 제거
+      const seen = new Set(masterResults.map(s => s.schoolName));
+      const merged = [...masterResults, ...neisResults.filter(s => !seen.has(s.schoolName))];
+      setSearchResults(merged);
+      setShowResults(merged.length > 0);
       setIsSearching(false);
     }, 500);
   }

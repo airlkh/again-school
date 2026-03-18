@@ -54,6 +54,11 @@ import Banners from './pages/content/Banners';
 import FAQ from './pages/content/FAQ';
 import Policies from './pages/content/Policies';
 
+// Content - Additional
+import Stories from './pages/content/Stories';
+import Meetups from './pages/content/Meetups';
+import Jobs from './pages/content/Jobs';
+
 // Settlement
 import RevenueDashboard from './pages/settlement/RevenueDashboard';
 import SettlementTargets from './pages/settlement/SettlementTargets';
@@ -170,6 +175,9 @@ function App() {
           <Route path="content/banners" element={<Banners />} />
           <Route path="content/faq" element={<FAQ />} />
           <Route path="content/policies" element={<Policies />} />
+          <Route path="content/stories" element={<Stories />} />
+          <Route path="content/meetups" element={<Meetups />} />
+          <Route path="content/jobs" element={<Jobs />} />
 
           <Route path="settlement/revenue" element={<RevenueDashboard />} />
           <Route path="settlement/targets" element={<SettlementTargets />} />

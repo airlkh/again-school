@@ -88,6 +88,9 @@ const menuData = [
       { label: '배너 관리', path: '/content/banners' },
       { label: 'FAQ', path: '/content/faq' },
       { label: '약관/정책', path: '/content/policies' },
+      { label: '스토리 관리', path: '/content/stories' },
+      { label: '모임 관리', path: '/content/meetups' },
+      { label: '구인/구직 관리', path: '/content/jobs' },
     ],
   },
   {

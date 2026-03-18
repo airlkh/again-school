@@ -57,6 +57,9 @@ const pageTitleMap = {
   '/settings/notifications': '알림 설정',
   '/settings/security': '보안 설정',
   '/system/error-logs': '오류 로그',
+  '/content/stories': '스토리 관리',
+  '/content/meetups': '모임 관리',
+  '/content/jobs': '구인/구직 관리',
 };
 
 const styles = {

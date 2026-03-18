@@ -25,6 +25,7 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useGoBack } from '../../src/hooks/useGoBack';
 import { useAuth } from '../../src/contexts/AuthContext';
+import { submitReport } from '../../src/services/reportService';
 import { useCurrentUser } from '../../src/hooks/useCurrentUser';
 import { useMusic } from '../../src/contexts/MusicContext';
 import { useMute } from '../../src/contexts/MuteContext';
@@ -266,7 +267,11 @@ export default function PostDetailScreen() {
             if (buttonIndex === 0) handleBookmark();
             else if (buttonIndex === 1) handleShare();
             else if (buttonIndex === 2) Alert.alert('숨기기', '이 게시물을 숨겼습니다.');
-            else if (buttonIndex === 3) Alert.alert('신고', '신고가 접수되었습니다.');
+            else if (buttonIndex === 3) {
+              if (user) {
+                submitReport({ targetType: 'post', targetId: id!, targetUserId: authorUid, reason: 'other', reporterId: user.uid }).then(() => Alert.alert('신고', '신고가 접수되었습니다.')).catch(() => Alert.alert('오류', '신고 접수에 실패했습니다.'));
+              }
+            }
           }
         },
       );
@@ -481,7 +486,7 @@ export default function PostDetailScreen() {
         { icon: 'bookmark-outline' as const, label: '북마크 저장', onPress: handleBookmark },
         { icon: 'share-outline' as const, label: '공유하기', onPress: handleShare },
         { icon: 'eye-off-outline' as const, label: '숨기기', onPress: () => Alert.alert('숨기기', '이 게시물을 숨겼습니다.') },
-        { icon: 'flag-outline' as const, label: '신고하기', onPress: () => Alert.alert('신고', '신고가 접수되었습니다.'), destructive: true },
+        { icon: 'flag-outline' as const, label: '신고하기', onPress: () => { if (user) { submitReport({ targetType: 'post', targetId: id!, targetUserId: authorUid, reason: 'other', reporterId: user.uid }).then(() => Alert.alert('신고', '신고가 접수되었습니다.')).catch(() => Alert.alert('오류', '신고 접수에 실패했습니다.')); } }, destructive: true },
       ];
 
   return (
