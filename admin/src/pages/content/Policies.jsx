@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { doc, getDoc, setDoc, collection, getDocs, query, orderBy, addDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs, query, orderBy, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 
 const POLICY_DOCS = [
@@ -91,6 +91,8 @@ const styles = {
 export default function Policies() {
   const [activeTab, setActiveTab] = useState(POLICY_DOCS[0].id);
   const [content, setContent] = useState('');
+  const [title, setTitle] = useState('');
+  const [version, setVersion] = useState('1.0');
   const [published, setPublished] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [versions, setVersions] = useState([]);
@@ -109,7 +111,9 @@ export default function Policies() {
       if (snap.exists()) {
         const data = snap.data();
         setContent(data.content || '');
-        setPublished(!!data.published);
+        setTitle(data.title || '');
+        setVersion(data.version || '1.0');
+        setPublished(data.status === 'published' || !!data.published);
         setLastUpdated(data.updatedAt);
       } else {
         setContent('');
@@ -140,11 +144,15 @@ export default function Policies() {
     setSaving(true);
     try {
       const now = new Date();
-      await setDoc(doc(db, 'policies', activeTab), {
+      const saveData = {
+        title: title || activeLabel,
         content,
-        published: shouldPublish ? true : published,
-        updatedAt: now,
-      }, { merge: true });
+        status: shouldPublish ? 'published' : 'draft',
+        version,
+        updatedAt: serverTimestamp(),
+        ...(shouldPublish ? { publishedAt: serverTimestamp() } : {}),
+      };
+      await setDoc(doc(db, 'policies', activeTab), saveData, { merge: true });
 
       // 버전 기록 추가
       await addDoc(collection(db, 'policies', activeTab, 'versions'), {
