@@ -9,7 +9,7 @@
     "scheme": "again-school",
     "splash": {
       "image": "./assets/splash.png",
-      "resizeMode": "cover",
+      "resizeMode": "contain",
       "backgroundColor": "#FF3124"
     },
     "ios": {
