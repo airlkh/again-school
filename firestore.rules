@@ -24,6 +24,14 @@ service cloud.firestore {
       allow create: if isOwner(userId);
       allow update: if isOwner(userId) || isAdmin();
       allow delete: if isAdmin();
+
+      // bookmarks 서브컬렉션 (users/{uid}/bookmarks/{postId})
+      match /bookmarks/{bookmarkId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update: if isOwner(userId);
+        allow delete: if isOwner(userId) || isAdmin();
+      }
     }
 
     // posts 컬렉션
@@ -57,12 +65,19 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // notifications 컬렉션
-    match /notifications/{notificationId} {
-      allow read: if isOwner(resource.data.userId) || isAdmin();
-      allow create: if isAuthenticated() || isAdmin();
-      allow update: if isOwner(resource.data.userId) || isAdmin();
-      allow delete: if isOwner(resource.data.userId) || isAdmin();
+    // notifications 컬렉션 (notifications/{uid}/items/{itemId} 구조)
+    match /notifications/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated();
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isOwner(userId) || isAdmin();
+
+      match /items/{itemId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isAuthenticated();
+        allow update: if isOwner(userId) || isAdmin();
+        allow delete: if isOwner(userId) || isAdmin();
+      }
     }
 
     // errorLogs 컬렉션
@@ -150,6 +165,14 @@ service cloud.firestore {
       allow read: if isAdmin() || isOwner(resource.data.userId);
       allow create: if isAuthenticated();
       allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // music 컬렉션
+    match /music/{musicId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
       allow delete: if isAdmin();
     }
 
