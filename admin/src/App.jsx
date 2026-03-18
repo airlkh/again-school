@@ -89,6 +89,11 @@ import SecuritySettings from './pages/settings/SecuritySettings';
 // System
 import ErrorLogs from './pages/system/ErrorLogs';
 
+// Public (no auth required)
+import PrivacyPage from './pages/public/PrivacyPage';
+import TermsPage from './pages/public/TermsPage';
+import CommunityPage from './pages/public/CommunityPage';
+
 function App() {
   const [user, setUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -134,6 +139,11 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Public pages (no auth required) */}
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/community-guidelines" element={<CommunityPage />} />
+
         <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
         <Route path="/" element={user ? <AdminLayout user={user} /> : <Navigate to="/login" />}>
           <Route index element={<DashboardHome />} />
