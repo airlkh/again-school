@@ -20,24 +20,13 @@ function RootLayoutNav() {
   const segments = useSegments();
   const splashHidden = useRef(false);
 
-  // 스플래시 숨기기 — isLoading이 끝나면 반드시 호출
+  // 스플래시 숨기기 — SplashOverlay가 처리하므로 여기서는 안전장치만
   useEffect(() => {
     if (!isLoading && !splashHidden.current) {
       splashHidden.current = true;
-      SplashScreen.hideAsync().catch(() => {});
+      // SplashOverlay가 이미 hideAsync() 호출했으므로 여기선 중복 방지
     }
   }, [isLoading]);
-
-  // 안전장치: 5초 후에도 스플래시가 안 숨겨졌으면 강제 숨김
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!splashHidden.current) {
-        splashHidden.current = true;
-        SplashScreen.hideAsync().catch(() => {});
-      }
-    }, 5000);
-    return () => clearTimeout(timer);
-  }, []);
 
   // 더미 모임 데이터를 Firestore에 마이그레이션
   useEffect(() => {
