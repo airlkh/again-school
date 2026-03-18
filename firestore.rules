@@ -177,13 +177,14 @@ service cloud.firestore {
     // policies 컬렉션 (약관 - 비로그인도 읽기 가능)
     match /policies/{policyId} {
       allow read: if true;
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow write: if request.auth != null && (
+        isAdmin() ||
+        request.auth.token.email == 'airlkh80@gmail.com'
+      );
 
       match /versions/{versionId} {
-        allow read: if isAdmin();
-        allow create: if isAdmin();
+        allow read: if request.auth != null && (isAdmin() || request.auth.token.email == 'airlkh80@gmail.com');
+        allow create: if request.auth != null && (isAdmin() || request.auth.token.email == 'airlkh80@gmail.com');
         allow update: if false;
         allow delete: if false;
       }
