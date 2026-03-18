@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "again-school-bfea8"
+  },
+  "targets": {
+    "again-school-bfea8": {
+      "hosting": {
+        "admin": [
+          "again-school-admin"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

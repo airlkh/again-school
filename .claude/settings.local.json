@@ -28,7 +28,8 @@
       "Bash(netstat:*)",
       "Bash(taskkill:*)",
       "Bash(git:*)",
-      "Bash(npx firebase:*)"
+      "Bash(npx firebase:*)",
+      "Bash(cd:*)"
     ]
   }
 }
