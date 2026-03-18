@@ -15,6 +15,7 @@ import {
   Platform,
   Modal,
   Animated,
+  Easing,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -192,6 +193,30 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
   const [imgHeight, setImgHeight] = useState(SCREEN_WIDTH);
   const [multiImgHeights, setMultiImgHeights] = useState<Record<number, number>>({});
   const [imgLoadFailed, setImgLoadFailed] = useState(false);
+
+  // 음악 제목 marquee
+  const marqueeAnim = useRef(new Animated.Value(0)).current;
+  const [marqueeTextW, setMarqueeTextW] = useState(0);
+  const [marqueeBoxW, setMarqueeBoxW] = useState(0);
+  const isPlaying = !musicMuted && isFirestore && !!(fsPost as any)?.music?.url;
+
+  useEffect(() => {
+    if (isPlaying && marqueeTextW > 0 && marqueeBoxW > 0 && marqueeTextW > marqueeBoxW) {
+      marqueeAnim.setValue(marqueeBoxW);
+      Animated.loop(
+        Animated.timing(marqueeAnim, {
+          toValue: -marqueeTextW,
+          duration: (marqueeTextW + marqueeBoxW) * 18,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        })
+      ).start();
+    } else {
+      marqueeAnim.stopAnimation();
+      marqueeAnim.setValue(0);
+    }
+    return () => marqueeAnim.stopAnimation();
+  }, [isPlaying, marqueeTextW, marqueeBoxW]);
 
   // 동영상 모달 플레이어 (expo-video)
   // useVideoPlayer는 source 변경 시 자동으로 이전 player release + 새 player 생성
@@ -641,7 +666,24 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
           activeOpacity={0.7}
         >
           <Ionicons name={musicMuted ? 'volume-mute' : 'volume-high'} size={14} color={colors.primary} />
-          <Text style={[styles.musicIndicatorText, { color: colors.text }]} numberOfLines={1}>{fsPost.music.name}</Text>
+          <View
+            style={{ overflow: 'hidden', flex: 1, maxWidth: 150 }}
+            onLayout={(e) => setMarqueeBoxW(e.nativeEvent.layout.width)}
+          >
+            {isPlaying ? (
+              <Animated.Text
+                style={[styles.musicIndicatorText, { color: colors.text, transform: [{ translateX: marqueeAnim }] }]}
+                onLayout={(e) => setMarqueeTextW(e.nativeEvent.layout.width)}
+                numberOfLines={1}
+              >
+                {fsPost.music.name} ♪
+              </Animated.Text>
+            ) : (
+              <Text style={[styles.musicIndicatorText, { color: colors.text }]} numberOfLines={1}>
+                {fsPost.music.name} ♪
+              </Text>
+            )}
+          </View>
         </TouchableOpacity>
       )}
 
