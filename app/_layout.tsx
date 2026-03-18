@@ -203,6 +203,12 @@ function RootLayoutNav() {
 
 function SplashOverlay() {
   const [show, setShow] = useState(true);
+
+  useEffect(() => {
+    // AnimatedSplash가 대체하므로 expo 기본 스플래시 즉시 숨김
+    SplashScreen.hideAsync().catch(() => {});
+  }, []);
+
   if (!show) return null;
   const AnimatedSplash = require('../src/components/AnimatedSplash').AnimatedSplash;
   return <AnimatedSplash onFinish={() => setShow(false)} />;
