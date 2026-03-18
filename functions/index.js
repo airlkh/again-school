@@ -140,3 +140,138 @@ exports.naverAuth = functions.https.onRequest(async (req, res) => {
     res.status(500).json({ error: String(e) });
   }
 });
+
+// ── 동창 추천 알고리즘 ──────────────────────────────────────────
+const db = admin.firestore();
+
+function calcAlumniScore(me, target, friendUids, friendOfFriendUids) {
+  let score = 0;
+  const commonSchools = [];
+  const reasons = [];
+  const mySchools = me.schools || [];
+  const targetSchools = target.schools || [];
+
+  for (const mine of mySchools) {
+    for (const theirs of targetSchools) {
+      if (mine.schoolName === theirs.schoolName) {
+        if (!commonSchools.includes(mine.schoolName)) commonSchools.push(mine.schoolName);
+        score += 50;
+        if (mine.graduationYear && theirs.graduationYear) {
+          const diff = Math.abs(mine.graduationYear - theirs.graduationYear);
+          if (diff === 0) score += 30;
+          else if (diff === 1) score += 25;
+          else if (diff === 2) score += 20;
+          else if (diff === 3) score += 10;
+          else if (diff <= 5) score += 5;
+        }
+        const label = mine.schoolType || '학교';
+        if (!reasons.includes(`같은 ${label} 동창`)) reasons.push(`같은 ${label} 동창`);
+      }
+    }
+  }
+  if (commonSchools.length >= 2) { score += 20; reasons.unshift(`${commonSchools.length}개 학교 공통`); }
+
+  const myTeacherSchools = [...(me.teacherHistory || []).map(t => t.schoolName), me.teacherSchoolName].filter(Boolean);
+  const targetSchoolNames = target.schoolNames || [];
+  for (const ts of myTeacherSchools) {
+    if (targetSchoolNames.includes(ts)) { score += 40; reasons.push('가르친 학교 출신'); break; }
+  }
+
+  if (friendOfFriendUids.has(target.uid) && !friendUids.has(target.uid)) { score += 30; reasons.push('친구의 동창'); }
+  if (me.region && target.region && me.region === target.region) { score += 15; reasons.push(`${me.region} 지역`); }
+
+  return { score, commonSchools, reason: reasons[0] || '같은 학교 출신', reasonDetail: reasons.slice(0, 2).join(' · ') };
+}
+
+exports.generateAlumniRecommendations = functions.https.onRequest(async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'POST') { res.status(405).send('Method Not Allowed'); return; }
+
+  const authHeader = req.headers.authorization || '';
+  let uid;
+  try {
+    const token = authHeader.replace('Bearer ', '');
+    const decoded = await admin.auth().verifyIdToken(token);
+    uid = decoded.uid;
+  } catch {
+    res.status(401).json({ error: '로그인이 필요합니다.' }); return;
+  }
+
+  const myDoc = await db.collection('users').doc(uid).get();
+  if (!myDoc.exists) throw new functions.https.HttpsError('not-found', '유저 없음');
+  const me = { uid, ...myDoc.data() };
+  if (!me.schoolNames || me.schoolNames.length === 0) return { recommendations: [] };
+
+  const connSnap = await db.collection('connections').where('fromUid', '==', uid).get();
+  const friendUids = new Set(connSnap.docs.map(d => d.data().toUid));
+  friendUids.add(uid);
+
+  const friendOfFriendUids = new Set();
+  for (const fid of Array.from(friendUids).slice(0, 20)) {
+    const fofSnap = await db.collection('connections').where('fromUid', '==', fid).limit(30).get();
+    fofSnap.docs.forEach(d => { const toId = d.data().toUid; if (!friendUids.has(toId)) friendOfFriendUids.add(toId); });
+  }
+
+  const candidatesSnap = await db.collection('users')
+    .where('schoolNames', 'array-contains-any', me.schoolNames.slice(0, 10))
+    .limit(200).get();
+
+  const results = [];
+  for (const cdoc of candidatesSnap.docs) {
+    const target = { uid: cdoc.id, ...cdoc.data() };
+    if (friendUids.has(target.uid)) continue;
+    const { score, commonSchools, reason, reasonDetail } = calcAlumniScore(me, target, friendUids, friendOfFriendUids);
+    if (score > 0) {
+      results.push({ uid: target.uid, displayName: target.displayName || '알 수 없음', photoURL: target.photoURL || '', score, commonSchools, reason, reasonDetail, updatedAt: admin.firestore.Timestamp.now() });
+    }
+  }
+
+  results.sort((a, b) => b.score - a.score);
+  const top20 = results.slice(0, 20);
+  await db.collection('users').doc(uid).collection('recommendations').doc('alumni').set({ list: top20, updatedAt: admin.firestore.Timestamp.now() });
+  res.json({ recommendations: top20.slice(0, 5) });
+});
+
+exports.scheduledAlumniRecommendations = functions.scheduler.onSchedule({ schedule: '0 3 * * *', timeZone: 'Asia/Seoul' }, async () => {
+  const usersSnap = await db.collection('users').limit(500).get();
+  let count = 0;
+  for (const userDoc of usersSnap.docs) {
+    const uid = userDoc.id;
+    try {
+      const me = { uid, ...userDoc.data() };
+      if (!me.schoolNames || me.schoolNames.length === 0) continue;
+
+      const connSnap = await db.collection('connections').where('fromUid', '==', uid).get();
+      const friendUids = new Set(connSnap.docs.map(d => d.data().toUid));
+      friendUids.add(uid);
+
+      const friendOfFriendUids = new Set();
+      for (const fid of Array.from(friendUids).slice(0, 10)) {
+        const fofSnap = await db.collection('connections').where('fromUid', '==', fid).limit(20).get();
+        fofSnap.docs.forEach(d => { const toId = d.data().toUid; if (!friendUids.has(toId)) friendOfFriendUids.add(toId); });
+      }
+
+      const candidatesSnap = await db.collection('users')
+        .where('schoolNames', 'array-contains-any', me.schoolNames.slice(0, 10))
+        .limit(100).get();
+
+      const results = [];
+      for (const cdoc of candidatesSnap.docs) {
+        const target = { uid: cdoc.id, ...cdoc.data() };
+        if (friendUids.has(target.uid)) continue;
+        const { score, commonSchools, reason, reasonDetail } = calcAlumniScore(me, target, friendUids, friendOfFriendUids);
+        if (score > 0) {
+          results.push({ uid: target.uid, displayName: target.displayName || '알 수 없음', photoURL: target.photoURL || '', score, commonSchools, reason, reasonDetail, updatedAt: admin.firestore.Timestamp.now() });
+        }
+      }
+      results.sort((a, b) => b.score - a.score);
+      await db.collection('users').doc(uid).collection('recommendations').doc('alumni').set({ list: results.slice(0, 20), updatedAt: admin.firestore.Timestamp.now() });
+      count++;
+    } catch (e) { console.error(`추천 생성 실패 uid=${uid}`, e); }
+  }
+  console.log(`추천 갱신 완료: ${count}명`);
+  return null;
+});

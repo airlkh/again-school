@@ -25,6 +25,12 @@ service cloud.firestore {
       allow update: if isOwner(userId) || isAdmin();
       allow delete: if isAdmin();
 
+      // recommendations 서브컬렉션 (Functions에서만 쓰기)
+      match /recommendations/{docId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow write: if false;
+      }
+
       // bookmarks 서브컬렉션 (users/{uid}/bookmarks/{postId})
       match /bookmarks/{bookmarkId} {
         allow read: if isOwner(userId);

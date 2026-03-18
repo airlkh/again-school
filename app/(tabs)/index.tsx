@@ -32,6 +32,7 @@ import {
   DummyPost,
 } from '../../src/data/dummyClassmates';
 import { Meetup } from '../../src/types/auth';
+import { useAlumniRecommendations, AlumniRecommend } from '../../src/hooks/useAlumniRecommendations';
 import { subscribePosts, FirestorePost } from '../../src/services/postService';
 import { useLike } from '../../src/hooks/useLike';
 import { useBookmark } from '../../src/hooks/useBookmark';
@@ -793,11 +794,30 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
 // ─── 추천 동창 카드 ────────────────────────────────────────────────
 function ClassmateRecommendCard() {
   const { colors } = useTheme();
+  const { recommendations, loading } = useAlumniRecommendations();
+
+  // Firebase 추천 데이터가 있으면 사용, 없으면 더미 폴백
+  const hasSmartData = !loading && recommendations.length > 0;
+  const displayItems = hasSmartData
+    ? recommendations.map((item) => ({
+        id: item.uid,
+        name: item.displayName,
+        photoURL: item.photoURL || null,
+        schoolName: item.commonSchools[0] || '',
+        subInfo: item.reasonDetail || item.reason,
+      }))
+    : DUMMY_CLASSMATES.slice(0, 6).map((item) => ({
+        id: item.id,
+        name: item.name,
+        photoURL: item.photoURL || null,
+        schoolName: item.schools[0]?.schoolName || '',
+        subInfo: `${item.graduationYear}년 졸업`,
+      }));
 
   return (
     <View style={[styles.recommendCard, { backgroundColor: colors.surface }]}>
       <View style={styles.recommendHeader}>
-        <Text style={[styles.recommendTitle, { color: colors.text }]}>추천 동창</Text>
+        <Text style={[styles.recommendTitle, { color: colors.text }]}>{hasSmartData ? '맞춤 추천 동창' : '추천 동창'}</Text>
         <TouchableOpacity onPress={() => router.push('/alumni/all')}>
           <Text style={[styles.recommendSeeAll, { color: colors.primary }]}>전체보기</Text>
         </TouchableOpacity>
@@ -807,7 +827,7 @@ function ClassmateRecommendCard() {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.recommendScroll}
       >
-        {DUMMY_CLASSMATES.slice(0, 6).map((item) => (
+        {displayItems.map((item) => (
           <TouchableOpacity
             key={item.id}
             style={[styles.recommendItem, { backgroundColor: colors.card, borderColor: colors.border }]}
@@ -819,10 +839,10 @@ function ClassmateRecommendCard() {
             />
             <Text style={[styles.recommendName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
             <Text style={[styles.recommendInfo, { color: colors.textSecondary }]} numberOfLines={1}>
-              {item.schools[0]?.schoolName}
+              {item.schoolName}
             </Text>
             <Text style={[styles.recommendYear, { color: colors.inactive }]} numberOfLines={1}>
-              {item.graduationYear}년 졸업
+              {item.subInfo}
             </Text>
             <TouchableOpacity
               style={styles.recommendBtn}
