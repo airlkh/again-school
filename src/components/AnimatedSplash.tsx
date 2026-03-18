@@ -1,146 +1,187 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet, View, Dimensions } from 'react-native';
+import {
+  Animated, Easing, StyleSheet,
+  Dimensions, View,
+} from 'react-native';
+import Svg, { Path, Line } from 'react-native-svg';
 
 const { width, height } = Dimensions.get('window');
 
-interface Props {
-  onFinish: () => void;
-}
+interface Props { onFinish: () => void; }
 
 export function AnimatedSplash({ onFinish }: Props) {
-  const LOGO = Math.min(width * 0.5, 200);
-  const CX = width / 2;
-  const CY = height / 2 - 30;
-  const DOT_R = LOGO * 0.1;
-  const STROKE = LOGO * 0.065;
+  const LOGO     = Math.min(width * 0.52, 210);
+  const CX       = width / 2;
+  const CY       = height / 2 - 30;
 
-  // Animation values
-  const topY = useRef(new Animated.Value(-150)).current;
-  const topOp = useRef(new Animated.Value(0)).current;
-  const leftX = useRef(new Animated.Value(-200)).current;
-  const leftOp = useRef(new Animated.Value(0)).current;
-  const rightX = useRef(new Animated.Value(200)).current;
-  const rightOp = useRef(new Animated.Value(0)).current;
-  const lineOp = useRef(new Animated.Value(0)).current;
-  const arcOp = useRef(new Animated.Value(0)).current;
-  const textOp = useRef(new Animated.Value(0)).current;
-  const textY = useRef(new Animated.Value(20)).current;
-  const fadeOut = useRef(new Animated.Value(1)).current;
+  const TOP_X    = CX;
+  const TOP_Y    = CY - LOGO * 0.30;
+  const LEFT_X   = CX - LOGO * 0.44;
+  const LEFT_Y   = CY + LOGO * 0.28;
+  const RIGHT_X  = CX + LOGO * 0.44;
+  const RIGHT_Y  = CY + LOGO * 0.28;
 
-  // Arc segments (simulate curve with rotated views)
-  const arcScale = useRef(new Animated.Value(0)).current;
+  const TOP_R    = LOGO * 0.115;
+  const DOT_R    = LOGO * 0.085;
+  const INNER_R  = LOGO * 0.038;
+  const STROKE   = LOGO * 0.068;
+
+  const CTRL_X   = CX;
+  const CTRL_Y   = TOP_Y - LOGO * 0.08;
+
+  const topDotY      = useRef(new Animated.Value(-250)).current;
+  const topDotOp     = useRef(new Animated.Value(0)).current;
+  const leftDotX     = useRef(new Animated.Value(-width * 0.6)).current;
+  const leftDotOp    = useRef(new Animated.Value(0)).current;
+  const rightDotX    = useRef(new Animated.Value(width * 0.6)).current;
+  const rightDotOp   = useRef(new Animated.Value(0)).current;
+  const arcOp        = useRef(new Animated.Value(0)).current;
+  const lineOp       = useRef(new Animated.Value(0)).current;
+  const textOp       = useRef(new Animated.Value(0)).current;
+  const containerOp  = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    const spring = { tension: 80, friction: 9, useNativeDriver: true };
+    const SP = { tension: 75, friction: 9, useNativeDriver: true };
 
     Animated.sequence([
-      Animated.delay(300),
-      // 1. Top dot drops in
+      Animated.delay(350),
       Animated.parallel([
-        Animated.spring(topY, { toValue: 0, ...spring }),
-        Animated.timing(topOp, { toValue: 1, duration: 250, useNativeDriver: true }),
+        Animated.parallel([
+          Animated.spring(topDotY,  { toValue: 0, ...SP }),
+          Animated.timing(topDotOp, { toValue: 1, duration: 180, useNativeDriver: true }),
+        ]),
+        Animated.sequence([
+          Animated.delay(120),
+          Animated.parallel([
+            Animated.spring(leftDotX,  { toValue: 0, ...SP }),
+            Animated.timing(leftDotOp, { toValue: 1, duration: 180, useNativeDriver: true }),
+          ]),
+        ]),
+        Animated.sequence([
+          Animated.delay(120),
+          Animated.parallel([
+            Animated.spring(rightDotX,  { toValue: 0, ...SP }),
+            Animated.timing(rightDotOp, { toValue: 1, duration: 180, useNativeDriver: true }),
+          ]),
+        ]),
       ]),
-      // 2. Left & right dots slide in
-      Animated.parallel([
-        Animated.spring(leftX, { toValue: 0, ...spring }),
-        Animated.timing(leftOp, { toValue: 1, duration: 250, useNativeDriver: true }),
-        Animated.spring(rightX, { toValue: 0, ...spring }),
-        Animated.timing(rightOp, { toValue: 1, duration: 250, useNativeDriver: true }),
-      ]),
-      // 3. Arc appears
-      Animated.parallel([
-        Animated.timing(arcOp, { toValue: 1, duration: 400, easing: Easing.out(Easing.ease), useNativeDriver: true }),
-        Animated.timing(arcScale, { toValue: 1, duration: 400, easing: Easing.out(Easing.back(1.2)), useNativeDriver: true }),
-      ]),
-      // 4. Horizontal line
-      Animated.timing(lineOp, { toValue: 0.3, duration: 250, useNativeDriver: true }),
-      // 5. Text fades up
-      Animated.parallel([
-        Animated.timing(textOp, { toValue: 1, duration: 400, useNativeDriver: true }),
-        Animated.spring(textY, { toValue: 0, tension: 60, friction: 8, useNativeDriver: true }),
-      ]),
-      // 6. Hold
-      Animated.delay(600),
-      // 7. Fade out
-      Animated.timing(fadeOut, { toValue: 0, duration: 350, useNativeDriver: true }),
+      Animated.delay(80),
+      Animated.timing(arcOp, {
+        toValue: 1, duration: 450,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(lineOp, {
+        toValue: 1, duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(textOp, {
+        toValue: 1, duration: 450,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.delay(650),
+      Animated.timing(containerOp, {
+        toValue: 0, duration: 380,
+        useNativeDriver: true,
+      }),
     ]).start(() => onFinish());
   }, []);
 
-  const TOP_Y = CY - LOGO * 0.45;
-  const LEFT_X = CX - LOGO * 0.48;
-  const BOT_Y = CY + LOGO * 0.32;
-  const RIGHT_X = CX + LOGO * 0.48;
-
   return (
-    <Animated.View style={[styles.container, { opacity: fadeOut }]} pointerEvents="none">
-      {/* Top dot */}
-      <Animated.View style={[styles.dot, {
-        width: DOT_R * 2, height: DOT_R * 2, borderRadius: DOT_R, borderWidth: STROKE,
-        left: CX - DOT_R, top: TOP_Y - DOT_R,
-        opacity: topOp, transform: [{ translateY: topY }],
-      }]}>
-        <View style={[styles.dotInner, { width: DOT_R * 0.7, height: DOT_R * 0.7, borderRadius: DOT_R * 0.35, opacity: 0.25 }]} />
+    <Animated.View style={[styles.container, { opacity: containerOp }]} pointerEvents="none">
+      {/* SVG: arc + line */}
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: arcOp }]}>
+        <Svg width={width} height={height}>
+          <Path
+            d={`M ${LEFT_X} ${LEFT_Y} Q ${CTRL_X} ${CTRL_Y} ${RIGHT_X} ${RIGHT_Y}`}
+            fill="none"
+            stroke="white"
+            strokeWidth={STROKE}
+            strokeLinecap="round"
+          />
+        </Svg>
       </Animated.View>
 
-      {/* Left dot */}
-      <Animated.View style={[styles.dot, {
-        width: DOT_R * 1.6, height: DOT_R * 1.6, borderRadius: DOT_R, borderWidth: STROKE * 0.85,
-        left: LEFT_X - DOT_R * 0.8, top: BOT_Y - DOT_R * 0.8,
-        opacity: leftOp, transform: [{ translateX: leftX }],
-      }]}>
-        <View style={[styles.dotInner, { width: DOT_R * 0.55, height: DOT_R * 0.55, borderRadius: DOT_R * 0.3, opacity: 0.2 }]} />
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: lineOp }]}>
+        <Svg width={width} height={height}>
+          <Line
+            x1={LEFT_X + DOT_R * 0.9}
+            y1={LEFT_Y}
+            x2={RIGHT_X - DOT_R * 0.9}
+            y2={RIGHT_Y}
+            stroke="white"
+            strokeWidth={STROKE * 0.45}
+            strokeLinecap="round"
+            opacity={0.3}
+          />
+        </Svg>
       </Animated.View>
 
-      {/* Right dot */}
-      <Animated.View style={[styles.dot, {
-        width: DOT_R * 1.6, height: DOT_R * 1.6, borderRadius: DOT_R, borderWidth: STROKE * 0.85,
-        left: RIGHT_X - DOT_R * 0.8, top: BOT_Y - DOT_R * 0.8,
-        opacity: rightOp, transform: [{ translateX: rightX }],
-      }]}>
-        <View style={[styles.dotInner, { width: DOT_R * 0.55, height: DOT_R * 0.55, borderRadius: DOT_R * 0.3, opacity: 0.2 }]} />
+      {/* Top circle */}
+      <Animated.View style={[
+        styles.circle,
+        {
+          width: TOP_R * 2, height: TOP_R * 2,
+          borderRadius: TOP_R, borderWidth: STROKE,
+          left: TOP_X - TOP_R, top: TOP_Y - TOP_R,
+          opacity: topDotOp,
+          transform: [{ translateY: topDotY }],
+        }
+      ]}>
+        <View style={[styles.innerDot, {
+          width: INNER_R * 2, height: INNER_R * 2,
+          borderRadius: INNER_R,
+          backgroundColor: '#FF3124',
+        }]} />
       </Animated.View>
 
-      {/* Arc (curved line simulated with border) */}
-      <Animated.View style={{
-        position: 'absolute',
-        left: LEFT_X,
-        top: TOP_Y - LOGO * 0.15,
-        width: RIGHT_X - LEFT_X,
-        height: (BOT_Y - TOP_Y) + LOGO * 0.15,
-        borderWidth: STROKE,
-        borderColor: 'white',
-        borderTopLeftRadius: (RIGHT_X - LEFT_X) * 0.5,
-        borderTopRightRadius: (RIGHT_X - LEFT_X) * 0.5,
-        borderBottomWidth: 0,
-        opacity: arcOp,
-        transform: [{ scaleY: arcScale }],
-      }} />
+      {/* Left circle */}
+      <Animated.View style={[
+        styles.circle,
+        {
+          width: DOT_R * 2, height: DOT_R * 2,
+          borderRadius: DOT_R, borderWidth: STROKE * 0.82,
+          left: LEFT_X - DOT_R, top: LEFT_Y - DOT_R,
+          opacity: leftDotOp,
+          transform: [{ translateX: leftDotX }],
+        }
+      ]}>
+        <View style={[styles.innerDot, {
+          width: INNER_R * 1.6, height: INNER_R * 1.6,
+          borderRadius: INNER_R,
+          backgroundColor: '#FF3124',
+        }]} />
+      </Animated.View>
 
-      {/* Horizontal line */}
-      <Animated.View style={[styles.line, {
-        left: LEFT_X + DOT_R,
-        top: BOT_Y,
-        width: RIGHT_X - LEFT_X - DOT_R * 2,
-        height: STROKE * 0.5,
-        opacity: lineOp,
-      }]} />
+      {/* Right circle */}
+      <Animated.View style={[
+        styles.circle,
+        {
+          width: DOT_R * 2, height: DOT_R * 2,
+          borderRadius: DOT_R, borderWidth: STROKE * 0.82,
+          left: RIGHT_X - DOT_R, top: RIGHT_Y - DOT_R,
+          opacity: rightDotOp,
+          transform: [{ translateX: rightDotX }],
+        }
+      ]}>
+        <View style={[styles.innerDot, {
+          width: INNER_R * 1.6, height: INNER_R * 1.6,
+          borderRadius: INNER_R,
+          backgroundColor: '#FF3124',
+        }]} />
+      </Animated.View>
 
       {/* Text */}
-      <Animated.Text style={[styles.text, {
-        top: BOT_Y + DOT_R * 3.5,
-        fontSize: LOGO * 0.115,
-        opacity: textOp,
-        transform: [{ translateY: textY }],
-      }]}>
+      <Animated.Text style={[
+        styles.text,
+        {
+          top: LEFT_Y + DOT_R * 2.8,
+          fontSize: LOGO * 0.115,
+          opacity: textOp,
+        }
+      ]}>
         AGAIN SCHOOL
-      </Animated.Text>
-      <Animated.Text style={[styles.subtext, {
-        top: BOT_Y + DOT_R * 3.5 + LOGO * 0.16,
-        fontSize: LOGO * 0.065,
-        opacity: textOp,
-        transform: [{ translateY: textY }],
-      }]}>
-        다시 만나는 학교 동창
       </Animated.Text>
     </Animated.View>
   );
@@ -153,35 +194,22 @@ const styles = StyleSheet.create({
     zIndex: 9999,
     elevation: 9999,
   },
-  dot: {
+  circle: {
     position: 'absolute',
     borderColor: 'white',
     backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dotInner: {
-    backgroundColor: 'white',
-  },
-  line: {
+  innerDot: {
     position: 'absolute',
-    backgroundColor: 'white',
-    borderRadius: 2,
   },
   text: {
     position: 'absolute',
     width: '100%',
     textAlign: 'center',
     color: 'white',
-    fontWeight: '800',
-    letterSpacing: 4,
-  },
-  subtext: {
-    position: 'absolute',
-    width: '100%',
-    textAlign: 'center',
-    color: 'rgba(255,255,255,0.7)',
-    fontWeight: '400',
-    letterSpacing: 1,
+    fontWeight: '700',
+    letterSpacing: 3,
   },
 });
