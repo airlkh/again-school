@@ -3,6 +3,10 @@
 # dependencies
 node_modules/
 
+# Keystore (서명 키)
+*.keystore
+!android/app/debug.keystore
+
 # Expo
 .expo/
 dist/

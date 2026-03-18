@@ -1,0 +1,74 @@
+name: Android AAB Build (Play Store)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+    paths:
+      - 'android/**'
+      - 'src/**'
+      - 'app/**'
+      - 'package.json'
+
+env:
+  NODE_OPTIONS: "--max-old-space-size=4096"
+
+jobs:
+  build-aab:
+    name: Build Android AAB
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Fix Gradle permissions
+        run: chmod +x android/gradlew
+
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/again-school.keystore
+
+      - name: Build AAB
+        run: |
+          export ANDROID_HOME=$ANDROID_SDK_ROOT
+          cd android && ./gradlew bundleRelease \
+            --no-daemon \
+            --warning-mode none \
+            -Dorg.gradle.jvmargs="-Xmx4g" \
+            -Pandroid.injected.signing.store.file=${{ github.workspace }}/android/app/again-school.keystore \
+            -Pandroid.injected.signing.store.password=${{ secrets.STORE_PASSWORD }} \
+            -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
+            -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
+        env:
+          NODE_ENV: "production"
+
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: again-school-release-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 30
+
+      - name: Build Summary
+        run: |
+          echo "## Android AAB Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "- **Format:** AAB (App Bundle)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Profile:** Release (Play Store)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Download:** Check Artifacts tab" >> $GITHUB_STEP_SUMMARY
