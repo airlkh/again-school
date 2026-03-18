@@ -6,6 +6,7 @@ import {
   FlatList,
   TouchableOpacity,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -14,13 +15,33 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 import { DUMMY_CLASSMATES, DummyClassmate } from '../../src/data/dummyClassmates';
 import { useGoBack } from '../../src/hooks/useGoBack';
 import { getAvatarSource } from '../../src/utils/avatar';
+import { useAlumniRecommendations } from '../../src/hooks/useAlumniRecommendations';
 
 export default function AllAlumniScreen() {
   const goBack = useGoBack();
   const { colors, isDark } = useTheme();
+  const { recommendations, loading } = useAlumniRecommendations();
+
+  // Firebase 추천 데이터가 있으면 사용, 없으면 더미 폴백
+  const hasSmartData = !loading && recommendations.length > 0;
+  const displayData: DummyClassmate[] = hasSmartData
+    ? recommendations.map((item) => ({
+        id: item.uid,
+        name: item.displayName,
+        avatarImg: 1,
+        photoURL: item.photoURL || null,
+        schools: item.commonSchools.map((s) => ({ schoolType: '중학교' as const, schoolName: s, graduationYear: 0 })),
+        graduationYear: 0,
+        classNumber: 0,
+        region: item.reasonDetail || '',
+        verified: false,
+        job: item.reason,
+      }))
+    : DUMMY_CLASSMATES;
 
   function renderItem({ item }: { item: DummyClassmate }) {
     const primarySchool = item.schools[0];
+    const isSmartItem = hasSmartData;
     return (
       <TouchableOpacity
         style={styles.card}
@@ -41,18 +62,29 @@ export default function AllAlumniScreen() {
             )}
           </View>
           <Text style={[styles.schoolInfo, { color: colors.textSecondary }]} numberOfLines={1}>
-            {primarySchool.schoolName} · {primarySchool.graduationYear}년 졸업
-            {item.classNumber > 0 ? ` · ${item.classNumber}반` : ''}
+            {isSmartItem
+              ? `${primarySchool?.schoolName || ''}${item.job ? ` · ${item.job}` : ''}`
+              : `${primarySchool?.schoolName || ''} · ${primarySchool?.graduationYear || ''}년 졸업${item.classNumber > 0 ? ` · ${item.classNumber}반` : ''}`}
           </Text>
           <View style={styles.tagRow}>
-            {item.schools.map((s, i) => (
-              <View key={i} style={[styles.tag, { backgroundColor: isDark ? colors.surface2 : '#fef2f2' }]}>
-                <Text style={[styles.tagText, { color: colors.primary }]}>{s.schoolType}</Text>
-              </View>
-            ))}
-            <View style={[styles.tagRegion, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.tagRegionText, { color: colors.textSecondary }]}>{item.region}</Text>
-            </View>
+            {isSmartItem ? (
+              item.schools.map((s, i) => (
+                <View key={i} style={[styles.tag, { backgroundColor: isDark ? colors.surface2 : '#fef2f2' }]}>
+                  <Text style={[styles.tagText, { color: colors.primary }]}>{s.schoolName}</Text>
+                </View>
+              ))
+            ) : (
+              <>
+                {item.schools.map((s, i) => (
+                  <View key={i} style={[styles.tag, { backgroundColor: isDark ? colors.surface2 : '#fef2f2' }]}>
+                    <Text style={[styles.tagText, { color: colors.primary }]}>{s.schoolType}</Text>
+                  </View>
+                ))}
+                <View style={[styles.tagRegion, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <Text style={[styles.tagRegionText, { color: colors.textSecondary }]}>{item.region}</Text>
+                </View>
+              </>
+            )}
           </View>
         </View>
         <Ionicons name="chevron-forward" size={20} color={colors.inactive} />
@@ -67,26 +99,33 @@ export default function AllAlumniScreen() {
         <TouchableOpacity onPress={goBack} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>추천 동창</Text>
+        <Text style={styles.headerTitle}>{hasSmartData ? '맞춤 추천 동창' : '추천 동창'}</Text>
         <View style={styles.backBtn} />
       </View>
 
       {/* 카운트 */}
       <View style={styles.countBar}>
         <Text style={[styles.countText, { color: colors.textSecondary }]}>
-          전체 <Text style={[styles.countNumber, { color: colors.primary }]}>{DUMMY_CLASSMATES.length}</Text>명
+          전체 <Text style={[styles.countNumber, { color: colors.primary }]}>{displayData.length}</Text>명
         </Text>
       </View>
 
       {/* 리스트 */}
-      <FlatList
-        data={DUMMY_CLASSMATES}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
-        showsVerticalScrollIndicator={false}
-        ItemSeparatorComponent={() => <View style={[styles.separator, { backgroundColor: colors.border }]} />}
-      />
+      {loading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={{ color: colors.textSecondary, marginTop: 12, fontSize: 14 }}>추천 동창을 불러오는 중...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={displayData}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
+          ItemSeparatorComponent={() => <View style={[styles.separator, { backgroundColor: colors.border }]} />}
+        />
+      )}
     </SafeAreaView>
   );
 }
