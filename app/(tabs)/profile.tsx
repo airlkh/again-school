@@ -422,40 +422,45 @@ export default function ProfileScreen() {
       await updateProfile(user, { photoURL: newPhotoURL });
       await updateUserProfile(user.uid, { photoURL: newPhotoURL });
 
-      const postsSnap = await getDocs(
-        query(collection(db, 'posts'), where('authorUid', '==', user.uid)),
-      );
-      if (!postsSnap.empty) {
-        const postsBatch = writeBatch(db);
-        postsSnap.docs.forEach((d) => postsBatch.update(d.ref, { authorPhotoURL: newPhotoURL }));
-        await postsBatch.commit();
-      }
+      // 관련 컬렉션 동기화 (실패해도 프로필 사진 변경은 유지)
+      try {
+        const postsSnap = await getDocs(
+          query(collection(db, 'posts'), where('authorUid', '==', user.uid)),
+        );
+        if (!postsSnap.empty) {
+          const postsBatch = writeBatch(db);
+          postsSnap.docs.forEach((d) => postsBatch.update(d.ref, { authorPhotoURL: newPhotoURL }));
+          await postsBatch.commit();
+        }
 
-      const storiesSnap = await getDocs(
-        query(collection(db, 'stories'), where('uid', '==', user.uid)),
-      );
-      if (!storiesSnap.empty) {
-        const storiesBatch = writeBatch(db);
-        storiesSnap.docs.forEach((d) => storiesBatch.update(d.ref, { photoURL: newPhotoURL }));
-        await storiesBatch.commit();
-      }
+        const storiesSnap = await getDocs(
+          query(collection(db, 'stories'), where('uid', '==', user.uid)),
+        );
+        if (!storiesSnap.empty) {
+          const storiesBatch = writeBatch(db);
+          storiesSnap.docs.forEach((d) => storiesBatch.update(d.ref, { photoURL: newPhotoURL }));
+          await storiesBatch.commit();
+        }
 
-      const meetupsSnap = await getDocs(
-        query(collection(db, 'meetups'), where('hostUid', '==', user.uid)),
-      );
-      if (!meetupsSnap.empty) {
-        const meetupsBatch = writeBatch(db);
-        meetupsSnap.docs.forEach((d) => meetupsBatch.update(d.ref, { hostPhotoURL: newPhotoURL }));
-        await meetupsBatch.commit();
-      }
+        const meetupsSnap = await getDocs(
+          query(collection(db, 'meetups'), where('hostUid', '==', user.uid)),
+        );
+        if (!meetupsSnap.empty) {
+          const meetupsBatch = writeBatch(db);
+          meetupsSnap.docs.forEach((d) => meetupsBatch.update(d.ref, { hostPhotoURL: newPhotoURL }));
+          await meetupsBatch.commit();
+        }
 
-      const chatsSnap = await getDocs(
-        query(collection(db, 'chatRooms'), where('participants', 'array-contains', user.uid)),
-      );
-      if (!chatsSnap.empty) {
-        const chatsBatch = writeBatch(db);
-        chatsSnap.docs.forEach((d) => chatsBatch.update(d.ref, { [`participantPhotos.${user.uid}`]: newPhotoURL }));
-        await chatsBatch.commit();
+        const chatsSnap = await getDocs(
+          query(collection(db, 'chatRooms'), where('participants', 'array-contains', user.uid)),
+        );
+        if (!chatsSnap.empty) {
+          const chatsBatch = writeBatch(db);
+          chatsSnap.docs.forEach((d) => chatsBatch.update(d.ref, { [`participantPhotos.${user.uid}`]: newPhotoURL }));
+          await chatsBatch.commit();
+        }
+      } catch (syncErr) {
+        console.warn('프로필 사진 동기화 일부 실패 (무시):', syncErr);
       }
 
       Alert.alert('완료', '프로필 사진이 변경되었습니다.');

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
 
 export interface AlumniRecommend {
@@ -14,6 +14,25 @@ export interface AlumniRecommend {
 
 const FUNCTION_URL = 'https://us-central1-again-school-bfea8.cloudfunctions.net/generateAlumniRecommendations';
 
+async function enrichWithLatestPhotos(items: AlumniRecommend[]): Promise<AlumniRecommend[]> {
+  return Promise.all(
+    items.map(async (item) => {
+      try {
+        const userDoc = await getDoc(doc(db, 'users', item.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          return {
+            ...item,
+            photoURL: userData.photoURL || item.photoURL || '',
+            displayName: userData.displayName || item.displayName,
+          };
+        }
+      } catch {}
+      return item;
+    })
+  );
+}
+
 export function useAlumniRecommendations() {
   const [recommendations, setRecommendations] = useState<AlumniRecommend[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,10 +46,11 @@ export function useAlumniRecommendations() {
       async (snapshot) => {
         if (snapshot.exists()) {
           const data = snapshot.data();
-          setRecommendations((data.list || []).slice(0, 5));
+          const raw = (data.list || []).slice(0, 20) as AlumniRecommend[];
+          const enriched = await enrichWithLatestPhotos(raw);
+          setRecommendations(enriched);
           setLoading(false);
         } else {
-          // 추천 데이터 없으면 Functions 호출해서 생성
           try {
             const token = await auth.currentUser?.getIdToken();
             const res = await fetch(FUNCTION_URL, {
@@ -38,8 +58,10 @@ export function useAlumniRecommendations() {
               headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
               body: JSON.stringify({}),
             });
-            const data = await res.json();
-            setRecommendations((data.recommendations || []).slice(0, 5));
+            const result = await res.json();
+            const raw = (result.recommendations || []).slice(0, 20) as AlumniRecommend[];
+            const enriched = await enrichWithLatestPhotos(raw);
+            setRecommendations(enriched);
           } catch (e) {
             console.warn('[useAlumniRecommendations] 추천 생성 실패:', e);
           } finally {
