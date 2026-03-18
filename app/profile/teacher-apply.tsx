@@ -114,6 +114,7 @@ export default function TeacherApplyScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [alreadyApplied, setAlreadyApplied] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -206,15 +207,22 @@ export default function TeacherApplyScreen() {
           </View>
         </View>
 
-        {isVerified ? (
+        {isVerified && !isEditing ? (
           <View style={[styles.verifiedBox, { backgroundColor: '#7C3AED18' }]}>
             <Text style={{ fontSize: 40, textAlign: 'center' }}>👩‍🏫</Text>
             <Text style={[styles.verifiedTitle, { color: '#7C3AED' }]}>인증 완료!</Text>
             <Text style={[styles.verifiedDesc, { color: colors.textSecondary }]}>
               선생님 인증 뱃지가 활성화되었어요.
             </Text>
+            <TouchableOpacity
+              style={[styles.editBtn, { borderColor: '#7C3AED' }]}
+              onPress={() => setIsEditing(true)}
+            >
+              <Ionicons name="create-outline" size={16} color="#7C3AED" />
+              <Text style={{ fontSize: 14, color: '#7C3AED', fontWeight: '600' }}>재직 이력 수정</Text>
+            </TouchableOpacity>
           </View>
-        ) : alreadyApplied ? (
+        ) : alreadyApplied && !isEditing ? (
           <View style={[styles.pendingBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Ionicons name="time-outline" size={40} color={colors.inactive} />
             <Text style={[styles.pendingTitle, { color: colors.text }]}>검토 중</Text>
@@ -233,6 +241,13 @@ export default function TeacherApplyScreen() {
                 </View>
               ))}
             </View>
+              <TouchableOpacity
+                style={[styles.editBtn, { borderColor: colors.border, marginTop: 8 }]}
+                onPress={() => setIsEditing(true)}
+              >
+                <Ionicons name="create-outline" size={16} color={colors.textSecondary} />
+                <Text style={{ fontSize: 14, color: colors.textSecondary, fontWeight: '600' }}>재직 이력 수정</Text>
+              </TouchableOpacity>
           </View>
         ) : (
           <>
@@ -312,4 +327,5 @@ const styles = StyleSheet.create({
   appliedInfo: { width: '100%', borderTopWidth: 1, marginTop: 16, paddingTop: 16, gap: 4 },
   appliedInfoLabel: { fontSize: 12 },
   appliedInfoValue: { fontSize: 15, fontWeight: '600', marginBottom: 8 },
+  editBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center', borderWidth: 1, borderRadius: 12, height: 44, paddingHorizontal: 16, marginTop: 8 },
 });
