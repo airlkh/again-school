@@ -57,6 +57,8 @@
     "react-native-webview": "13.16.0"
   },
   "devDependencies": {
+    "@react-native-community/cli": "^20.1.2",
+    "@react-native-community/cli-platform-android": "^20.1.2",
     "@types/react": "~19.2.2",
     "@types/sharp": "^0.31.1",
     "firebase-admin": "^13.7.0",
