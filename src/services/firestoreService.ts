@@ -316,3 +316,73 @@ export function subscribeMyConnections(
     console.warn('[firestoreService] subscribeMyConnections 오류:', error);
   });
 }
+
+// ── 학교 랭킹 ──────────────────────────────────────────────
+export interface SchoolRankingItem {
+  schoolName: string;
+  schoolType: string;
+  count: number;
+  weeklyNew: number;
+}
+
+export async function getSchoolRanking(schoolTypeFilter?: string): Promise<SchoolRankingItem[]> {
+  try {
+    const snap = await getDocs(collection(db, 'users'));
+    const schoolMap: Record<string, { schoolType: string; uids: Set<string>; weeklyUids: Set<string> }> = {};
+    const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+
+    snap.docs.forEach((d) => {
+      const data = d.data();
+      const schools: any[] = data.schools ?? [];
+      schools.forEach((s) => {
+        if (!s?.schoolName) return;
+        if (schoolTypeFilter && schoolTypeFilter !== '전체' && s.schoolType !== schoolTypeFilter) return;
+        if (!schoolMap[s.schoolName]) {
+          schoolMap[s.schoolName] = { schoolType: s.schoolType ?? '', uids: new Set(), weeklyUids: new Set() };
+        }
+        schoolMap[s.schoolName].uids.add(d.id);
+        if ((data.createdAt ?? 0) > oneWeekAgo) {
+          schoolMap[s.schoolName].weeklyUids.add(d.id);
+        }
+      });
+    });
+
+    return Object.entries(schoolMap)
+      .map(([schoolName, val]) => ({
+        schoolName,
+        schoolType: val.schoolType,
+        count: val.uids.size,
+        weeklyNew: val.weeklyUids.size,
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 50);
+  } catch (e) {
+    console.warn('getSchoolRanking error:', e);
+    return [];
+  }
+}
+
+// ── 인증 선생님 목록 ──────────────────────────────────────────
+export async function getVerifiedTeachers(keyword?: string): Promise<any[]> {
+  try {
+    const q = query(
+      collection(db, 'users'),
+      where('teacherVerified', '==', true)
+    );
+    const snap = await getDocs(q);
+    let results = snap.docs.map((d) => ({ uid: d.id, ...d.data() }));
+    if (keyword?.trim()) {
+      const lower = keyword.toLowerCase();
+      results = results.filter((r: any) =>
+        r.displayName?.toLowerCase().includes(lower) ||
+        r.teacherSchoolName?.toLowerCase().includes(lower) ||
+        r.teacherSubject?.toLowerCase().includes(lower) ||
+        r.teacherHistory?.some((h: any) => h.schoolName?.toLowerCase().includes(lower))
+      );
+    }
+    return results;
+  } catch (e) {
+    console.warn('getVerifiedTeachers error:', e);
+    return [];
+  }
+}

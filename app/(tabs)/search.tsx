@@ -25,6 +25,8 @@ import {
 } from '../../src/services/firestoreService';
 import { UserProfile, SchoolEntry, ConnectionRequest } from '../../src/types/auth';
 import { getAvatarSource } from '../../src/utils/avatar';
+import { getSchoolRanking, getVerifiedTeachers, SchoolRankingItem } from '../../src/services/firestoreService';
+import { TeacherHistory } from '../../src/types/auth';
 
 import { UserPrivacySettings } from '../../src/types/auth';
 import { getTrustBadge, TRUST_BADGE_INFO, TrustBadgeLevel } from '../../src/hooks/useTrust';
@@ -46,6 +48,8 @@ interface SearchResult {
   isTeacher?: boolean;
   teacherVerified?: boolean;
 }
+
+type SearchTab = 'classmate' | 'ranking' | 'teacher';
 
 const DUMMY_RESULTS: SearchResult[] = [
   {
@@ -129,6 +133,14 @@ export default function SearchScreen() {
   const [expandedFilter, setExpandedFilter] = useState<FilterType | null>(null);
   const [mySchools, setMySchools] = useState<SchoolEntry[]>([]);
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [activeTab, setActiveTab] = useState<SearchTab>('classmate');
+  const [schoolRanking, setSchoolRanking] = useState<SchoolRankingItem[]>([]);
+  const [rankingLoading, setRankingLoading] = useState(false);
+  const [rankingFilter, setRankingFilter] = useState('전체');
+  const [mySchoolRank, setMySchoolRank] = useState<number>(-1);
+  const [teachers, setTeachers] = useState<any[]>([]);
+  const [teacherLoading, setTeacherLoading] = useState(false);
+  const [teacherKeyword, setTeacherKeyword] = useState('');
 
   // 내 프로필 로드
   useEffect(() => {
@@ -140,6 +152,27 @@ export default function SearchScreen() {
       } catch {}
     })();
   }, [user]);
+
+  useEffect(() => {
+    if (activeTab !== 'ranking') return;
+    setRankingLoading(true);
+    getSchoolRanking(rankingFilter).then((data) => {
+      setSchoolRanking(data);
+      const mySchoolNames = (mySchools || []).map((s) => s.schoolName);
+      const idx = data.findIndex((r) => mySchoolNames.includes(r.schoolName));
+      setMySchoolRank(idx);
+      setRankingLoading(false);
+    });
+  }, [activeTab, rankingFilter, mySchools]);
+
+  useEffect(() => {
+    if (activeTab !== 'teacher') return;
+    setTeacherLoading(true);
+    getVerifiedTeachers(teacherKeyword).then((data) => {
+      setTeachers(data);
+      setTeacherLoading(false);
+    });
+  }, [activeTab, teacherKeyword]);
 
   // 연결 요청 실시간 구독
   useEffect(() => {
@@ -491,8 +524,23 @@ export default function SearchScreen() {
         )}
       </View>
 
-      {/* 필터 칩 */}
-      <View style={styles.filterContainer}>
+      {/* 탭 */}
+        <View style={[styles.tabContainer, { borderBottomColor: colors.border }]}>
+          {([['classmate', '동창 검색'], ['ranking', '학교 랭킹'], ['teacher', '선생님']] as [SearchTab, string][]).map(([tab, label]) => (
+            <TouchableOpacity
+              key={tab}
+              style={[styles.tab, activeTab === tab && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}
+              onPress={() => setActiveTab(tab)}
+            >
+              <Text style={[styles.tabText, { color: activeTab === tab ? colors.primary : colors.inactive }]}>
+                {label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* 필터 칩 */}
+        <View style={[styles.filterContainer, { display: activeTab === 'classmate' ? 'flex' : 'none' }]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
           {/* 학교 필터 */}
           <FilterChip
@@ -552,7 +600,160 @@ export default function SearchScreen() {
       </View>
 
       {/* 필터 드롭다운 */}
-      {renderFilterDropdown()}
+        {activeTab === 'classmate' && renderFilterDropdown()}
+
+        {/* 학교 랭킹 탭 */}
+        {activeTab === 'ranking' && (
+          <View style={{ flex: 1 }}>
+            {mySchoolRank >= 0 && schoolRanking[mySchoolRank] && (
+              <View style={[styles.mySchoolBanner, { backgroundColor: isDark ? '#3a0a0a' : '#fef2f2', borderColor: colors.primary }]}>
+                <Text style={{ fontSize: 20 }}>🏫</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, color: colors.primary, fontWeight: '600' }}>내 학교</Text>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text }}>{schoolRanking[mySchoolRank].schoolName}</Text>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={{ fontSize: 20, fontWeight: '700', color: colors.primary }}>{mySchoolRank + 1}위</Text>
+                  <Text style={{ fontSize: 12, color: colors.textSecondary }}>{schoolRanking[mySchoolRank].count}명</Text>
+                </View>
+              </View>
+            )}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 44 }} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, alignItems: 'center', paddingVertical: 6 }}>
+              {['전체', '초등학교', '중학교', '고등학교', '대학교'].map((f) => (
+                <TouchableOpacity
+                  key={f}
+                  style={[{ paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, borderWidth: 1, backgroundColor: rankingFilter === f ? colors.primary : colors.card, borderColor: rankingFilter === f ? colors.primary : colors.border }]}
+                  onPress={() => setRankingFilter(f)}
+                >
+                  <Text style={[{ fontSize: 13, fontWeight: rankingFilter === f ? '600' : '500', color: rankingFilter === f ? '#fff' : colors.textSecondary }]}>{f}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            {rankingLoading ? (
+              <View style={styles.centerWrap}><ActivityIndicator size="large" color={colors.primary} /></View>
+            ) : (
+              <FlatList
+                data={schoolRanking}
+                keyExtractor={(item) => item.schoolName}
+                contentContainerStyle={{ padding: 16, gap: 8 }}
+                renderItem={({ item, index }) => {
+                  const isMySchool = mySchoolRank === index;
+                  const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : null;
+                  return (
+                    <View style={[styles.rankCard, { backgroundColor: isMySchool ? (isDark ? '#3a0a0a' : '#fef2f2') : colors.card, borderColor: isMySchool ? colors.primary : colors.border }]}>
+                      <View style={[styles.rankBadge, { backgroundColor: medal ? 'transparent' : colors.surface }]}>
+                        {medal ? <Text style={{ fontSize: 22 }}>{medal}</Text> : <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textSecondary }}>{index + 1}</Text>}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text }}>{item.schoolName}</Text>
+                          {isMySchool && <View style={{ backgroundColor: colors.primary, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 8 }}><Text style={{ fontSize: 10, color: '#fff', fontWeight: '700' }}>내 학교</Text></View>}
+                        </View>
+                        <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>{item.schoolType}</Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={{ fontSize: 18, fontWeight: '700', color: isMySchool ? colors.primary : colors.text }}>{item.count}명</Text>
+                        {item.weeklyNew > 0 && <Text style={{ fontSize: 11, color: '#16a34a' }}>+{item.weeklyNew} 이번 주</Text>}
+                      </View>
+                    </View>
+                  );
+                }}
+                ListEmptyComponent={<View style={styles.centerWrap}><Text style={{ color: colors.textSecondary }}>데이터가 없습니다</Text></View>}
+              />
+            )}
+          </View>
+        )}
+
+        {/* 선생님 탭 */}
+        {activeTab === 'teacher' && (
+          <View style={{ flex: 1 }}>
+            <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border, marginBottom: 8 }]}>
+              <Ionicons name="search" size={18} color={colors.inactive} />
+              <TextInput
+                style={[styles.searchInput, { color: colors.text }]}
+                placeholder="선생님 이름, 학교, 과목 검색"
+                placeholderTextColor={colors.inactive}
+                value={teacherKeyword}
+                onChangeText={setTeacherKeyword}
+              />
+              {teacherKeyword.length > 0 && (
+                <TouchableOpacity onPress={() => setTeacherKeyword('')}>
+                  <Ionicons name="close-circle" size={18} color={colors.inactive} />
+                </TouchableOpacity>
+              )}
+            </View>
+            <View style={[styles.teacherBanner, { backgroundColor: '#7C3AED18', borderColor: '#7C3AED44' }]}>
+              <Text style={{ fontSize: 16 }}>👩‍🏫</Text>
+              <Text style={{ fontSize: 13, color: '#7C3AED', fontWeight: '600' }}>Again School 인증 선생님</Text>
+            </View>
+            {teacherLoading ? (
+              <View style={styles.centerWrap}><ActivityIndicator size="large" color="#7C3AED" /></View>
+            ) : (
+              <FlatList
+                data={teachers}
+                keyExtractor={(item) => item.uid}
+                contentContainerStyle={{ padding: 16, gap: 8 }}
+                renderItem={({ item }) => {
+                  const currentHistory = item.teacherHistory?.find((h: TeacherHistory) => h.isCurrent);
+                  const conn = connections.find((c) => (c.fromUid === user?.uid && c.toUid === item.uid) || (c.toUid === user?.uid && c.fromUid === item.uid));
+                  return (
+                    <TouchableOpacity
+                      style={[styles.rankCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                      onPress={() => router.push(`/profile/${item.uid}`)}
+                      activeOpacity={0.7}
+                    >
+                      <Image source={getAvatarSource(item.photoURL)} style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: colors.surface }} />
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                          <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text }}>{item.displayName}</Text>
+                          <View style={{ backgroundColor: '#7C3AED18', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 8 }}>
+                            <Text style={{ fontSize: 10, color: '#7C3AED', fontWeight: '700' }}>👩‍🏫 인증</Text>
+                          </View>
+                        </View>
+                        <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                          {currentHistory ? `${currentHistory.schoolName} · ${currentHistory.subject}` : item.teacherSchoolName ? `${item.teacherSchoolName} · ${item.teacherSubject}` : '재직 정보 없음'}
+                        </Text>
+                        {item.teacherHistory && item.teacherHistory.length > 1 && (
+                          <Text style={{ fontSize: 11, color: colors.inactive, marginTop: 2 }}>재직 이력 {item.teacherHistory.length}곳</Text>
+                        )}
+                      </View>
+                      {conn?.status === 'accepted' ? (
+                        <TouchableOpacity
+                          style={[styles.actionButton, { backgroundColor: isDark ? colors.surface2 : '#fef2f2', borderColor: colors.primary, borderWidth: 1 }]}
+                          onPress={() => router.push({ pathname: '/chat/[id]', params: { id: item.uid, name: item.displayName, avatar: String(item.avatarImg ?? 1), online: '0' } })}
+                        >
+                          <Ionicons name="chatbubble-outline" size={14} color={colors.primary} />
+                          <Text style={{ fontSize: 12, color: colors.primary, fontWeight: '700' }}>메시지</Text>
+                        </TouchableOpacity>
+                      ) : conn?.status === 'pending' ? (
+                        <View style={[styles.actionButton, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
+                          <Text style={{ fontSize: 12, color: colors.inactive }}>요청됨</Text>
+                        </View>
+                      ) : (
+                        <TouchableOpacity
+                          style={[styles.actionButton, { backgroundColor: colors.primary }]}
+                          onPress={() => handleConnect({ uid: item.uid, displayName: item.displayName, avatarImg: item.avatarImg ?? 1, photoURL: item.photoURL, schools: item.schools ?? [], region: '', verified: false })}
+                        >
+                          <Ionicons name="person-add-outline" size={14} color="#fff" />
+                          <Text style={{ fontSize: 12, color: '#fff', fontWeight: '700' }}>연결</Text>
+                        </TouchableOpacity>
+                      )}
+                    </TouchableOpacity>
+                  );
+                }}
+                ListEmptyComponent={
+                  <View style={styles.centerWrap}>
+                    <Text style={{ fontSize: 32, marginBottom: 8 }}>👩‍🏫</Text>
+                    <Text style={{ color: colors.textSecondary, fontSize: 15 }}>인증된 선생님이 없습니다</Text>
+                  </View>
+                }
+              />
+            )}
+          </View>
+        )}
+
+        {/* 동창 검색 결과 */}
+        {activeTab === 'classmate' && (<>
 
       {/* 결과 카운트 */}
       {hasSearched && !isSearching && (
@@ -601,6 +802,7 @@ export default function SearchScreen() {
           ItemSeparatorComponent={() => <View style={[styles.separator, { backgroundColor: colors.border }]} />}
         />
       )}
+        </>)}
     </View>
   );
 }
@@ -953,4 +1155,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#fff',
   },
+  tabContainer: { flexDirection: 'row', borderBottomWidth: 0.5 },
+  tab: { flex: 1, alignItems: 'center', paddingVertical: 12 },
+  tabText: { fontSize: 14, fontWeight: '500' },
+  mySchoolBanner: { flexDirection: 'row', alignItems: 'center', gap: 12, margin: 16, padding: 14, borderRadius: 14, borderWidth: 1 },
+  rankCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1 },
+  rankBadge: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
+  teacherBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginBottom: 8, padding: 10, borderRadius: 10, borderWidth: 1 },
 });

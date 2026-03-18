@@ -10,13 +10,106 @@ import { db } from '../../src/config/firebase';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useGoBack } from '../../src/hooks/useGoBack';
+import { TeacherHistory } from '../../src/types/auth';
+
+const CURRENT_YEAR = new Date().getFullYear();
+
+function HistoryItem({
+  item,
+  index,
+  onUpdate,
+  onRemove,
+  colors,
+}: {
+  item: TeacherHistory;
+  index: number;
+  onUpdate: (index: number, field: keyof TeacherHistory, value: any) => void;
+  onRemove: (index: number) => void;
+  colors: any;
+}) {
+  return (
+    <View style={[itemStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={itemStyles.cardHeader}>
+        <Text style={[itemStyles.cardTitle, { color: colors.text }]}>재직 이력 {index + 1}</Text>
+        <TouchableOpacity onPress={() => onRemove(index)}>
+          <Ionicons name="close-circle" size={20} color={colors.inactive} />
+        </TouchableOpacity>
+      </View>
+      <Text style={[itemStyles.label, { color: colors.textSecondary }]}>학교명 *</Text>
+      <TextInput
+        style={[itemStyles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
+        placeholder="예: 한빛중학교"
+        placeholderTextColor={colors.inactive}
+        value={item.schoolName}
+        onChangeText={(v) => onUpdate(index, 'schoolName', v)}
+      />
+      <Text style={[itemStyles.label, { color: colors.textSecondary }]}>담당 과목 *</Text>
+      <TextInput
+        style={[itemStyles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
+        placeholder="예: 수학"
+        placeholderTextColor={colors.inactive}
+        value={item.subject}
+        onChangeText={(v) => onUpdate(index, 'subject', v)}
+      />
+      <View style={itemStyles.yearRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={[itemStyles.label, { color: colors.textSecondary }]}>시작연도 *</Text>
+          <TextInput
+            style={[itemStyles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
+            placeholder="예: 2010"
+            placeholderTextColor={colors.inactive}
+            keyboardType="number-pad"
+            maxLength={4}
+            value={item.startYear ? String(item.startYear) : ''}
+            onChangeText={(v) => onUpdate(index, 'startYear', Number(v))}
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[itemStyles.label, { color: colors.textSecondary }]}>종료연도</Text>
+          <TextInput
+            style={[itemStyles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text, opacity: item.isCurrent ? 0.4 : 1 }]}
+            placeholder={item.isCurrent ? '재직 중' : '예: 2015'}
+            placeholderTextColor={colors.inactive}
+            keyboardType="number-pad"
+            maxLength={4}
+            editable={!item.isCurrent}
+            value={item.isCurrent ? '' : (item.endYear ? String(item.endYear) : '')}
+            onChangeText={(v) => onUpdate(index, 'endYear', Number(v))}
+          />
+        </View>
+      </View>
+      <TouchableOpacity
+        style={itemStyles.currentRow}
+        onPress={() => onUpdate(index, 'isCurrent', !item.isCurrent)}
+      >
+        <View style={[itemStyles.checkbox, { borderColor: item.isCurrent ? '#7C3AED' : colors.border, backgroundColor: item.isCurrent ? '#7C3AED' : 'transparent' }]}>
+          {item.isCurrent && <Ionicons name="checkmark" size={14} color="#fff" />}
+        </View>
+        <Text style={[itemStyles.currentLabel, { color: colors.text }]}>현재 재직 중</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const itemStyles = StyleSheet.create({
+  card: { borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 12, gap: 4 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  cardTitle: { fontSize: 14, fontWeight: '700' },
+  label: { fontSize: 12, marginTop: 6, marginBottom: 4 },
+  input: { height: 44, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, fontSize: 14 },
+  yearRow: { flexDirection: 'row', gap: 8 },
+  currentRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  checkbox: { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, justifyContent: 'center', alignItems: 'center' },
+  currentLabel: { fontSize: 14 },
+});
 
 export default function TeacherApplyScreen() {
   const { user } = useAuth();
   const { colors } = useTheme();
   const goBack = useGoBack();
-  const [schoolName, setSchoolName] = useState('');
-  const [subject, setSubject] = useState('');
+  const [history, setHistory] = useState<TeacherHistory[]>([
+    { schoolName: '', subject: '', startYear: CURRENT_YEAR, endYear: null, isCurrent: true },
+  ]);
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [alreadyApplied, setAlreadyApplied] = useState(false);
@@ -31,30 +124,55 @@ export default function TeacherApplyScreen() {
           const data = snap.data();
           setAlreadyApplied(!!data.isTeacher);
           setIsVerified(!!data.teacherVerified);
-          if (data.teacherSchoolName) setSchoolName(data.teacherSchoolName);
-          if (data.teacherSubject) setSubject(data.teacherSubject);
+          if (data.teacherHistory?.length) setHistory(data.teacherHistory);
+          if (data.teacherMessage) setMessage(data.teacherMessage);
         }
       } catch {}
     })();
   }, [user]);
 
+  function updateItem(index: number, field: keyof TeacherHistory, value: any) {
+    setHistory((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      if (field === 'isCurrent' && value === true) {
+        next[index].endYear = null;
+      }
+      return next;
+    });
+  }
+
+  function removeItem(index: number) {
+    setHistory((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function addItem() {
+    setHistory((prev) => [
+      ...prev,
+      { schoolName: '', subject: '', startYear: CURRENT_YEAR, endYear: null, isCurrent: false },
+    ]);
+  }
+
   async function handleApply() {
     if (!user) return;
-    if (!schoolName.trim()) {
-      Alert.alert('입력 오류', '재직 중인 학교명을 입력해주세요.');
+    const invalid = history.find((h) => !h.schoolName.trim() || !h.subject.trim() || !h.startYear);
+    if (invalid) {
+      Alert.alert('입력 오류', '모든 재직 이력의 학교명, 과목, 시작연도를 입력해주세요.');
       return;
     }
-    if (!subject.trim()) {
-      Alert.alert('입력 오류', '담당 과목을 입력해주세요.');
+    if (history.length === 0) {
+      Alert.alert('입력 오류', '재직 이력을 1개 이상 추가해주세요.');
       return;
     }
     setIsLoading(true);
     try {
+      const currentHistory = history.find((h) => h.isCurrent);
       await updateDoc(doc(db, 'users', user.uid), {
         isTeacher: true,
         teacherVerified: false,
-        teacherSchoolName: schoolName.trim(),
-        teacherSubject: subject.trim(),
+        teacherHistory: history,
+        teacherSchoolName: currentHistory?.schoolName ?? history[0].schoolName,
+        teacherSubject: currentHistory?.subject ?? history[0].subject,
         teacherMessage: message.trim(),
         teacherAppliedAt: serverTimestamp(),
       });
@@ -78,14 +196,12 @@ export default function TeacherApplyScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        {/* 안내 배너 */}
         <View style={[styles.infoBanner, { backgroundColor: '#7C3AED18', borderColor: '#7C3AED44' }]}>
           <Text style={styles.infoEmoji}>👩‍🏫</Text>
           <View style={{ flex: 1 }}>
             <Text style={[styles.infoTitle, { color: '#7C3AED' }]}>선생님 인증 뱃지</Text>
             <Text style={[styles.infoDesc, { color: colors.textSecondary }]}>
-              현직 선생님임을 인증하면 프로필과 피드에 뱃지가 표시됩니다.
-              관리자 검토 후 승인됩니다.
+              모교 및 재직 이력을 등록하면 관리자 검토 후 뱃지가 부여됩니다.
             </Text>
           </View>
         </View>
@@ -106,45 +222,50 @@ export default function TeacherApplyScreen() {
               신청이 접수되었어요. 관리자 검토 후 뱃지가 부여됩니다.
             </Text>
             <View style={[styles.appliedInfo, { borderColor: colors.border }]}>
-              <Text style={[styles.appliedInfoLabel, { color: colors.textSecondary }]}>재직 학교</Text>
-              <Text style={[styles.appliedInfoValue, { color: colors.text }]}>{schoolName}</Text>
-              <Text style={[styles.appliedInfoLabel, { color: colors.textSecondary }]}>담당 과목</Text>
-              <Text style={[styles.appliedInfoValue, { color: colors.text }]}>{subject}</Text>
+              {history.map((h, i) => (
+                <View key={i} style={{ marginBottom: 8 }}>
+                  <Text style={[styles.appliedInfoLabel, { color: colors.textSecondary }]}>
+                    {h.isCurrent ? '현재 재직' : `재직 이력 ${i + 1}`}
+                  </Text>
+                  <Text style={[styles.appliedInfoValue, { color: colors.text }]}>
+                    {h.schoolName} · {h.subject} · {h.startYear}~{h.isCurrent ? '현재' : h.endYear}
+                  </Text>
+                </View>
+              ))}
             </View>
           </View>
         ) : (
           <>
-            <View style={styles.form}>
-              <Text style={[styles.label, { color: colors.text }]}>재직 중인 학교명 *</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
-                placeholder="예: 한빛중학교"
-                placeholderTextColor={colors.inactive}
-                value={schoolName}
-                onChangeText={setSchoolName}
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>재직 이력</Text>
+            {history.map((item, index) => (
+              <HistoryItem
+                key={index}
+                item={item}
+                index={index}
+                onUpdate={updateItem}
+                onRemove={removeItem}
+                colors={colors}
               />
+            ))}
+            <TouchableOpacity
+              style={[styles.addBtn, { borderColor: '#7C3AED' }]}
+              onPress={addItem}
+            >
+              <Ionicons name="add-circle-outline" size={18} color="#7C3AED" />
+              <Text style={[styles.addBtnText, { color: '#7C3AED' }]}>재직 이력 추가</Text>
+            </TouchableOpacity>
 
-              <Text style={[styles.label, { color: colors.text }]}>담당 과목 *</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
-                placeholder="예: 수학, 영어, 국어"
-                placeholderTextColor={colors.inactive}
-                value={subject}
-                onChangeText={setSubject}
-              />
-
-              <Text style={[styles.label, { color: colors.text }]}>추가 메시지 (선택)</Text>
-              <TextInput
-                style={[styles.input, styles.textArea, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
-                placeholder="관리자에게 전달할 메시지를 입력해주세요"
-                placeholderTextColor={colors.inactive}
-                value={message}
-                onChangeText={setMessage}
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-              />
-            </View>
+            <Text style={[styles.label, { color: colors.text }]}>추가 메시지 (선택)</Text>
+            <TextInput
+              style={[styles.input, styles.textArea, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
+              placeholder="관리자에게 전달할 메시지를 입력해주세요"
+              placeholderTextColor={colors.inactive}
+              value={message}
+              onChangeText={setMessage}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
 
             <TouchableOpacity
               style={[styles.submitBtn, isLoading && { opacity: 0.6 }]}
@@ -174,10 +295,12 @@ const styles = StyleSheet.create({
   infoEmoji: { fontSize: 32 },
   infoTitle: { fontSize: 15, fontWeight: '700', marginBottom: 4 },
   infoDesc: { fontSize: 13, lineHeight: 20 },
-  form: { gap: 8 },
-  label: { fontSize: 14, fontWeight: '600', marginTop: 8 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 4 },
+  label: { fontSize: 14, fontWeight: '600', marginTop: 4 },
   input: { height: 52, borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, fontSize: 15 },
   textArea: { height: 120, paddingTop: 14 },
+  addBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center', borderWidth: 1, borderRadius: 12, height: 44, borderStyle: 'dashed' },
+  addBtnText: { fontSize: 14, fontWeight: '600' },
   submitBtn: { backgroundColor: '#7C3AED', height: 52, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginTop: 8 },
   submitBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   verifiedBox: { alignItems: 'center', padding: 32, borderRadius: 16, gap: 8 },

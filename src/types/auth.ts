@@ -7,6 +7,14 @@ export interface SchoolEntry {
   isPublic?: boolean;
 }
 
+export interface TeacherHistory {
+  schoolName: string;
+  subject: string;
+  startYear: number;
+  endYear?: number | null;
+  isCurrent: boolean;
+}
+
 export interface UserPrivacySettings {
   showWorkplace: boolean;
   showSchools: boolean;
@@ -29,6 +37,9 @@ export interface UserProfile {
   isTeacher?: boolean;
   teacherVerified?: boolean;
   teacherAppliedAt?: number;
+  teacherHistory?: TeacherHistory[];
+  teacherSubject?: string;
+  teacherSchoolName?: string;
   onboardingCompleted: boolean;
   createdAt: number;
   updatedAt: number;
