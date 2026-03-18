@@ -194,29 +194,52 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
   const [multiImgHeights, setMultiImgHeights] = useState<Record<number, number>>({});
   const [imgLoadFailed, setImgLoadFailed] = useState(false);
 
-  // 음악 제목 marquee
+  // 음악 제목 marquee + 음표 bounce
   const marqueeAnim = useRef(new Animated.Value(0)).current;
+  const noteAnim = useRef(new Animated.Value(0)).current;
   const [marqueeTextW, setMarqueeTextW] = useState(0);
-  const [marqueeBoxW, setMarqueeBoxW] = useState(0);
+  const [marqueeBoxW, setMarqueeBoxW] = useState(130);
   const isPlaying = !musicMuted && isFirestore && !!(fsPost as any)?.music?.url;
+  const needsMarquee = marqueeTextW > marqueeBoxW;
 
   useEffect(() => {
-    if (isPlaying && marqueeTextW > 0 && marqueeBoxW > 0 && marqueeTextW > marqueeBoxW) {
-      marqueeAnim.setValue(marqueeBoxW);
+    if (isPlaying) {
+      if (needsMarquee && marqueeTextW > 0) {
+        marqueeAnim.setValue(0);
+        Animated.loop(
+          Animated.sequence([
+            Animated.delay(800),
+            Animated.timing(marqueeAnim, {
+              toValue: -(marqueeTextW - marqueeBoxW + 20),
+              duration: marqueeTextW * 30,
+              easing: Easing.linear,
+              useNativeDriver: true,
+            }),
+            Animated.delay(800),
+            Animated.timing(marqueeAnim, {
+              toValue: 0,
+              duration: 600,
+              easing: Easing.out(Easing.quad),
+              useNativeDriver: true,
+            }),
+          ])
+        ).start();
+      }
+      // 음표 bounce (항상)
       Animated.loop(
-        Animated.timing(marqueeAnim, {
-          toValue: -marqueeTextW,
-          duration: (marqueeTextW + marqueeBoxW) * 18,
-          easing: Easing.linear,
-          useNativeDriver: true,
-        })
+        Animated.sequence([
+          Animated.timing(noteAnim, { toValue: -4, duration: 300, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+          Animated.timing(noteAnim, { toValue: 0, duration: 300, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+        ])
       ).start();
     } else {
       marqueeAnim.stopAnimation();
       marqueeAnim.setValue(0);
+      noteAnim.stopAnimation();
+      noteAnim.setValue(0);
     }
-    return () => marqueeAnim.stopAnimation();
-  }, [isPlaying, marqueeTextW, marqueeBoxW]);
+    return () => { marqueeAnim.stopAnimation(); noteAnim.stopAnimation(); };
+  }, [isPlaying, needsMarquee, marqueeTextW, marqueeBoxW]);
 
   // 동영상 모달 플레이어 (expo-video)
   // useVideoPlayer는 source 변경 시 자동으로 이전 player release + 새 player 생성
@@ -670,19 +693,19 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
             style={{ overflow: 'hidden', flex: 1, maxWidth: 150 }}
             onLayout={(e) => setMarqueeBoxW(e.nativeEvent.layout.width)}
           >
-            {isPlaying ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Animated.Text
-                style={[styles.musicIndicatorText, { color: colors.text, transform: [{ translateX: marqueeAnim }] }]}
+                style={[styles.musicIndicatorText, { color: colors.text, maxWidth: undefined }, needsMarquee && isPlaying ? { transform: [{ translateX: marqueeAnim }] } : {}]}
                 onLayout={(e) => setMarqueeTextW(e.nativeEvent.layout.width)}
                 numberOfLines={1}
               >
-                {fsPost.music.name} ♪
+                {fsPost.music.name}
               </Animated.Text>
-            ) : (
-              <Text style={[styles.musicIndicatorText, { color: colors.text }]} numberOfLines={1}>
-                {fsPost.music.name} ♪
-              </Text>
-            )}
+              {isPlaying && (
+                <Animated.Text style={{ fontSize: 12, marginLeft: 4, color: colors.primary, transform: [{ translateY: noteAnim }] }}>♪</Animated.Text>
+              )}
+              {!isPlaying && <Text style={{ fontSize: 12, marginLeft: 4, color: colors.inactive }}>♪</Text>}
+            </View>
           </View>
         </TouchableOpacity>
       )}
