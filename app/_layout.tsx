@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Stack, Redirect, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet, AppState, AppStateStatus } from 'react-native';
@@ -201,6 +201,13 @@ function RootLayoutNav() {
   );
 }
 
+function SplashOverlay() {
+  const [show, setShow] = useState(true);
+  if (!show) return null;
+  const AnimatedSplash = require('../src/components/AnimatedSplash').AnimatedSplash;
+  return <AnimatedSplash onFinish={() => setShow(false)} />;
+}
+
 export default function RootLayout() {
   return (
     <ThemeProvider>
@@ -209,6 +216,7 @@ export default function RootLayout() {
           <MuteProvider>
             <MusicProvider>
               <RootLayoutNav />
+              <SplashOverlay />
             </MusicProvider>
           </MuteProvider>
         </UserProvider>
