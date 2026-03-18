@@ -10,7 +10,7 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "cover",
-      "backgroundColor": "#e8313a"
+      "backgroundColor": "#FF3124"
     },
     "ios": {
       "supportsTablet": true,
@@ -27,7 +27,7 @@
       "softwareKeyboardLayoutMode": "adjustResize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#e8313a"
+        "backgroundColor": "#FF3124"
       },
       "googleServicesFile": "./google-services.json",
       "permissions": [

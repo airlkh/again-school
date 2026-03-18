@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Stack, Redirect, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet, AppState, AppStateStatus } from 'react-native';
+import { AnimatedSplash } from '../src/components/AnimatedSplash';
 import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
 import { ThemeProvider, useTheme } from '../src/contexts/ThemeContext';
@@ -187,6 +188,8 @@ function RootLayoutNav() {
           options={{ presentation: 'fullScreenModal', animation: 'fade' }}
         />
         <Stack.Screen name="settings/notifications" />
+        <Stack.Screen name="settings/terms" />
+        <Stack.Screen name="settings/privacy" />
         <Stack.Screen name="story/create" />
         <Stack.Screen
           name="story/[id]"
@@ -202,6 +205,8 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
+  const [showAnimatedSplash, setShowAnimatedSplash] = useState(true);
+
   return (
     <ThemeProvider>
       <AuthProvider>
@@ -209,6 +214,9 @@ export default function RootLayout() {
           <MuteProvider>
             <MusicProvider>
               <RootLayoutNav />
+              {showAnimatedSplash && (
+                <AnimatedSplash onFinish={() => setShowAnimatedSplash(false)} />
+              )}
             </MusicProvider>
           </MuteProvider>
         </UserProvider>
