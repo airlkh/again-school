@@ -29,16 +29,38 @@ export function OAuthWebView({
   onClose,
   title,
 }: OAuthWebViewProps) {
+  function extractCode(url: string): string | null {
+    const match = url.match(/[?&]code=([^&]+)/);
+    return match ? match[1] : null;
+  }
+
   function handleNavigationStateChange(navState: WebViewNavigation) {
     const { url } = navState;
-    if (url.startsWith(redirectUri)) {
-      const match = url.match(/[?&]code=([^&]+)/);
-      if (match) {
-        onCodeReceived(match[1]);
+    if (url && url.startsWith(redirectUri)) {
+      const code = extractCode(url);
+      if (code) {
+        onCodeReceived(code);
       } else {
         onClose();
       }
     }
+  }
+
+  function handleShouldStartLoad(request: { url: string }): boolean {
+    const { url } = request;
+    console.log('[OAuthWebView] URL:', url?.substring(0, 100));
+    if (url && url.startsWith(redirectUri)) {
+      console.log('[OAuthWebView] redirectUri 감지!');
+      const code = extractCode(url);
+      if (code) {
+        console.log('[OAuthWebView] code 추출 성공:', code?.substring(0, 20));
+        onCodeReceived(code);
+      } else {
+        onClose();
+      }
+      return false;
+    }
+    return true;
   }
 
   return (
@@ -54,6 +76,7 @@ export function OAuthWebView({
         <WebView
           source={{ uri: authUrl }}
           onNavigationStateChange={handleNavigationStateChange}
+          onShouldStartLoadWithRequest={handleShouldStartLoad}
           style={styles.webview}
           javaScriptEnabled
           domStorageEnabled

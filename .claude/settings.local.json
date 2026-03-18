@@ -27,7 +27,8 @@
       "Bash(eas build:list:*)",
       "Bash(netstat:*)",
       "Bash(taskkill:*)",
-      "Bash(git:*)"
+      "Bash(git:*)",
+      "Bash(npx firebase:*)"
     ]
   }
 }
