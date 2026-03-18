@@ -25,7 +25,7 @@ import {
   subscribeMyConnections,
   subscribeUserProfile,
 } from '../../src/services/firestoreService';
-import { UserProfile, SchoolEntry, UserPrivacySettings, ConnectionRequest } from '../../src/types/auth';
+import { UserProfile, SchoolEntry, UserPrivacySettings, ConnectionRequest, TeacherHistory } from '../../src/types/auth';
 import {
   DummyClassmate,
   findClassmateById,
@@ -183,6 +183,10 @@ export default function ProfileDetailScreen() {
   const workplace = firestoreProfile?.workplace ?? '';
   const classNumber = profile?.classNumber ?? 0;
   const trustBadge = TRUST_BADGE_INFO[getTrustBadge(trustCount)];
+  const isTeacherVerified = (firestoreProfile as any)?.teacherVerified === true;
+  const teacherHistory: TeacherHistory[] = (firestoreProfile as any)?.teacherHistory ?? [];
+  const teacherSchoolName: string = (firestoreProfile as any)?.teacherSchoolName ?? '';
+  const teacherSubject: string = (firestoreProfile as any)?.teacherSubject ?? '';
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
@@ -308,7 +312,51 @@ export default function ProfileDetailScreen() {
           )}
         </View>
 
-        {/* 공통 동창 */}
+        {/* 선생님 재직 이력 카드 */}
+          {isTeacherVerified && (
+            <View style={[styles.infoCard, { backgroundColor: colors.surface }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                <Text style={[styles.infoCardTitle, { color: colors.text, marginBottom: 0 }]}>재직 이력</Text>
+                <View style={{ backgroundColor: '#7C3AED18', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
+                  <Text style={{ fontSize: 11, color: '#7C3AED', fontWeight: '700' }}>👩‍🏫 인증 선생님</Text>
+                </View>
+              </View>
+              {teacherHistory.length > 0 ? (
+                teacherHistory.map((h, i) => (
+                  <View key={i} style={[styles.schoolRow, { marginBottom: i < teacherHistory.length - 1 ? 12 : 0 }]}>
+                    <View style={[styles.schoolIcon, { backgroundColor: h.isCurrent ? '#7C3AED18' : (isDark ? colors.surface2 : '#f5f5f5') }]}>
+                      <Ionicons name="business-outline" size={18} color={h.isCurrent ? '#7C3AED' : colors.inactive} />
+                    </View>
+                    <View style={styles.schoolInfo}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={[styles.schoolName, { color: colors.text }]}>{h.schoolName}</Text>
+                        {h.isCurrent && (
+                          <View style={{ backgroundColor: '#7C3AED', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6 }}>
+                            <Text style={{ fontSize: 10, color: '#fff', fontWeight: '700' }}>현재</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={[styles.schoolDetail, { color: colors.textSecondary }]}>
+                        {h.subject} · {h.startYear}~{h.isCurrent ? '현재' : (h.endYear ?? '')}
+                      </Text>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <View style={styles.schoolRow}>
+                  <View style={[styles.schoolIcon, { backgroundColor: '#7C3AED18' }]}>
+                    <Ionicons name="business-outline" size={18} color="#7C3AED" />
+                  </View>
+                  <View style={styles.schoolInfo}>
+                    <Text style={[styles.schoolName, { color: colors.text }]}>{teacherSchoolName}</Text>
+                    <Text style={[styles.schoolDetail, { color: colors.textSecondary }]}>{teacherSubject}</Text>
+                  </View>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* 공통 동창 */}
         <View style={[styles.infoCard, { backgroundColor: colors.surface }]}>
           <View style={styles.statRow}>
             <View style={styles.statItem}>
