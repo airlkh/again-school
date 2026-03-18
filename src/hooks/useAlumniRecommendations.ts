@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
 
@@ -36,6 +36,7 @@ async function enrichWithLatestPhotos(items: AlumniRecommend[]): Promise<AlumniR
 export function useAlumniRecommendations() {
   const [recommendations, setRecommendations] = useState<AlumniRecommend[]>([]);
   const [loading, setLoading] = useState(true);
+  const rawRef = useRef<AlumniRecommend[]>([]);
 
   useEffect(() => {
     const uid = auth.currentUser?.uid;
@@ -47,6 +48,7 @@ export function useAlumniRecommendations() {
         if (snapshot.exists()) {
           const data = snapshot.data();
           const raw = (data.list || []).slice(0, 20) as AlumniRecommend[];
+          rawRef.current = raw;
           const enriched = await enrichWithLatestPhotos(raw);
           setRecommendations(enriched);
           setLoading(false);
@@ -60,6 +62,7 @@ export function useAlumniRecommendations() {
             });
             const result = await res.json();
             const raw = (result.recommendations || []).slice(0, 20) as AlumniRecommend[];
+            rawRef.current = raw;
             const enriched = await enrichWithLatestPhotos(raw);
             setRecommendations(enriched);
           } catch (e) {
@@ -78,5 +81,16 @@ export function useAlumniRecommendations() {
     return () => unsubscribe();
   }, []);
 
-  return { recommendations, loading };
+  // 화면 포커스 시 호출하여 최신 photoURL 갱신
+  const refreshPhotos = useCallback(async () => {
+    if (rawRef.current.length === 0) return;
+    try {
+      const enriched = await enrichWithLatestPhotos(rawRef.current);
+      setRecommendations(enriched);
+    } catch (e) {
+      console.warn('[useAlumniRecommendations] 사진 갱신 실패:', e);
+    }
+  }, []);
+
+  return { recommendations, loading, refreshPhotos };
 }

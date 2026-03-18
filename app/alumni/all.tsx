@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { DUMMY_CLASSMATES, DummyClassmate } from '../../src/data/dummyClassmates';
@@ -20,7 +20,14 @@ import { useAlumniRecommendations } from '../../src/hooks/useAlumniRecommendatio
 export default function AllAlumniScreen() {
   const goBack = useGoBack();
   const { colors, isDark } = useTheme();
-  const { recommendations, loading } = useAlumniRecommendations();
+  const { recommendations, loading, refreshPhotos } = useAlumniRecommendations();
+
+  // 화면 포커스될 때마다 최신 photoURL 갱신
+  useFocusEffect(
+    useCallback(() => {
+      refreshPhotos();
+    }, [refreshPhotos])
+  );
 
   // Firebase 추천 데이터가 있으면 사용, 없으면 더미 폴백
   const hasSmartData = !loading && recommendations.length > 0;
