@@ -178,6 +178,7 @@ export default function TeacherApplyScreen() {
         teacherAppliedAt: serverTimestamp(),
       });
       setAlreadyApplied(true);
+      setIsEditing(false);
       Alert.alert('신청 완료', '선생님 인증 신청이 완료됐어요.\n관리자 검토 후 뱃지가 부여됩니다.');
     } catch (e) {
       Alert.alert('오류', '신청에 실패했습니다. 다시 시도해주세요.');
