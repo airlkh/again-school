@@ -47,6 +47,7 @@ export default function Step4Screen() {
         photoURL: null,
         schools: data.schools,
         region: data.region,
+        ...(data.birthYear ? { birthYear: data.birthYear } : {}),
       });
 
       // 동창 수 조회

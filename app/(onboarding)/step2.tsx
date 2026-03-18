@@ -52,7 +52,7 @@ export default function Step2Screen() {
 
         {/* 학교 입력 */}
         <View style={styles.content}>
-          <SchoolInput schools={schools} onSchoolsChange={setSchools} />
+          <SchoolInput schools={schools} onSchoolsChange={setSchools} birthYear={data.birthYear} />
         </View>
       </ScrollView>
 

@@ -5,6 +5,7 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 
 interface OnboardingData {
   displayName: string;
+  birthYear: number;
   schools: SchoolEntry[];
   region: { sido: string; sigungu: string };
 }
@@ -17,6 +18,7 @@ interface OnboardingContextType {
 const OnboardingContext = createContext<OnboardingContextType>({
   data: {
     displayName: '',
+    birthYear: 0,
     schools: [],
     region: { sido: '', sigungu: '' },
   },
@@ -31,6 +33,7 @@ export default function OnboardingLayout() {
   const { colors } = useTheme();
   const [data, setData] = useState<OnboardingData>({
     displayName: '',
+    birthYear: 0,
     schools: [],
     region: { sido: '', sigungu: '' },
   });

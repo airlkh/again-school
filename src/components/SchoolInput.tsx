@@ -15,12 +15,15 @@ import { SchoolEntry } from '../types/auth';
 import { SCHOOL_TYPES, getGraduationYears } from '../data/schoolTypes';
 import { searchSchools, searchSchoolsFromMaster, NeisSchool } from '../services/neisService';
 
+import { getGraduationYear } from '../utils/graduationYear';
+
 interface SchoolInputProps {
   schools: SchoolEntry[];
   onSchoolsChange: (schools: SchoolEntry[]) => void;
+  birthYear?: number;
 }
 
-export function SchoolInput({ schools, onSchoolsChange }: SchoolInputProps) {
+export function SchoolInput({ schools, onSchoolsChange, birthYear }: SchoolInputProps) {
   const { colors, isDark } = useTheme();
   const [isAdding, setIsAdding] = useState(schools.length === 0);
   const [schoolType, setSchoolType] =
@@ -66,10 +69,17 @@ export function SchoolInput({ schools, onSchoolsChange }: SchoolInputProps) {
     }, 500);
   }
 
+  const [isAutoYear, setIsAutoYear] = useState(!!birthYear);
+
   function onSelectSchool(school: NeisSchool) {
     setSchoolName(school.schoolName);
     setSearchQuery(school.schoolName);
-    setSchoolType(school.schoolType as SchoolEntry['schoolType']);
+    const newType = school.schoolType as SchoolEntry['schoolType'];
+    setSchoolType(newType);
+    if (birthYear) {
+      setGraduationYear(getGraduationYear(birthYear, newType));
+      setIsAutoYear(true);
+    }
     setShowResults(false);
     setSearchResults([]);
   }
@@ -177,21 +187,38 @@ export function SchoolInput({ schools, onSchoolsChange }: SchoolInputProps) {
             )}
           </View>
 
-          <TouchableOpacity
-            style={[
-              styles.pickerButton,
-              {
-                borderColor: colors.border,
-                backgroundColor: colors.card,
-              },
-            ]}
-            onPress={() => setShowYearPicker(true)}
-          >
-            <Text style={[styles.pickerButtonText, { color: colors.text }]}>
-              {graduationYear}년
-            </Text>
-            <Ionicons name="chevron-down" size={20} color={colors.inactive} />
-          </TouchableOpacity>
+          {birthYear ? (
+            <View style={[styles.pickerButton, { borderColor: colors.border, backgroundColor: colors.card }]}>
+              <TouchableOpacity
+                onPress={() => { const autoMin = getGraduationYear(birthYear, schoolType) - 3; if (graduationYear > autoMin) { setGraduationYear(graduationYear - 1); setIsAutoYear(false); } }}
+                style={{ padding: 8 }}
+              >
+                <Ionicons name="chevron-back" size={20} color={colors.primary} />
+              </TouchableOpacity>
+              <View style={{ flex: 1, alignItems: 'center' }}>
+                <Text style={[styles.pickerButtonText, { color: isAutoYear ? colors.inactive : colors.primary, fontWeight: isAutoYear ? '400' : '700' }]}>
+                  {graduationYear}년
+                </Text>
+                <Text style={{ fontSize: 10, color: colors.inactive }}>{isAutoYear ? '자동계산' : '수동조정'}</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => { const autoMax = getGraduationYear(birthYear, schoolType) + 3; if (graduationYear < autoMax) { setGraduationYear(graduationYear + 1); setIsAutoYear(false); } }}
+                style={{ padding: 8 }}
+              >
+                <Ionicons name="chevron-forward" size={20} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.pickerButton, { borderColor: colors.border, backgroundColor: colors.card }]}
+              onPress={() => setShowYearPicker(true)}
+            >
+              <Text style={[styles.pickerButtonText, { color: colors.text }]}>
+                {graduationYear}년
+              </Text>
+              <Ionicons name="chevron-down" size={20} color={colors.inactive} />
+            </TouchableOpacity>
+          )}
 
           <View style={styles.addFormActions}>
             <TouchableOpacity
@@ -252,6 +279,10 @@ export function SchoolInput({ schools, onSchoolsChange }: SchoolInputProps) {
                 ]}
                 onPress={() => {
                   setSchoolType(type.value);
+                  if (birthYear) {
+                    setGraduationYear(getGraduationYear(birthYear, type.value));
+                    setIsAutoYear(true);
+                  }
                   setShowTypePicker(false);
                 }}
               >
