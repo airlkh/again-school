@@ -56,6 +56,7 @@ const pageTitleMap = {
   '/settings/community': '커뮤니티 설정',
   '/settings/notifications': '알림 설정',
   '/settings/security': '보안 설정',
+  '/system/error-logs': '오류 로그',
 };
 
 const styles = {

@@ -29,7 +29,8 @@
       "Bash(taskkill:*)",
       "Bash(git:*)",
       "Bash(npx firebase:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(find:*)"
     ]
   }
 }

@@ -131,6 +131,7 @@ const menuData = [
       { label: '커뮤니티 설정', path: '/settings/community' },
       { label: '알림 설정', path: '/settings/notifications' },
       { label: '보안 설정', path: '/settings/security' },
+      { label: '오류 로그', path: '/system/error-logs' },
     ],
   },
 ];

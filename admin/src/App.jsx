@@ -81,6 +81,9 @@ import CommunitySysSettings from './pages/settings/CommunitySettings';
 import NotificationSettings from './pages/settings/NotificationSettings';
 import SecuritySettings from './pages/settings/SecuritySettings';
 
+// System
+import ErrorLogs from './pages/system/ErrorLogs';
+
 function App() {
   const [user, setUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -190,6 +193,8 @@ function App() {
           <Route path="settings/community" element={<CommunitySysSettings />} />
           <Route path="settings/notifications" element={<NotificationSettings />} />
           <Route path="settings/security" element={<SecuritySettings />} />
+
+          <Route path="system/error-logs" element={<ErrorLogs />} />
 
           <Route path="*" element={<Navigate to="/" />} />
         </Route>

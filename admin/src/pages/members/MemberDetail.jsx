@@ -22,7 +22,7 @@ const STATUS_COLORS = {
 };
 
 export default function MemberDetail() {
-  const { uid } = useParams();
+  const { id: uid } = useParams();
   const navigate = useNavigate();
   const [member, setMember] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -263,19 +263,72 @@ export default function MemberDetail() {
         </div>
       </div>
 
-      {/* 학교 목록 */}
-      {schoolList.length > 0 && (
+      {/* 학교 이력 */}
+      {member.schools && member.schools.length > 0 && (
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>학교 목록</h2>
-          <div style={styles.schoolList}>
-            {schoolList.map((school, i) => (
-              <span key={i} style={styles.schoolTag}>
-                {school}
-              </span>
-            ))}
-          </div>
+          <h2 style={styles.sectionTitle}>학교 이력</h2>
+          <table style={styles.table}>
+            <thead>
+              <tr>
+                <th style={styles.th}>학교명</th>
+                <th style={styles.th}>유형</th>
+                <th style={styles.th}>졸업연도</th>
+                <th style={styles.th}>공개</th>
+              </tr>
+            </thead>
+            <tbody>
+              {member.schools.map((s, i) => (
+                <tr key={i} style={styles.tr}>
+                  <td style={{ ...styles.td, fontWeight: 600 }}>{s.schoolName || '-'}</td>
+                  <td style={styles.td}><span style={{ padding: '2px 8px', borderRadius: 8, fontSize: 11, fontWeight: 600, background: '#eff6ff', color: '#2563eb' }}>{s.schoolType || '-'}</span></td>
+                  <td style={styles.td}>{s.graduationYear || '-'}</td>
+                  <td style={styles.td}>{s.isPublic === false ? '🔒 비공개' : '✅ 공개'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
+
+      {/* 선생님 재직 이력 */}
+      {member.teacherHistory && member.teacherHistory.length > 0 && (
+        <div style={styles.section}>
+          <h2 style={styles.sectionTitle}>
+            선생님 재직 이력
+            {member.teacherVerified && <span style={{ marginLeft: 8, padding: '2px 8px', borderRadius: 8, fontSize: 11, fontWeight: 600, background: '#f3e8ff', color: '#7c3aed' }}>👩‍🏫 인증됨</span>}
+          </h2>
+          <table style={styles.table}>
+            <thead>
+              <tr>
+                <th style={styles.th}>학교명</th>
+                <th style={styles.th}>과목</th>
+                <th style={styles.th}>기간</th>
+                <th style={styles.th}>상태</th>
+              </tr>
+            </thead>
+            <tbody>
+              {member.teacherHistory.map((h, i) => (
+                <tr key={i} style={styles.tr}>
+                  <td style={{ ...styles.td, fontWeight: 600 }}>{h.schoolName}</td>
+                  <td style={styles.td}>{h.subject}</td>
+                  <td style={styles.td}>{h.startYear}~{h.isCurrent ? '현재' : (h.endYear || '')}</td>
+                  <td style={styles.td}>{h.isCurrent ? <span style={{ padding: '2px 8px', borderRadius: 8, fontSize: 11, fontWeight: 600, background: '#f0fdf4', color: '#16a34a' }}>재직 중</span> : <span style={{ padding: '2px 8px', borderRadius: 8, fontSize: 11, fontWeight: 600, background: '#f5f5f5', color: '#888' }}>퇴직</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* 제재 이력 */}
+      <div style={styles.section}>
+        <h2 style={styles.sectionTitle}>제재 이력</h2>
+        {member.disabled ? (
+          <div style={{ padding: '12px 16px', background: '#fef2f2', borderRadius: 8, color: '#e8313a', fontSize: 13 }}>현재 제재 상태입니다.</div>
+        ) : (
+          <p style={styles.emptyText}>제재 이력이 없습니다.</p>
+        )}
+      </div>
 
       {/* 관리 버튼 */}
       <div style={styles.section}>
