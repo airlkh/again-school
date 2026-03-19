@@ -14,6 +14,7 @@ import { KeyboardScrollView } from '../../src/components/KeyboardScrollView';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
+import * as AuthSession from 'expo-auth-session';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
 import { Colors } from '../../src/constants/colors';
@@ -54,9 +55,15 @@ export default function LoginScreen() {
   } | null>(null);
 
   // Google Auth Session
+  const redirectUri = AuthSession.makeRedirectUri({
+    scheme: 'again-school',
+    path: 'oauth2redirect/google',
+  });
+
   const [, response, promptAsync] = Google.useAuthRequest({
     androidClientId: '414642537109-1rvkvdtma5iv7fh2ti2jgvro0homdt6p.apps.googleusercontent.com',
     webClientId: '414642537109-4hc2a5k1m3hqrultrdav3r19q36b377o.apps.googleusercontent.com',
+    redirectUri,
   });
 
   useEffect(() => {

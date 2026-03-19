@@ -30,6 +30,19 @@
         "backgroundColor": "#FF3124"
       },
       "googleServicesFile": "./google-services.json",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "again-school",
+              "path": "oauth2redirect/google"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ],
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.READ_MEDIA_IMAGES",
@@ -58,7 +71,7 @@
         "expo-notifications",
         {
           "icon": "./assets/icon.png",
-          "color": "#e8313a"
+          "color": "#FF3124"
         }
       ],
       "expo-sharing",
