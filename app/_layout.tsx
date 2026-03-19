@@ -81,6 +81,7 @@ function RootLayoutNav() {
   // ─── 리다이렉트 로직 (useEffect로 한 번만 실행) ───
   useEffect(() => {
     if (isLoading) return; // 로딩 중이면 실행 안 함
+    if (onboardingCompleted === null && user) return; // Firestore 응답 대기 중
 
     const segs = (segments || []) as string[];
     const inSplash = segs.length === 0 || segs[0] === 'index';
@@ -109,22 +110,22 @@ function RootLayoutNav() {
 
     // 3. 인증됨 + auth 화면에 있으면 → 온보딩 또는 탭
     if (user && inAuthGroup) {
-      if (onboardingCompleted) {
+      if (onboardingCompleted === true) {
         rtr.replace('/(tabs)');
-      } else {
+      } else if (onboardingCompleted === false) {
         rtr.replace('/(onboarding)/step1');
       }
       return;
     }
 
     // 4. 인증됨 + 온보딩 미완료 + 탭 화면 → 온보딩
-    if (user && !onboardingCompleted && !inOnboardingGroup && !inAuthGroup) {
+    if (user && onboardingCompleted === false && !inOnboardingGroup && !inAuthGroup) {
       rtr.replace('/(onboarding)/step1');
       return;
     }
 
     // 5. 인증됨 + 온보딩 완료 + 온보딩 화면 → 탭
-    if (user && onboardingCompleted && inOnboardingGroup) {
+    if (user && onboardingCompleted === true && inOnboardingGroup) {
       rtr.replace('/(tabs)');
       return;
     }
