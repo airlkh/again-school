@@ -41,12 +41,17 @@ export default function Step4Screen() {
 
       // 프로필 사진 업로드
       let photoURL: string | null = null;
+      console.log('[Step4] data.photoURI:', data.photoURI);
       if (data.photoURI) {
         try {
+          console.log('[Step4] uploadProfileImage 시작');
           photoURL = await uploadProfileImage(data.photoURI, user.uid);
+          console.log('[Step4] uploadProfileImage 성공, photoURL:', photoURL?.substring(0, 80));
         } catch (e) {
           console.warn('[Step4] 프로필 사진 업로드 실패:', e);
         }
+      } else {
+        console.log('[Step4] photoURI 없음, 사진 업로드 스킵');
       }
 
       // Firestore에 프로필 저장
