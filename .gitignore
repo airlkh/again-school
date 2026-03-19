@@ -40,5 +40,8 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# Dev Client
+*.dev.apk
+
 # generated native folders
 /ios

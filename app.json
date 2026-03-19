@@ -94,7 +94,8 @@
           "googleServicesFile": "./google-services.json",
           "iosUrlScheme": "com.googleusercontent.apps.414642537109-4hc2a5k1m3hqrultrdav3r19q36b377o"
         }
-      ]
+      ],
+      "expo-dev-client"
     ],
     "extra": {
       "router": {},
