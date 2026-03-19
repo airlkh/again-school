@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useVideoPlayer } from 'expo-video';
-import { getAuth } from 'firebase/auth';
 import { AppState } from 'react-native';
 
 interface PostMusic {
@@ -91,7 +90,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     return () => sub.remove();
   }, [musicUrl]);
 
-  async function playMusic(postId: string, music: PostMusic) {
+  function playMusic(postId: string, music: PostMusic) {
     currentPostIdRef.current = postId;
     currentMusicRef.current = music;
     setCurrentPostId(postId);
@@ -104,20 +103,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     const isPreview = postId === 'preview';
     startTimeRef.current = startTime;
     endTimeRef.current = duration > 0 ? startTime + duration : 0;
-
-    // Firebase Storage URL이면 토큰 추가
-    let url = music.url;
-    if (url.includes('firebasestorage.googleapis.com')) {
-      try {
-        const auth = getAuth();
-        const token = await auth.currentUser?.getIdToken();
-        if (token) {
-          url = url + (url.includes('?') ? '&' : '?') + 'token=' + token;
-        }
-      } catch {}
-    }
-
-    setMusicUrl(url);
+    setMusicUrl(music.url);
     setTimeout(() => {
       if (musicPlayer) {
         try {
