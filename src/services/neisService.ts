@@ -41,23 +41,7 @@ function mapSchoolType(rawType: string): string {
   return rawType;
 }
 
-// schools 마스터 컬렉션에서 학교 검색 (searchKeywords 인덱스 검색)
+// schools 마스터 컬렉션 검색 (현재 미사용 — NEIS API로 대체)
 export async function searchSchoolsFromMaster(query: string): Promise<NeisSchool[]> {
-  if (!query || query.trim().length < 2) return [];
-  try {
-    const { collection, getDocs, query: fsQuery, where, limit: fsLimit } = await import('firebase/firestore');
-    const { db } = await import('../config/firebase');
-    const keyword = query.trim().toLowerCase();
-    const q = fsQuery(
-      collection(db, 'schools'),
-      where('isActive', '==', true),
-      where('searchKeywords', 'array-contains', keyword),
-      fsLimit(20)
-    );
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(d => d.data() as NeisSchool);
-  } catch (e) {
-    console.warn('[neisService] 마스터 검색 실패:', e);
-    return [];
-  }
+  return [];
 }

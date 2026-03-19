@@ -56,15 +56,9 @@ export function SchoolInput({ schools, onSchoolsChange, birthYear }: SchoolInput
     }
     setIsSearching(true);
     searchTimerRef.current = setTimeout(async () => {
-      const [masterResults, neisResults] = await Promise.all([
-        searchSchoolsFromMaster(text).catch(() => [] as NeisSchool[]),
-        searchSchools(text),
-      ]);
-      // 마스터 우선, 중복 제거
-      const seen = new Set(masterResults.map(s => s.schoolName));
-      const merged = [...masterResults, ...neisResults.filter(s => !seen.has(s.schoolName))];
-      setSearchResults(merged);
-      setShowResults(merged.length > 0);
+      const neisResults = await searchSchools(text).catch(() => [] as NeisSchool[]);
+      setSearchResults(neisResults);
+      setShowResults(neisResults.length > 0);
       setIsSearching(false);
     }, 200);
   }
