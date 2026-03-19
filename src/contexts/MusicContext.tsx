@@ -43,10 +43,14 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   const currentMusicRef = useRef<PostMusic | null>(null);
 
   const musicPlayer = useVideoPlayer(musicUrl, (player) => {
+    console.log('[MusicContext] useVideoPlayer 콜백 호출됨, url:', musicUrl);
     player.loop = true;
     player.muted = isMutedRef.current;
     player.volume = currentMusicRef.current?.volume ?? 0.8;
-    if (musicUrl) player.play();
+    if (musicUrl) {
+      console.log('[MusicContext] player.play() 호출');
+      player.play();
+    }
   });
 
   useEffect(() => {
