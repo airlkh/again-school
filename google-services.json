@@ -12,7 +12,12 @@
           "package_name": "com.again.school"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "414642537109-4hc2a5k1m3hqrultrdav3r19q36b377o.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCEZSTbUfz0Ca1W2cOKPwR2e4p4qTXXPIQ"
@@ -20,7 +25,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "414642537109-4hc2a5k1m3hqrultrdav3r19q36b377o.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     },
@@ -31,7 +41,20 @@
           "package_name": "com.againschool.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "414642537109-1rvkvdtma5iv7fh2ti2jgvro0homdt6p.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.againschool.app",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "414642537109-4hc2a5k1m3hqrultrdav3r19q36b377o.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCEZSTbUfz0Ca1W2cOKPwR2e4p4qTXXPIQ"
@@ -39,7 +62,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "414642537109-4hc2a5k1m3hqrultrdav3r19q36b377o.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
