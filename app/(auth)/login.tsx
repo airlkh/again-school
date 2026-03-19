@@ -12,9 +12,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardScrollView } from '../../src/components/KeyboardScrollView';
 import { router } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
-import * as Google from 'expo-auth-session/providers/google';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import * as Crypto from 'expo-crypto';
 import { Colors } from '../../src/constants/colors';
 import { SocialLoginButton } from '../../src/components/SocialLoginButton';
@@ -27,8 +26,6 @@ import {
   signInWithKakaoCode,
   signInWithNaverCode,
 } from '../../src/services/authService';
-
-WebBrowser.maybeCompleteAuthSession();
 
 // TODO: 각 소셜 로그인 플랫폼의 실제 클라이언트 ID를 입력하세요.
 const KAKAO_CLIENT_ID = 'f8d17cb22bfe25d76c2347fa4fa7ecd8';
@@ -53,30 +50,41 @@ export default function LoginScreen() {
     state: string;
   } | null>(null);
 
-  // Google Auth Session
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    androidClientId: '414642537109-1rvkvdtma5iv7fh2ti2jgvro0homdt6p.apps.googleusercontent.com',
-    webClientId: '414642537109-4hc2a5k1m3hqrultrdav3r19q36b377o.apps.googleusercontent.com',
-  });
-
+  // Google Sign-In 초기화
   useEffect(() => {
-    if (response?.type === 'success') {
-      const { id_token } = response.params;
-      const credential = GoogleAuthProvider.credential(id_token);
+    GoogleSignin.configure({
+      webClientId: '414642537109-4hc2a5k1m3hqrultrdav3r19q36b377o.apps.googleusercontent.com',
+      offlineAccess: true,
+    });
+  }, []);
+
+  // ---- Google 로그인 ----
+
+  async function handleGoogleLogin() {
+    try {
       setSocialLoading('google');
-      signInWithCredential(auth, credential)
-        .then((result) => {
-          console.log('[Google Login] 성공:', result.user.email);
-        })
-        .catch((error) => {
-          console.error('[Google Login] 실패:', error);
-          Alert.alert('로그인 실패', 'Google 로그인에 실패했습니다.');
-        })
-        .finally(() => {
-          setSocialLoading(null);
-        });
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      const userInfo = await GoogleSignin.signIn();
+      const idToken = userInfo.data?.idToken ?? (userInfo as any).idToken;
+      if (!idToken) throw new Error('idToken을 가져올 수 없습니다');
+      const credential = GoogleAuthProvider.credential(idToken);
+      const result = await signInWithCredential(auth, credential);
+      console.log('[Google Login] 성공:', result.user.email);
+    } catch (error: any) {
+      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+        console.log('[Google Login] 사용자가 취소함');
+      } else if (error.code === statusCodes.IN_PROGRESS) {
+        console.log('[Google Login] 이미 진행 중');
+      } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        Alert.alert('오류', 'Google Play Services를 사용할 수 없습니다');
+      } else {
+        console.error('[Google Login] 오류:', error);
+        Alert.alert('오류', 'Google 로그인에 실패했습니다');
+      }
+    } finally {
+      setSocialLoading(null);
     }
-  }, [response]);
+  }
 
   // ---- 이메일 로그인 ----
 
@@ -268,7 +276,7 @@ export default function LoginScreen() {
               <View style={styles.socialRow}>
                 <SocialLoginButton
                   provider="google"
-                  onPress={() => promptAsync()}
+                  onPress={handleGoogleLogin}
                   isLoading={socialLoading === 'google'}
                 />
                 {Platform.OS === 'ios' ? (
