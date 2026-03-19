@@ -10,14 +10,19 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { sendEmailVerification } from 'firebase/auth';
+import { sendEmailVerification, signOut } from 'firebase/auth';
 import { Colors } from '../../src/constants/colors';
-import { useAuth } from '../../src/contexts/AuthContext';
+import { auth } from '../../src/config/firebase';
 
 const RESEND_COOLDOWN = 30;
 
+const ACTION_CODE_SETTINGS = {
+  url: 'https://again-school-bfea8.firebaseapp.com',
+  handleCodeInApp: false,
+};
+
 export default function VerifyEmailScreen() {
-  const { user } = useAuth();
+  const user = auth.currentUser;
   const [checking, setChecking] = useState(false);
   const [resendTimer, setResendTimer] = useState(RESEND_COOLDOWN);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -32,17 +37,18 @@ export default function VerifyEmailScreen() {
   }, []);
 
   async function handleCheckVerification() {
-    if (!user) return;
+    if (!auth.currentUser) return;
     setChecking(true);
     try {
-      await user.reload();
-      if (user.emailVerified) {
+      await auth.currentUser.reload();
+      if (auth.currentUser.emailVerified) {
         Alert.alert('인증 완료', '이메일 인증이 완료되었습니다!');
         router.replace('/(onboarding)/step1');
       } else {
-        Alert.alert('미인증', '아직 이메일 인증이 완료되지 않았습니다.\n메일함을 확인해주세요.');
+        Alert.alert('미인증', '아직 이메일 인증이 완료되지 않았습니다.\n이메일함을 확인해 주세요.');
       }
-    } catch {
+    } catch (e) {
+      console.error('[VerifyEmail] 확인 오류:', e);
       Alert.alert('오류', '인증 확인에 실패했습니다.');
     } finally {
       setChecking(false);
@@ -50,15 +56,23 @@ export default function VerifyEmailScreen() {
   }
 
   async function handleResend() {
-    if (!user || resendTimer > 0) return;
+    if (!auth.currentUser || resendTimer > 0) return;
     try {
-      await sendEmailVerification(user);
+      await sendEmailVerification(auth.currentUser, ACTION_CODE_SETTINGS);
       setResendTimer(RESEND_COOLDOWN);
+      console.log('[VerifyEmail] 재발송 성공:', auth.currentUser.email);
       Alert.alert('발송 완료', '인증 메일을 다시 발송했습니다.');
     } catch (e) {
       console.error('[VerifyEmail] 재발송 실패:', e);
-      Alert.alert('오류', '메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요.');
+      Alert.alert('오류', '메일 발송에 실패했습니다.\n잠시 후 다시 시도해주세요.');
     }
+  }
+
+  async function handleChangeEmail() {
+    try {
+      await signOut(auth);
+    } catch {}
+    router.replace('/(auth)/signup');
   }
 
   return (
@@ -72,11 +86,11 @@ export default function VerifyEmailScreen() {
           <Ionicons name="mail-outline" size={48} color={Colors.primary} />
         </View>
 
-        <Text style={styles.title}>인증 메일을 발송했습니다</Text>
+        <Text style={styles.title}>인증 링크를 발송했습니다</Text>
         <Text style={styles.email}>{user?.email}</Text>
         <Text style={styles.desc}>
-          위 이메일로 인증 링크를 발송했습니다.{'\n'}
-          메일함을 확인하고 링크를 클릭한 후{'\n'}
+          입력하신 이메일로 인증 링크를 발송했습니다.{'\n'}
+          이메일의 링크를 클릭한 후{'\n'}
           아래 버튼을 눌러주세요.
         </Text>
 
@@ -102,6 +116,10 @@ export default function VerifyEmailScreen() {
           <Text style={[styles.resendText, resendTimer > 0 && styles.resendTextDisabled]}>
             {resendTimer > 0 ? `재발송 (${resendTimer}초)` : '인증 메일 재발송'}
           </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={handleChangeEmail} style={styles.backLink}>
+          <Text style={styles.backLinkText}>다른 이메일로 가입</Text>
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => router.replace('/(auth)/login')} style={styles.backLink}>
@@ -168,6 +186,6 @@ const styles = StyleSheet.create({
   resendDisabled: { borderColor: Colors.inactive },
   resendText: { fontSize: 15, fontWeight: '600', color: Colors.primary },
   resendTextDisabled: { color: Colors.inactive },
-  backLink: { padding: 8 },
+  backLink: { padding: 8, marginTop: 4 },
   backLinkText: { fontSize: 14, color: Colors.textSecondary },
 });

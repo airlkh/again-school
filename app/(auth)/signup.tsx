@@ -51,9 +51,12 @@ export default function SignupScreen() {
         console.warn('[Signup] provider 저장 실패 (무시):', e);
       }
 
-      // 이메일 인증 발송
+      // 이메일 인증 링크 발송
       try {
-        await sendEmailVerification(userCredential.user);
+        await sendEmailVerification(userCredential.user, {
+          url: 'https://again-school-bfea8.firebaseapp.com',
+          handleCodeInApp: false,
+        });
         console.log('[Signup] 인증 메일 발송 성공:', userCredential.user.email);
       } catch (e) {
         console.warn('[Signup] 인증 메일 발송 실패:', e);
