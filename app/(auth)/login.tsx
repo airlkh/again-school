@@ -14,19 +14,18 @@ import { KeyboardScrollView } from '../../src/components/KeyboardScrollView';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
-import * as AuthSession from 'expo-auth-session';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
 import { Colors } from '../../src/constants/colors';
 import { SocialLoginButton } from '../../src/components/SocialLoginButton';
 import { OAuthWebView } from '../../src/components/OAuthWebView';
+import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
+import { auth } from '../../src/config/firebase';
 import {
   signInWithEmail,
-  signInWithGoogle,
   signInWithApple,
   signInWithKakaoCode,
   signInWithNaverCode,
-
 } from '../../src/services/authService';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -55,23 +54,27 @@ export default function LoginScreen() {
   } | null>(null);
 
   // Google Auth Session
-  const redirectUri = AuthSession.makeRedirectUri({
-    scheme: 'again-school',
-    path: 'oauth2redirect/google',
-  });
-
-  const [, response, promptAsync] = Google.useAuthRequest({
+  const [request, response, promptAsync] = Google.useAuthRequest({
     androidClientId: '414642537109-1rvkvdtma5iv7fh2ti2jgvro0homdt6p.apps.googleusercontent.com',
     webClientId: '414642537109-4hc2a5k1m3hqrultrdav3r19q36b377o.apps.googleusercontent.com',
-    redirectUri,
   });
 
   useEffect(() => {
     if (response?.type === 'success') {
-      const idToken = response.params?.id_token;
-      if (idToken) {
-        handleGoogleSignIn(idToken);
-      }
+      const { id_token } = response.params;
+      const credential = GoogleAuthProvider.credential(id_token);
+      setSocialLoading('google');
+      signInWithCredential(auth, credential)
+        .then((result) => {
+          console.log('[Google Login] 성공:', result.user.email);
+        })
+        .catch((error) => {
+          console.error('[Google Login] 실패:', error);
+          Alert.alert('로그인 실패', 'Google 로그인에 실패했습니다.');
+        })
+        .finally(() => {
+          setSocialLoading(null);
+        });
     }
   }, [response]);
 
@@ -95,19 +98,6 @@ export default function LoginScreen() {
       Alert.alert('로그인 실패', message);
     } finally {
       setIsLoading(false);
-    }
-  }
-
-  // ---- Google 로그인 ----
-
-  async function handleGoogleSignIn(idToken: string) {
-    setSocialLoading('google');
-    try {
-      await signInWithGoogle(idToken);
-    } catch {
-      Alert.alert('로그인 실패', 'Google 로그인에 실패했습니다.');
-    } finally {
-      setSocialLoading(null);
     }
   }
 
