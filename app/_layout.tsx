@@ -9,7 +9,7 @@ import { MusicProvider } from '../src/contexts/MusicContext';
 import { MuteProvider } from '../src/contexts/MuteContext';
 import { UserProvider } from '../src/contexts/UserContext';
 import { migrateDummyMeetups } from '../src/services/meetupService';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../src/config/firebase';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -45,10 +45,10 @@ function RootLayoutNav() {
 
     const updateStatus = async (online: boolean) => {
       try {
-        await updateDoc(doc(db, 'users', user.uid), {
+        await setDoc(doc(db, 'users', user.uid), {
           isOnline: online,
           lastSeen: serverTimestamp(),
-        });
+        }, { merge: true });
       } catch (e) {
         console.warn('[RootLayout] 상태 업데이트 실패:', e);
       }

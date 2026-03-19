@@ -55,18 +55,35 @@ export function useAlumniRecommendations() {
         } else {
           try {
             const token = await auth.currentUser?.getIdToken();
+            if (!token) {
+              setLoading(false);
+              return;
+            }
             const res = await fetch(FUNCTION_URL, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
               body: JSON.stringify({}),
             });
-            const result = await res.json();
+            if (!res.ok) {
+              console.warn('[useAlumniRecommendations] 서버 응답 오류:', res.status);
+              setRecommendations([]);
+              setLoading(false);
+              return;
+            }
+            const text = await res.text();
+            if (!text) {
+              setRecommendations([]);
+              setLoading(false);
+              return;
+            }
+            const result = JSON.parse(text);
             const raw = (result.recommendations || []).slice(0, 20) as AlumniRecommend[];
             rawRef.current = raw;
             const enriched = await enrichWithLatestPhotos(raw);
             setRecommendations(enriched);
           } catch (e) {
             console.warn('[useAlumniRecommendations] 추천 생성 실패:', e);
+            setRecommendations([]);
           } finally {
             setLoading(false);
           }
