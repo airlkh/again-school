@@ -43,8 +43,22 @@ export default function SignupScreen() {
       console.log('[Signup] 회원가입 시도:', email.trim());
       const userCredential = await signUpWithEmail(email.trim(), password);
       console.log('[Signup] 회원가입 성공:', userCredential.user.uid);
-      await setDoc(doc(db, 'users', userCredential.user.uid), { provider: 'email', updatedAt: serverTimestamp() }, { merge: true });
-      await sendEmailVerification(userCredential.user);
+
+      // provider 저장 (실패해도 진행)
+      try {
+        await setDoc(doc(db, 'users', userCredential.user.uid), { provider: 'email', updatedAt: serverTimestamp() }, { merge: true });
+      } catch (e) {
+        console.warn('[Signup] provider 저장 실패 (무시):', e);
+      }
+
+      // 이메일 인증 발송
+      try {
+        await sendEmailVerification(userCredential.user);
+        console.log('[Signup] 인증 메일 발송 성공:', userCredential.user.email);
+      } catch (e) {
+        console.warn('[Signup] 인증 메일 발송 실패:', e);
+      }
+
       router.replace('/(auth)/verify-email');
     } catch (error: any) {
       console.error('[Signup] 회원가입 실패:', error.code, error.message);

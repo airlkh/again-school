@@ -55,7 +55,8 @@ export default function VerifyEmailScreen() {
       await sendEmailVerification(user);
       setResendTimer(RESEND_COOLDOWN);
       Alert.alert('발송 완료', '인증 메일을 다시 발송했습니다.');
-    } catch {
+    } catch (e) {
+      console.error('[VerifyEmail] 재발송 실패:', e);
       Alert.alert('오류', '메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요.');
     }
   }

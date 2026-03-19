@@ -414,13 +414,16 @@ export default function ProfileScreen() {
     setCropTargetUri('');
     if (!user) return;
 
+    console.log('[Profile] handleCropDone, croppedUri:', croppedUri?.substring(0, 60));
     setUploadingPhoto(true);
     try {
       const uploaded = await uploadImage(croppedUri);
       const newPhotoURL = uploaded.url;
+      console.log('[Profile] uploadImage 성공, newPhotoURL:', newPhotoURL?.substring(0, 80));
 
       await updateProfile(user, { photoURL: newPhotoURL });
       await updateUserProfile(user.uid, { photoURL: newPhotoURL });
+      console.log('[Profile] Auth + Firestore photoURL 업데이트 완료');
 
       // 관련 컬렉션 동기화 (실패해도 프로필 사진 변경은 유지)
       try {
@@ -464,7 +467,8 @@ export default function ProfileScreen() {
       }
 
       Alert.alert('완료', '프로필 사진이 변경되었습니다.');
-    } catch {
+    } catch (err) {
+      console.error('[Profile] 사진 업로드 실패:', err);
       Alert.alert('오류', '사진 업로드에 실패했습니다.');
     } finally {
       setUploadingPhoto(false);
