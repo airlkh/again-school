@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createAudioPlayer, setAudioModeAsync, AudioPlayer } from 'expo-audio';
+import { useVideoPlayer } from 'expo-video';
 import { AppState } from 'react-native';
 
 interface PostMusic {
@@ -37,97 +37,94 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   const [currentPostId, setCurrentPostId] = useState<string | null>(null);
   const endTimeRef = useRef<number>(0);
   const startTimeRef = useRef<number>(0);
+  const [musicUrl, setMusicUrl] = useState('');
   const isMutedRef = useRef(false);
   const currentPostIdRef = useRef<string | null>(null);
   const currentMusicRef = useRef<PostMusic | null>(null);
-  const playerRef = useRef<AudioPlayer | null>(null);
-  const timeCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const musicPlayer = useVideoPlayer(musicUrl, (player) => {
+    player.loop = true;
+    player.muted = isMutedRef.current;
+    player.volume = currentMusicRef.current?.volume ?? 0.8;
+    if (musicUrl) player.play();
+  });
 
   useEffect(() => {
     AsyncStorage.getItem(MUTE_KEY).then((val) => {
       const muted = val === 'true';
       setIsMuted(muted);
       isMutedRef.current = muted;
+      if (musicPlayer) musicPlayer.muted = muted;
     });
   }, []);
 
   useEffect(() => {
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state !== 'active') {
-        try { playerRef.current?.pause(); } catch {}
-      } else if (state === 'active' && !isMutedRef.current && playerRef.current) {
-        try { playerRef.current.play(); } catch {}
+    if (!musicPlayer) return;
+    musicPlayer.timeUpdateEventInterval = 0.5;
+    const sub = musicPlayer.addListener('timeUpdate', (payload) => {
+      const current = payload.currentTime;
+      const end = endTimeRef.current;
+      const start = startTimeRef.current;
+      if (end > 0 && current >= end) {
+        try {
+          musicPlayer.currentTime = start;
+          if (!isMutedRef.current) musicPlayer.play();
+        } catch {}
       }
     });
     return () => sub.remove();
-  }, []);
+  }, [musicPlayer]);
 
-  function stopTimeCheck() {
-    if (timeCheckRef.current) {
-      clearInterval(timeCheckRef.current);
-      timeCheckRef.current = null;
-    }
-  }
-
-  function startTimeCheck() {
-    stopTimeCheck();
-    timeCheckRef.current = setInterval(() => {
-      const player = playerRef.current;
-      if (!player) return;
-      const end = endTimeRef.current;
-      const start = startTimeRef.current;
-      if (end > 0 && player.currentTime >= end) {
-        try {
-          player.seekTo(start);
-          if (!isMutedRef.current) player.play();
-        } catch {}
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' && musicPlayer) {
+        try { musicPlayer.pause(); } catch {}
+      } else if (state === 'active' && musicPlayer && musicUrl && !isMutedRef.current) {
+        try { musicPlayer.play(); } catch {}
       }
-    }, 500);
-  }
+    });
+    return () => sub.remove();
+  }, [musicUrl]);
 
-  function stopPlayer() {
-    stopTimeCheck();
-    if (playerRef.current) {
-      try { playerRef.current.pause(); } catch {}
-      try { playerRef.current.remove(); } catch {}
-      playerRef.current = null;
-    }
-  }
-
-  async function playMusic(postId: string, music: PostMusic) {
-    stopPlayer();
+  function playMusic(postId: string, music: PostMusic) {
     currentPostIdRef.current = postId;
     currentMusicRef.current = music;
     setCurrentPostId(postId);
+    if (musicPlayer) {
+      musicPlayer.volume = music.volume ?? 0.8;
+      musicPlayer.muted = isMutedRef.current;
+    }
     const startTime = music.startTime ?? 0;
     const duration = music.duration ?? 0;
     const isPreview = postId === 'preview';
     startTimeRef.current = startTime;
     endTimeRef.current = duration > 0 ? startTime + duration : 0;
-    try {
-      await setAudioModeAsync({ playsInSilentMode: true });
-      const player = createAudioPlayer({ uri: music.url });
-      player.volume = music.volume ?? 0.8;
-      playerRef.current = player;
-      setTimeout(async () => {
+    setMusicUrl(music.url);
+    setTimeout(() => {
+      if (musicPlayer) {
         try {
-          if (startTime > 0) await player.seekTo(startTime);
-          if (isPreview || !isMutedRef.current) {
-            player.play();
-            startTimeCheck();
+          if (startTime > 0) musicPlayer.currentTime = startTime;
+          if (isPreview) {
+            musicPlayer.muted = false;
+            musicPlayer.play();
+          } else if (!isMutedRef.current) {
+            musicPlayer.play();
           }
         } catch {}
-      }, 300);
-    } catch {}
+      }
+    }, 300);
   }
 
   function stopMusic() {
-    stopPlayer();
     currentPostIdRef.current = null;
     startTimeRef.current = 0;
     endTimeRef.current = 0;
     currentMusicRef.current = null;
     setCurrentPostId(null);
+    setMusicUrl('');
+    if (musicPlayer) {
+      try { musicPlayer.pause(); } catch {}
+    }
   }
 
   function toggleMute() {
@@ -135,11 +132,10 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     setIsMuted(next);
     isMutedRef.current = next;
     AsyncStorage.setItem(MUTE_KEY, String(next));
-    if (playerRef.current) {
-      if (next) {
-        try { playerRef.current.pause(); } catch {}
-      } else {
-        try { playerRef.current.play(); } catch {}
+    if (musicPlayer) {
+      musicPlayer.muted = next;
+      if (!next && musicUrl) {
+        try { musicPlayer.play(); } catch {}
       }
     }
   }
