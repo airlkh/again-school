@@ -66,7 +66,7 @@ export function SchoolInput({ schools, onSchoolsChange, birthYear }: SchoolInput
       setSearchResults(merged);
       setShowResults(merged.length > 0);
       setIsSearching(false);
-    }, 500);
+    }, 200);
   }
 
   const [isAutoYear, setIsAutoYear] = useState(!!birthYear);
