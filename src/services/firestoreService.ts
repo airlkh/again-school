@@ -38,18 +38,21 @@ export async function saveUserProfile(
     photoURL: string | null;
     schools: SchoolEntry[];
     region: { sido: string; sigungu: string };
+    birthYear?: number;
   },
 ): Promise<void> {
   const docRef = doc(db, 'users', uid);
   const now = Date.now();
 
   const searchKeywords = generateSearchKeywords(data.displayName, data.schools);
+  const schoolNames = data.schools.map((s) => s.schoolName);
 
-  const profile = {
+  const profile: Record<string, any> = {
     uid,
     displayName: data.displayName,
     photoURL: data.photoURL,
     schools: data.schools,
+    schoolNames,
     region: data.region,
     onboardingCompleted: true,
     searchKeywords,
@@ -57,7 +60,21 @@ export async function saveUserProfile(
     updatedAt: now,
   };
 
+  if (data.birthYear) {
+    profile.birthYear = data.birthYear;
+  }
+
   await setDoc(docRef, profile, { merge: true });
+
+  // Firebase Auth 프로필도 동기화
+  const { auth } = await import('../config/firebase');
+  if (auth.currentUser) {
+    const { updateProfile } = await import('firebase/auth');
+    await updateProfile(auth.currentUser, {
+      displayName: data.displayName,
+      ...(data.photoURL ? { photoURL: data.photoURL } : {}),
+    });
+  }
 }
 
 export async function countClassmates(schools: SchoolEntry[]): Promise<number> {
