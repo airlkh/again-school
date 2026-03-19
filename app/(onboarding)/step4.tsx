@@ -17,8 +17,7 @@ import {
   saveUserProfile,
   countClassmates,
 } from '../../src/services/firestoreService';
-// TODO: Firebase Storage 활성화 후 프로필 사진 업로드 추가
-// import { uploadProfilePhoto } from '../../src/services/storageService';
+import { uploadProfileImage } from '../../src/services/storageService';
 
 export default function Step4Screen() {
   const { colors, isDark } = useTheme();
@@ -40,11 +39,20 @@ export default function Step4Screen() {
     try {
       setIsSaving(true);
 
-      // Firestore에 프로필 저장 (기본 아바타 사용)
-      // TODO: Storage 활성화 후 photoURL에 업로드된 사진 URL 저장
+      // 프로필 사진 업로드
+      let photoURL: string | null = null;
+      if (data.photoURI) {
+        try {
+          photoURL = await uploadProfileImage(data.photoURI, user.uid);
+        } catch (e) {
+          console.warn('[Step4] 프로필 사진 업로드 실패:', e);
+        }
+      }
+
+      // Firestore에 프로필 저장
       await saveUserProfile(user.uid, {
         displayName: data.displayName,
-        photoURL: null,
+        photoURL,
         schools: data.schools,
         region: data.region,
         ...(data.birthYear ? { birthYear: data.birthYear } : {}),

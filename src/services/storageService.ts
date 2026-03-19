@@ -1,18 +1,27 @@
-// TODO: Firebase Storage를 사용한 프로필 사진 업로드
-// Storage 활성화 후 아래 주석을 해제하세요.
-//
-// import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-// import { storage } from '../config/firebase';
-//
-// export async function uploadProfilePhoto(
-//   uid: string,
-//   uri: string,
-// ): Promise<string> {
-//   const response = await fetch(uri);
-//   const blob = await response.blob();
-//
-//   const storageRef = ref(storage, `profile-photos/${uid}`);
-//   await uploadBytes(storageRef, blob);
-//
-//   return getDownloadURL(storageRef);
-// }
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { updateProfile } from 'firebase/auth';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { storage, auth, db } from '../config/firebase';
+
+export async function uploadProfileImage(
+  uri: string,
+  uid: string,
+): Promise<string> {
+  const response = await fetch(uri);
+  const blob = await response.blob();
+
+  const storageRef = ref(storage, `profiles/${uid}/avatar.jpg`);
+  await uploadBytes(storageRef, blob);
+  const downloadURL = await getDownloadURL(storageRef);
+
+  await updateDoc(doc(db, 'users', uid), {
+    photoURL: downloadURL,
+    updatedAt: serverTimestamp(),
+  });
+
+  if (auth.currentUser) {
+    await updateProfile(auth.currentUser, { photoURL: downloadURL });
+  }
+
+  return downloadURL;
+}

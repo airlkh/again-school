@@ -29,8 +29,7 @@ import { getFirestore } from 'firebase/firestore';
 
 export const db = getFirestore(app);
 
-// TODO: Firebase Storage 사용 시 아래 주석 해제
-// import { getStorage } from 'firebase/storage';
-// export const storage = getStorage(app);
+import { getStorage } from 'firebase/storage';
+export const storage = getStorage(app);
 
 export default app;

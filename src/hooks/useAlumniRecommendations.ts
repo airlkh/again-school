@@ -12,7 +12,7 @@ export interface AlumniRecommend {
   reasonDetail: string;
 }
 
-const FUNCTION_URL = 'https://us-central1-again-school-bfea8.cloudfunctions.net/generateAlumniRecommendations';
+const FUNCTION_URL = 'https://asia-northeast3-again-school-bfea8.cloudfunctions.net/generateAlumniRecommendations';
 
 async function enrichWithLatestPhotos(items: AlumniRecommend[]): Promise<AlumniRecommend[]> {
   return Promise.all(

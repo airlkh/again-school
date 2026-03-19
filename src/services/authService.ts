@@ -43,9 +43,7 @@ export function signInWithApple(identityToken: string, nonce: string) {
 
 // ---- 카카오 로그인 (Cloud Function 경유) ----
 // Cloud Function이 authorization code를 받아 Firebase custom token을 반환합니다.
-// TODO: Cloud Function 배포 후 실제 URL로 교체하세요.
-
-const CLOUD_FUNCTION_BASE = 'https://us-central1-again-school-bfea8.cloudfunctions.net';
+const CLOUD_FUNCTION_BASE = 'https://asia-northeast3-again-school-bfea8.cloudfunctions.net';
 
 export async function signInWithKakaoCode(authorizationCode: string) {
   const response = await fetch(`${CLOUD_FUNCTION_BASE}/kakaoAuth`, {

@@ -11,24 +11,41 @@ import {
   ScrollView,
   Modal,
   FlatList,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { StepIndicator } from '../../src/components/StepIndicator';
 import { useOnboarding } from './_layout';
 import { BIRTH_YEAR_RANGE, getSchoolYears } from '../../src/utils/graduationYear';
 
-// TODO: Firebase Storage 활성화 후 프로필 사진 업로드 기능 추가
-// import * as ImagePicker from 'expo-image-picker';
-
 export default function Step1Screen() {
   const { colors, isDark } = useTheme();
   const { data, updateData } = useOnboarding();
   const [name, setName] = useState(data.displayName);
+  const [photoURI, setPhotoURI] = useState<string | null>(data.photoURI);
   const [birthYear, setBirthYear] = useState(data.birthYear || 0);
   const [showBirthYearPicker, setShowBirthYearPicker] = useState(false);
+
+  async function pickImage() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('권한 필요', '사진 접근 권한을 허용해주세요.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setPhotoURI(result.assets[0].uri);
+    }
+  }
   const birthYears = Array.from({ length: BIRTH_YEAR_RANGE.max - BIRTH_YEAR_RANGE.min + 1 }, (_, i) => BIRTH_YEAR_RANGE.max - i);
 
   function handleNext() {
@@ -40,7 +57,7 @@ export default function Step1Screen() {
       Alert.alert('입력 오류', '출생년도를 선택해주세요.');
       return;
     }
-    updateData({ displayName: name.trim(), birthYear });
+    updateData({ displayName: name.trim(), birthYear, photoURI });
     router.push('/(onboarding)/step2');
   }
 
@@ -66,23 +83,31 @@ export default function Step1Screen() {
           <StepIndicator totalSteps={4} currentStep={1} />
 
           <View style={styles.content}>
-            {/* 기본 아바타 */}
+            {/* 프로필 사진 */}
             <View style={styles.avatarContainer}>
-              <View
-                style={[
-                  styles.avatar,
-                  {
-                    backgroundColor: colors.card,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <Ionicons name="person" size={48} color={colors.inactive} />
-              </View>
+              <TouchableOpacity onPress={pickImage} activeOpacity={0.8}>
+                {photoURI ? (
+                  <Image source={{ uri: photoURI }} style={styles.avatarImage} />
+                ) : (
+                  <View
+                    style={[
+                      styles.avatar,
+                      {
+                        backgroundColor: colors.card,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  >
+                    <Ionicons name="person" size={48} color={colors.inactive} />
+                  </View>
+                )}
+                <View style={[styles.cameraIcon, { backgroundColor: colors.primary }]}>
+                  <Ionicons name="camera" size={16} color="#fff" />
+                </View>
+              </TouchableOpacity>
               <Text style={[styles.avatarHint, { color: colors.inactive }]}>
-                기본 프로필 이미지
+                {photoURI ? '탭하여 변경' : '탭하여 사진 추가'}
               </Text>
-              {/* TODO: Storage 활성화 후 사진 변경 버튼 추가 */}
             </View>
 
             {/* 이름 입력 */}
@@ -192,6 +217,23 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  avatarImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+  },
+  cameraIcon: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
   },
   avatarHint: {
     fontSize: 13,

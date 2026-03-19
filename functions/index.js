@@ -19,7 +19,7 @@ admin.initializeApp({
 });
 
 // ── 카카오 로그인 ──────────────────────────────────────────────
-exports.kakaoAuth = functions.https.onRequest(async (req, res) => {
+exports.kakaoAuth = functions.region("asia-northeast3").https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type');
@@ -74,7 +74,7 @@ exports.kakaoAuth = functions.https.onRequest(async (req, res) => {
 });
 
 // ── 네이버 로그인 ──────────────────────────────────────────────
-exports.naverAuth = functions.https.onRequest(async (req, res) => {
+exports.naverAuth = functions.region("asia-northeast3").https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type');
@@ -183,7 +183,7 @@ function calcAlumniScore(me, target, friendUids, friendOfFriendUids) {
   return { score, commonSchools, reason: reasons[0] || '같은 학교 출신', reasonDetail: reasons.slice(0, 2).join(' · ') };
 }
 
-exports.generateAlumniRecommendations = functions.https.onRequest(async (req, res) => {
+exports.generateAlumniRecommendations = functions.region("asia-northeast3").https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -235,7 +235,7 @@ exports.generateAlumniRecommendations = functions.https.onRequest(async (req, re
   res.json({ recommendations: top20.slice(0, 5) });
 });
 
-exports.scheduledAlumniRecommendations = functions.scheduler.onSchedule({ schedule: '0 3 * * *', timeZone: 'Asia/Seoul' }, async () => {
+exports.scheduledAlumniRecommendations = functions.region("asia-northeast3").scheduler.onSchedule({ schedule: '0 3 * * *', timeZone: 'Asia/Seoul' }, async () => {
   const usersSnap = await db.collection('users').limit(500).get();
   let count = 0;
   for (const userDoc of usersSnap.docs) {
