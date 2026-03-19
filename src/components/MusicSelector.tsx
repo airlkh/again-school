@@ -107,11 +107,14 @@ export function MusicSelector({ selectedMusic, onChange, isVideo = false }: Prop
     try {
       await setAudioModeAsync({ playsInSilentMode: true });
       const player = createAudioPlayer({ uri: url });
-      player.volume = 0.8;
-      await player.seekTo(startTime);
-      player.play();
       previewSoundRef.current = player;
-      previewTimerRef.current = setTimeout(() => { stopPreview(); }, 2000);
+      setTimeout(async () => {
+        try {
+          if (startTime > 0) await player.seekTo(startTime);
+          player.play();
+          previewTimerRef.current = setTimeout(() => { stopPreview(); }, 2000);
+        } catch {}
+      }, 300);
     } catch {}
   }
 
@@ -121,9 +124,11 @@ export function MusicSelector({ selectedMusic, onChange, isVideo = false }: Prop
     try {
       await setAudioModeAsync({ playsInSilentMode: true });
       const player = createAudioPlayer({ uri: item.url });
-      player.play();
       soundRef.current = player;
       setPlayingId(item.id);
+      setTimeout(() => {
+        try { player.play(); } catch {}
+      }, 300);
     } catch (e) {
       console.warn('재생 실패:', e);
     }
