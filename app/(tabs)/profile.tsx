@@ -35,7 +35,7 @@ import { UserProfile, SchoolEntry, UserPrivacySettings, ConnectionRequest } from
 import { useSchoolMemberCounts } from '../../src/hooks/useSchoolMemberCount';
 import { getAvatarSource } from '../../src/utils/avatar';
 import { CropEditor } from '../../src/components/CropEditor';
-import { doc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs, writeBatch, onSnapshot, orderBy, limit, startAfter, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs, writeBatch, onSnapshot, orderBy, limit, startAfter, QueryDocumentSnapshot, DocumentData, getCountFromServer } from 'firebase/firestore';
 import { updateProfile } from 'firebase/auth';
 import { db } from '../../src/config/firebase';
 import { getTrustBadge, TRUST_BADGE_INFO } from '../../src/hooks/useTrust';
@@ -245,6 +245,7 @@ export default function ProfileScreen() {
 
   // 사용자 게시물 (페이징)
   const [userPosts, setUserPosts] = useState<FirestorePost[]>([]);
+  const [totalPostCount, setTotalPostCount] = useState(0);
   const [loadingPosts, setLoadingPosts] = useState(false);
   const lastPostDoc = useRef<QueryDocumentSnapshot<DocumentData> | null>(null);
   const hasMoreRef = useRef(true);
@@ -303,6 +304,15 @@ export default function ProfileScreen() {
       setLoadingPosts(false);
     }
   }, [user?.uid]);
+
+  // 게시물 전체 수 조회
+  useEffect(() => {
+    if (!user?.uid) return;
+    const q = query(collection(db, 'posts'), where('authorUid', '==', user.uid));
+    getCountFromServer(q)
+      .then((snap) => setTotalPostCount(snap.data().count))
+      .catch(() => {});
+  }, [user?.uid, userPosts.length]); // userPosts 변경 시 갱신
 
   // 프로필 구독
   useEffect(() => {
@@ -663,7 +673,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
-            <Text style={[styles.statNumber, { color: colors.text }]}>{userPosts.length}</Text>
+            <Text style={[styles.statNumber, { color: colors.text }]}>{totalPostCount}</Text>
             <Text style={[styles.statLabel, { color: colors.textSecondary }]}>게시물</Text>
           </View>
           <TouchableOpacity style={styles.statItem} onPress={() => { setConnectionsTab('connected'); setShowConnectionsModal(true); }}>
@@ -788,7 +798,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </View>
     </>
-  ), [photoUrl, uploadingPhoto, userPosts.length, connectedCount, sentCount, receivedCount, displayName, job, region, schools, trustCount, schoolTrustCounts, colors, isDark, user?.uid]);
+  ), [photoUrl, uploadingPhoto, totalPostCount, connectedCount, sentCount, receivedCount, displayName, job, region, schools, trustCount, schoolTrustCounts, colors, isDark, user?.uid]);
 
   // ─── ListFooterComponent (useMemo로 안정화) ───
   const listFooter = useMemo(() => (
