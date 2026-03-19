@@ -123,7 +123,7 @@ export const HorizontalSlider: React.FC<HorizontalSliderProps> = ({
         width: THUMB,
         height: THUMB,
         borderRadius: THUMB / 2,
-        backgroundColor: '#e8313a',
+        backgroundColor: '#FF3124',
         top: 8,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },

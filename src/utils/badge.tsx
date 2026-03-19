@@ -16,7 +16,7 @@ export const TRUST_BADGE_INFO = {
   newbie: { icon: '🌱', label: '새싹 동창', color: '#4CAF50' },
   verified: { icon: '✅', label: '인증 동창', color: '#2196F3' },
   trusted: { icon: '⭐', label: '신뢰 동창', color: '#FF9800' },
-  legend: { icon: '🏆', label: '레전드 동창', color: '#e8313a' },
+  legend: { icon: '🏆', label: '레전드 동창', color: '#FF3124' },
 };
 
 export type TrustBadgeKey = keyof typeof TRUST_BADGE_INFO;

@@ -145,7 +145,7 @@ export default function MeetupScreen() {
             refreshing={refreshing}
             onRefresh={onRefresh}
             tintColor={colors.primary}
-            colors={['#e8313a']}
+            colors={['#FF3124']}
           />
         }
         ListEmptyComponent={

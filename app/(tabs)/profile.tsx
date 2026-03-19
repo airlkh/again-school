@@ -803,7 +803,7 @@ export default function ProfileScreen() {
             <Text style={styles.schoolEmoji}>💼</Text>
             <View style={styles.schoolInfo}>
               <Text style={[styles.schoolName, { color: colors.text }]}>{workplace}</Text>
-              <Text style={[styles.schoolPublicLabel, { color: (privacySettings?.showWorkplace ?? true) ? '#4CAF50' : '#e8313a' }]}>
+              <Text style={[styles.schoolPublicLabel, { color: (privacySettings?.showWorkplace ?? true) ? '#4CAF50' : '#FF3124' }]}>
                 {(privacySettings?.showWorkplace ?? true) ? '🔓 동창에게 공개' : '🔒 비공개'}
               </Text>
             </View>
@@ -843,7 +843,7 @@ export default function ProfileScreen() {
           <Switch
             value={privacySettings.showSchools}
             onValueChange={(val) => handleSavePrivacy({ ...privacySettings, showSchools: val })}
-            trackColor={{ false: isDark ? '#555' : '#ddd', true: '#e8313a' }}
+            trackColor={{ false: isDark ? '#555' : '#ddd', true: '#FF3124' }}
             thumbColor="#fff"
           />
         </View>
@@ -858,7 +858,7 @@ export default function ProfileScreen() {
           <Switch
             value={privacySettings.showWorkplace}
             onValueChange={(val) => handleSavePrivacy({ ...privacySettings, showWorkplace: val })}
-            trackColor={{ false: isDark ? '#555' : '#ddd', true: '#e8313a' }}
+            trackColor={{ false: isDark ? '#555' : '#ddd', true: '#FF3124' }}
             thumbColor="#fff"
           />
         </View>
@@ -1037,7 +1037,7 @@ export default function ProfileScreen() {
                 <Switch
                   value={newIsPublic}
                   onValueChange={setNewIsPublic}
-                  trackColor={{ false: isDark ? '#555' : '#ddd', true: '#e8313a' }}
+                  trackColor={{ false: isDark ? '#555' : '#ddd', true: '#FF3124' }}
                   thumbColor="#fff"
                 />
               </View>
@@ -1095,7 +1095,7 @@ export default function ProfileScreen() {
                     const updated = { ...privacySettings, showWorkplace: val };
                     setPrivacySettings(updated);
                   }}
-                  trackColor={{ false: isDark ? '#555' : '#ddd', true: '#e8313a' }}
+                  trackColor={{ false: isDark ? '#555' : '#ddd', true: '#FF3124' }}
                   thumbColor="#fff"
                 />
               </View>

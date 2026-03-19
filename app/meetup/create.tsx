@@ -272,13 +272,13 @@ export default function MeetupCreateScreen() {
                   {/* 색상 선택 */}
                   <Text style={styles.textPanelLabel}>텍스트 색상</Text>
                   <View style={styles.colorRow}>
-                    {['#ffffff', '#000000', '#e8313a', '#FFD700', '#00C851', '#2196F3', '#FF69B4', '#FF8C00'].map((c) => (
+                    {['#ffffff', '#000000', '#FF3124', '#FFD700', '#00C851', '#2196F3', '#FF69B4', '#FF8C00'].map((c) => (
                       <TouchableOpacity
                         key={c}
                         onPress={() => setTextColor(c)}
                         style={[
                           styles.colorCircle,
-                          { backgroundColor: c, borderColor: textColor === c ? '#e8313a' : 'rgba(0,0,0,0.2)', borderWidth: textColor === c ? 3 : 1 },
+                          { backgroundColor: c, borderColor: textColor === c ? '#FF3124' : 'rgba(0,0,0,0.2)', borderWidth: textColor === c ? 3 : 1 },
                         ]}
                       />
                     ))}
@@ -299,9 +299,9 @@ export default function MeetupCreateScreen() {
                           paddingHorizontal: 12,
                           paddingVertical: 7,
                           borderRadius: 8,
-                          backgroundColor: textBgStyle === b.key ? '#e8313a' : colors.background,
+                          backgroundColor: textBgStyle === b.key ? '#FF3124' : colors.background,
                           borderWidth: 1,
-                          borderColor: textBgStyle === b.key ? '#e8313a' : colors.border,
+                          borderColor: textBgStyle === b.key ? '#FF3124' : colors.border,
                         }}
                       >
                         <Text style={{ fontSize: 12, color: textBgStyle === b.key ? '#fff' : colors.text, fontWeight: '600' }}>
@@ -733,7 +733,7 @@ const styles = StyleSheet.create({
   sliderLabel: { fontWeight: '700' },
   sliderTrackWrap: { flex: 1, height: 40, justifyContent: 'center', position: 'relative' as const },
   sliderTrack: { position: 'absolute' as const, left: 0, right: 0, height: 4, borderRadius: 2 },
-  sliderTrackFill: { position: 'absolute' as const, left: 0, height: 4, borderRadius: 2, backgroundColor: '#e8313a' },
+  sliderTrackFill: { position: 'absolute' as const, left: 0, height: 4, borderRadius: 2, backgroundColor: '#FF3124' },
   textPanelHint: { fontSize: 12, color: '#999', textAlign: 'center' },
 
   // DateTime picker buttons
@@ -789,7 +789,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 0.5,
   },
   createBtn: {
-    backgroundColor: '#e8313a',
+    backgroundColor: '#FF3124',
     borderRadius: 12,
     height: 52,
     flexDirection: 'row',

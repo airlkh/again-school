@@ -11,7 +11,7 @@ export type ThemeColors = {
 };
 
 export const LightTheme: ThemeColors = {
-  primary: '#e8313a',
+  primary: '#FF3124',
   background: '#ffffff',
   surface: '#fafafa',
   surface2: '#f0f0f0',
@@ -23,7 +23,7 @@ export const LightTheme: ThemeColors = {
 };
 
 export const DarkTheme: ThemeColors = {
-  primary: '#e8313a',
+  primary: '#FF3124',
   background: '#000000',
   surface: '#111111',
   surface2: '#1a1a1a',

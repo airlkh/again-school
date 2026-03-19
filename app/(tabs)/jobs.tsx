@@ -161,7 +161,7 @@ export default function JobsScreen() {
               refreshing={refreshing}
               onRefresh={onRefresh}
               tintColor={colors.primary}
-              colors={['#e8313a']}
+              colors={['#FF3124']}
             />
           }
         />

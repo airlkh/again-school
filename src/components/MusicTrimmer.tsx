@@ -302,7 +302,7 @@ export function MusicTrimmer({ visible, selectedMusic, isVideo = false, onConfir
                 />
               </View>
               {loading ? (
-                <ActivityIndicator size="large" color="#e8313a" style={{ marginTop: 40 }} />
+                <ActivityIndicator size="large" color="#FF3124" style={{ marginTop: 40 }} />
               ) : (
                 <FlatList
                   data={filtered}
@@ -310,7 +310,7 @@ export function MusicTrimmer({ visible, selectedMusic, isVideo = false, onConfir
                   renderItem={({ item }: { item: MusicItem }) => (
                     <TouchableOpacity style={styles.musicItem} onPress={() => selectMusic(item)}>
                       <View style={styles.albumArt}>
-                        <Ionicons name="musical-note" size={20} color="#e8313a" />
+                        <Ionicons name="musical-note" size={20} color="#FF3124" />
                       </View>
                       <View style={{ flex: 1, marginLeft: 12 }}>
                         <Text style={styles.musicTitle} numberOfLines={1}>{item.title}</Text>
@@ -324,7 +324,7 @@ export function MusicTrimmer({ visible, selectedMusic, isVideo = false, onConfir
                         <Ionicons
                           name={playingId === item.id ? 'pause-circle' : 'play-circle'}
                           size={32}
-                          color="#e8313a"
+                          color="#FF3124"
                         />
                       </TouchableOpacity>
                     </TouchableOpacity>
@@ -340,7 +340,7 @@ export function MusicTrimmer({ visible, selectedMusic, isVideo = false, onConfir
               {/* 트랙 정보 */}
               <View style={styles.waveHeader}>
                 <View style={styles.albumThumb}>
-                  <Ionicons name="musical-note" size={28} color="#e8313a" />
+                  <Ionicons name="musical-note" size={28} color="#FF3124" />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.waveTitle} numberOfLines={1}>{editingMusic.title}</Text>
@@ -433,7 +433,7 @@ export function MusicTrimmer({ visible, selectedMusic, isVideo = false, onConfir
                       minimumValue={0} maximumValue={1} step={0.01}
                       value={editingMusic.volume}
                       onValueChange={(v: number) => setEditingMusic((prev: SelectedMusic | null) => prev ? { ...prev, volume: v } : prev)}
-                      minimumTrackTintColor="#e8313a" maximumTrackTintColor="#444" thumbTintColor="#e8313a"
+                      minimumTrackTintColor="#FF3124" maximumTrackTintColor="#444" thumbTintColor="#FF3124"
                     />
                     <Text style={styles.volumeValue}>{Math.round(editingMusic.volume * 100)}%</Text>
                   </View>
@@ -446,7 +446,7 @@ export function MusicTrimmer({ visible, selectedMusic, isVideo = false, onConfir
                         minimumValue={0} maximumValue={1} step={0.01}
                         value={editingMusic.videoVolume ?? 1}
                         onValueChange={(v: number) => setEditingMusic((prev: SelectedMusic | null) => prev ? { ...prev, videoVolume: v } : prev)}
-                        minimumTrackTintColor="#e8313a" maximumTrackTintColor="#444" thumbTintColor="#e8313a"
+                        minimumTrackTintColor="#FF3124" maximumTrackTintColor="#444" thumbTintColor="#FF3124"
                       />
                       <Text style={styles.volumeValue}>{Math.round((editingMusic.videoVolume ?? 1) * 100)}%</Text>
                     </View>
@@ -502,7 +502,7 @@ const styles = StyleSheet.create({
   },
   barsRow: { flexDirection: 'row', alignItems: 'center', height: 80 },
   timeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, marginBottom: 6 },
-  timeLabel: { fontSize: 12, color: '#e8313a', fontWeight: '600' },
+  timeLabel: { fontSize: 12, color: '#FF3124', fontWeight: '600' },
   timeDuration: { fontSize: 12, color: '#FFD700', fontWeight: '700' },
   durRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginBottom: 8 },
   durLabel: { fontSize: 12, color: '#aaa', width: 36 },
@@ -515,5 +515,5 @@ const styles = StyleSheet.create({
   bottomBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
   bottomBtnActive: { backgroundColor: '#333' },
   bottomBtnText: { fontSize: 15, color: '#fff' },
-  confirmText: { color: '#e8313a', fontWeight: '700' },
+  confirmText: { color: '#FF3124', fontWeight: '700' },
 });

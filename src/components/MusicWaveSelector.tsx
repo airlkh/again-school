@@ -212,7 +212,7 @@ export function MusicWaveSelector({ visible, selectedMusic, isVideo = false, onC
               </View>
 
               {loading ? (
-                <ActivityIndicator size="large" color="#e8313a" style={{ marginTop: 40 }} />
+                <ActivityIndicator size="large" color="#FF3124" style={{ marginTop: 40 }} />
               ) : (
                 <FlatList
                   data={filtered}
@@ -223,7 +223,7 @@ export function MusicWaveSelector({ visible, selectedMusic, isVideo = false, onC
                       onPress={() => selectMusic(item)}
                     >
                       <View style={styles.albumArt}>
-                        <Ionicons name="musical-note" size={20} color="#e8313a" />
+                        <Ionicons name="musical-note" size={20} color="#FF3124" />
                       </View>
                       <View style={{ flex: 1, marginLeft: 12 }}>
                         <Text style={styles.musicTitle} numberOfLines={1}>{item.title}</Text>
@@ -233,7 +233,7 @@ export function MusicWaveSelector({ visible, selectedMusic, isVideo = false, onC
                         <Ionicons
                           name={playingId === item.id ? 'pause-circle' : 'play-circle'}
                           size={32}
-                          color="#e8313a"
+                          color="#FF3124"
                         />
                       </TouchableOpacity>
                     </TouchableOpacity>
@@ -249,7 +249,7 @@ export function MusicWaveSelector({ visible, selectedMusic, isVideo = false, onC
               {/* 앨범 정보 */}
               <View style={styles.waveHeader}>
                 <View style={styles.albumThumb}>
-                  <Ionicons name="musical-note" size={28} color="#e8313a" />
+                  <Ionicons name="musical-note" size={28} color="#FF3124" />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.waveTitle} numberOfLines={1}>{editing.title}</Text>
@@ -320,9 +320,9 @@ export function MusicWaveSelector({ visible, selectedMusic, isVideo = false, onC
                       minimumValue={0} maximumValue={1}
                       value={editing.volume}
                       onValueChange={(v) => setEditing(prev => prev ? { ...prev, volume: v } : prev)}
-                      minimumTrackTintColor="#e8313a"
+                      minimumTrackTintColor="#FF3124"
                       maximumTrackTintColor="#444"
-                      thumbTintColor="#e8313a"
+                      thumbTintColor="#FF3124"
                     />
                     <Text style={styles.volumeValue}>{Math.round(editing.volume * 100)}%</Text>
                   </View>
@@ -335,9 +335,9 @@ export function MusicWaveSelector({ visible, selectedMusic, isVideo = false, onC
                         minimumValue={0} maximumValue={1}
                         value={editing.videoVolume ?? 1}
                         onValueChange={(v) => setEditing(prev => prev ? { ...prev, videoVolume: v } : prev)}
-                        minimumTrackTintColor="#e8313a"
+                        minimumTrackTintColor="#FF3124"
                         maximumTrackTintColor="#444"
-                        thumbTintColor="#e8313a"
+                        thumbTintColor="#FF3124"
                       />
                       <Text style={styles.volumeValue}>{Math.round((editing.videoVolume ?? 1) * 100)}%</Text>
                     </View>
@@ -358,7 +358,7 @@ export function MusicWaveSelector({ visible, selectedMusic, isVideo = false, onC
                   <Text style={styles.bottomBtnText}>오디오</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={handleConfirm} style={styles.bottomBtn}>
-                  <Text style={[styles.bottomBtnText, { color: '#e8313a', fontWeight: '700' }]}>완료</Text>
+                  <Text style={[styles.bottomBtnText, { color: '#FF3124', fontWeight: '700' }]}>완료</Text>
                 </TouchableOpacity>
               </View>
             </>

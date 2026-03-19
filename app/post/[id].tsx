@@ -388,7 +388,7 @@ export default function PostDetailScreen() {
             {mediaList.length > 1 && (
               <View style={styles.dotIndicator}>
                 {mediaList.map((_, i) => (
-                  <View key={i} style={[styles.dotItem, { backgroundColor: i === imageIndex ? '#e8313a' : '#ccc' }]} />
+                  <View key={i} style={[styles.dotItem, { backgroundColor: i === imageIndex ? '#FF3124' : '#ccc' }]} />
                 ))}
               </View>
             )}

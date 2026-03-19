@@ -602,7 +602,7 @@ export default function ChatRoomScreen() {
       {sending && uploadProgress > 0 && (
         <View style={styles.uploadOverlay}>
           <View style={styles.uploadBox}>
-            <ActivityIndicator size="large" color="#e8313a" />
+            <ActivityIndicator size="large" color="#FF3124" />
             <Text style={styles.uploadBoxTitle}>{uploadStatus || '전송 중...'}</Text>
             <View style={styles.uploadBarBg}>
               <View style={[styles.uploadBarFill, { width: `${uploadProgress}%` as `${number}%` }]} />
@@ -826,7 +826,7 @@ const styles = StyleSheet.create({
   },
   uploadBarFill: {
     height: '100%',
-    backgroundColor: '#e8313a',
+    backgroundColor: '#FF3124',
     borderRadius: 3,
   },
   uploadBoxPct: {

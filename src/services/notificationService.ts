@@ -92,7 +92,7 @@ export function setupNotificationHandlers(): () => void {
       name: 'Again School',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#e8313a',
+      lightColor: '#FF3124',
     });
   }
 

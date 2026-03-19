@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   closedBottomBannerText: {
-    color: '#e8313a',
+    color: '#FF3124',
     fontWeight: '700',
     fontSize: 16,
   },

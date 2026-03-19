@@ -391,7 +391,7 @@ export default function ProfileDetailScreen() {
                 styles.trustButton,
                 isTrustedByMe
                   ? [styles.trustButtonDone, { borderColor: '#4CAF50' }]
-                  : { backgroundColor: '#e8313a' },
+                  : { backgroundColor: '#FF3124' },
                 trustLoading && { opacity: 0.6 },
               ]}
               activeOpacity={0.8}
@@ -704,7 +704,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     borderRadius: 12,
-    backgroundColor: '#e8313a',
+    backgroundColor: '#FF3124',
     alignItems: 'center',
   },
   trustModalConfirmText: { fontSize: 15, fontWeight: '700', color: '#fff' },

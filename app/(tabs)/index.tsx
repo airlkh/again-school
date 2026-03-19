@@ -1242,7 +1242,7 @@ export default function HomeScreen() {
               <View style={{
                 position: 'absolute',
                 top: 2, right: 2,
-                backgroundColor: '#e8313a',
+                backgroundColor: '#FF3124',
                 borderRadius: 10,
                 minWidth: 18,
                 height: 18,
@@ -1269,7 +1269,7 @@ export default function HomeScreen() {
               <View style={{
                 position: 'absolute',
                 top: 2, right: 2,
-                backgroundColor: '#e8313a',
+                backgroundColor: '#FF3124',
                 borderRadius: 10,
                 minWidth: 18,
                 height: 18,
@@ -1309,7 +1309,7 @@ export default function HomeScreen() {
             refreshing={refreshing}
             onRefresh={onRefresh}
             tintColor={colors.primary}
-            colors={['#e8313a']}
+            colors={['#FF3124']}
           />
         }
       />

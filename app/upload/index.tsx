@@ -767,7 +767,7 @@ export default function UploadScreen() {
                       width: 24,
                       height: 24,
                       borderRadius: 12,
-                      backgroundColor: '#e8313a',
+                      backgroundColor: '#FF3124',
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
@@ -888,7 +888,7 @@ export default function UploadScreen() {
             <TouchableOpacity
               onPress={goToShare}
               style={{
-                backgroundColor: '#e8313a',
+                backgroundColor: '#FF3124',
                 borderRadius: 8,
                 paddingHorizontal: 14,
                 paddingVertical: 6,
@@ -1092,9 +1092,9 @@ export default function UploadScreen() {
               <Ionicons
                 name={selectedMusic ? 'musical-notes' : 'musical-notes-outline'}
                 size={20}
-                color={selectedMusic ? '#e8313a' : '#fff'}
+                color={selectedMusic ? '#FF3124' : '#fff'}
               />
-              <Text style={{ color: selectedMusic ? '#e8313a' : '#fff', fontSize: 14, fontWeight: '600', flex: 1 }}>
+              <Text style={{ color: selectedMusic ? '#FF3124' : '#fff', fontSize: 14, fontWeight: '600', flex: 1 }}>
                 {selectedMusic ? selectedMusic.title : '음악 추가'}
               </Text>
               {selectedMusic && (
@@ -1126,7 +1126,7 @@ export default function UploadScreen() {
               {overlayText.trim().length > 0 && (
                 <View
                   style={{
-                    backgroundColor: '#e8313a',
+                    backgroundColor: '#FF3124',
                     borderRadius: 10,
                     paddingHorizontal: 8,
                     paddingVertical: 2,
@@ -1297,7 +1297,7 @@ export default function UploadScreen() {
                   style={{ paddingHorizontal: 16, marginBottom: 8 }}
                 >
                   <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-                    {['#ffffff', '#000000', '#e8313a', '#FFD700', '#00C851', '#2196F3', '#FF69B4', '#FF8C00'].map(
+                    {['#ffffff', '#000000', '#FF3124', '#FFD700', '#00C851', '#2196F3', '#FF69B4', '#FF8C00'].map(
                       (c) => (
                         <TouchableOpacity
                           key={c}
@@ -1536,7 +1536,7 @@ export default function UploadScreen() {
                 height: 22,
                 borderRadius: 11,
                 borderWidth: 2,
-                borderColor: uploadTarget === t.key ? '#e8313a' : colors.inactive,
+                borderColor: uploadTarget === t.key ? '#FF3124' : colors.inactive,
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
@@ -1547,7 +1547,7 @@ export default function UploadScreen() {
                     width: 12,
                     height: 12,
                     borderRadius: 6,
-                    backgroundColor: '#e8313a',
+                    backgroundColor: '#FF3124',
                   }}
                 />
               )}
@@ -1568,7 +1568,7 @@ export default function UploadScreen() {
           onPress={handleShare}
           disabled={uploading}
           style={{
-            backgroundColor: uploading ? '#aaa' : '#e8313a',
+            backgroundColor: uploading ? '#aaa' : '#FF3124',
             borderRadius: 12,
             height: 52,
             alignItems: 'center',

@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
   linkRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   linkText: { flex: 1, fontSize: 13, fontWeight: '600' },
   copyBtn: {
-    backgroundColor: '#e8313a',
+    backgroundColor: '#FF3124',
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 8,
