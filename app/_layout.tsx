@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Stack, Redirect, useSegments } from 'expo-router';
+import { Stack, useSegments, useRouter, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet, AppState, AppStateStatus } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
@@ -18,13 +18,14 @@ function RootLayoutNav() {
   const { user, isLoading, onboardingCompleted } = useAuth();
   const { colors, isDark } = useTheme();
   const segments = useSegments();
+  const rtr = useRouter();
+  const pathname = usePathname();
   const splashHidden = useRef(false);
 
   // 스플래시 숨기기 — SplashOverlay가 처리하므로 여기서는 안전장치만
   useEffect(() => {
     if (!isLoading && !splashHidden.current) {
       splashHidden.current = true;
-      // SplashOverlay가 이미 hideAsync() 호출했으므로 여기선 중복 방지
     }
   }, [isLoading]);
 
@@ -77,81 +78,70 @@ function RootLayoutNav() {
     };
   }, [user?.uid]);
 
-  console.log('[RootLayout] 렌더링 상태:', {
-    user: user ? user.uid : null,
-    isLoading,
-    onboardingCompleted,
-    segments: (segments || []).join('/'),
-  });
+  // ─── 리다이렉트 로직 (useEffect로 한 번만 실행) ───
+  useEffect(() => {
+    if (isLoading) return; // 로딩 중이면 실행 안 함
 
-  // 스플래시(index) 또는 인트로 슬라이드에서는 리다이렉트 스킵
-  const segs = (segments || []) as string[];
-  const inSplash = segs.length === 0 || segs[0] === 'index';
-  const inIntro = segs[0] === 'onboarding'; // 그룹이 아닌 일반 onboarding
+    const segs = (segments || []) as string[];
+    const inSplash = segs.length === 0 || segs[0] === 'index';
+    const inIntro = segs[0] === 'onboarding';
+    if (inSplash || inIntro) return; // 스플래시/인트로에서는 스킵
 
-  if (isLoading) {
-    // 스플래시 화면에 있을 때는 로딩 스피너 대신 Stack 렌더링
-    if (inSplash || inIntro) {
-      console.log('[RootLayout] → 로딩 중이지만 스플래시/인트로이므로 Stack 렌더링');
-    } else {
-      console.log('[RootLayout] → 로딩 스피너 표시');
-      return (
-        <View style={[styles.loading, { backgroundColor: colors.background }]}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      );
-    }
-  }
-
-  if (!inSplash && !inIntro && !isLoading) {
     const inAuthGroup = segs[0] === '(auth)';
     const inOnboardingGroup = segs[0] === '(onboarding)';
+    const isEmailProvider = user?.providerData?.[0]?.providerId === 'password';
+    const needsEmailVerify = !!(isEmailProvider && user && !user.emailVerified);
+    const onVerifyScreen = pathname.includes('verify-email');
 
-    // 1. 미인증 → 로그인
+    // 1. 로그인 안 됨 → 로그인 화면
     if (!user && !inAuthGroup) {
-      console.log('[RootLayout] → Redirect: /(auth)/login (미인증)');
-      return <Redirect href="/(auth)/login" />;
+      rtr.replace('/(auth)/login');
+      return;
     }
 
-    // 이메일 미인증 체크 (소셜 로그인은 스킵)
-    const isEmailProvider = user?.providerData[0]?.providerId === 'password';
-    const needsEmailVerify = isEmailProvider && user && !user.emailVerified;
-    const inVerifyEmail = segs[0] === '(auth)' && segs[1] === 'verify-email';
-
-    // 2. 이메일 미인증 유저 처리
+    // 2. 이메일 미인증 → verify-email (이미 있으면 스킵)
     if (needsEmailVerify) {
-      if (inVerifyEmail) {
-        // verify-email에 이미 있으면 그대로 렌더링 (무한 루프 방지)
-      } else {
-        console.log('[RootLayout] → Redirect: /(auth)/verify-email (이메일 미인증)');
-        return <Redirect href="/(auth)/verify-email" />;
+      if (!onVerifyScreen) {
+        rtr.replace('/(auth)/verify-email');
       }
+      return;
     }
 
-    // 3. 인증됨 + auth 화면 → 온보딩 또는 탭으로 이동
-    else if (user && inAuthGroup) {
+    // 3. 인증됨 + auth 화면에 있으면 → 온보딩 또는 탭
+    if (user && inAuthGroup) {
       if (onboardingCompleted) {
-        console.log('[RootLayout] → Redirect: /(tabs) (인증+온보딩완료+auth화면)');
-        return <Redirect href="/(tabs)" />;
+        rtr.replace('/(tabs)');
+      } else {
+        rtr.replace('/(onboarding)/step1');
       }
-      console.log('[RootLayout] → Redirect: /(onboarding)/step1 (인증+온보딩미완료+auth화면)');
-      return <Redirect href="/(onboarding)/step1" />;
+      return;
     }
 
-    // 4-1. 인증됨 + 온보딩 미완료 + 탭 화면 → 온보딩으로
+    // 4. 인증됨 + 온보딩 미완료 + 탭 화면 → 온보딩
     if (user && !onboardingCompleted && !inOnboardingGroup && !inAuthGroup) {
-      console.log('[RootLayout] → Redirect: /(onboarding)/step1 (인증+온보딩미완료+탭화면)');
-      return <Redirect href="/(onboarding)/step1" />;
+      rtr.replace('/(onboarding)/step1');
+      return;
     }
 
-    // 4-2. 인증됨 + 온보딩 완료 + 온보딩 화면 → 탭으로
+    // 5. 인증됨 + 온보딩 완료 + 온보딩 화면 → 탭
     if (user && onboardingCompleted && inOnboardingGroup) {
-      console.log('[RootLayout] → Redirect: /(tabs) (인증+온보딩완료+온보딩화면)');
-      return <Redirect href="/(tabs)" />;
+      rtr.replace('/(tabs)');
+      return;
     }
-  }
+  }, [user, isLoading, onboardingCompleted, segments, pathname]);
 
-  console.log('[RootLayout] → Stack 렌더링 (리다이렉트 없음)');
+  // ─── 로딩 중 표시 ───
+  const segs = (segments || []) as string[];
+  const inSplash = segs.length === 0 || segs[0] === 'index';
+  const inIntro = segs[0] === 'onboarding';
+
+  if (isLoading && !inSplash && !inIntro) {
+    return (
+      <View style={[styles.loading, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   const inAuthGroup = segs[0] === '(auth)';
   const inOnboardingGroup = segs[0] === '(onboarding)';
