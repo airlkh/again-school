@@ -1,4 +1,4 @@
-const functions = require('firebase-functions');
+const functions = require('firebase-functions/v1');
 const admin = require('firebase-admin');
 const fetch = (...args) => import('node-fetch').then(({default: f}) => f(...args));
 const serviceAccount = {
@@ -235,7 +235,7 @@ exports.generateAlumniRecommendations = functions.region("asia-northeast3").http
   res.json({ recommendations: top20.slice(0, 5) });
 });
 
-exports.scheduledAlumniRecommendations = functions.region("asia-northeast3").scheduler.onSchedule({ schedule: '0 3 * * *', timeZone: 'Asia/Seoul' }, async () => {
+exports.scheduledAlumniRecommendations = functions.region("asia-northeast3").pubsub.schedule('0 3 * * *').timeZone('Asia/Seoul').onRun(async () => {
   const usersSnap = await db.collection('users').limit(500).get();
   let count = 0;
   for (const userDoc of usersSnap.docs) {
