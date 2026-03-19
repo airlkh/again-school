@@ -1,6 +1,3 @@
-import { updateProfile } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '../config/firebase';
 import { CLOUDINARY_CONFIG } from '../config/cloudinary';
 import { compressImage } from './mediaService';
 
@@ -28,7 +25,6 @@ export async function uploadProfileImage(
     formData.append('folder', `profiles/${uid}`);
 
     const xhr = new XMLHttpRequest();
-
     xhr.addEventListener('load', () => {
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
@@ -41,25 +37,13 @@ export async function uploadProfileImage(
         reject(new Error(`Cloudinary 업로드 실패: ${xhr.status}`));
       }
     });
-
     xhr.addEventListener('error', () => reject(new Error('네트워크 오류')));
     xhr.addEventListener('timeout', () => reject(new Error('업로드 시간 초과')));
-
     xhr.timeout = 60000;
     xhr.open('POST', CLOUDINARY_CONFIG.imageUploadUrl);
     xhr.send(formData);
   });
 
   console.log('[uploadProfileImage] Cloudinary URL:', downloadURL?.substring(0, 80));
-
-  await setDoc(doc(db, 'users', uid), {
-    photoURL: downloadURL,
-    updatedAt: serverTimestamp(),
-  }, { merge: true });
-
-  if (auth.currentUser) {
-    await updateProfile(auth.currentUser, { photoURL: downloadURL });
-  }
-
   return downloadURL;
 }
