@@ -12,7 +12,7 @@ import {
 } from 'firebase/firestore';
 
 /* ───────────────────── styles ───────────────────── */
-const ACCENT = '#e8313a';
+const ACCENT = '#FF3124';
 
 const s = {
   container: {
@@ -309,7 +309,7 @@ const s = {
     borderRadius: 6,
     border: '1px solid #ddd',
     background: '#fff',
-    color: '#e8313a',
+    color: '#FF3124',
     fontSize: 13,
     fontWeight: 600,
     cursor: 'pointer',

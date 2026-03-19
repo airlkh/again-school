@@ -33,7 +33,7 @@ export default function Login() {
     <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui' }}>
       <div style={{ background: '#fff', borderRadius: 20, padding: 48, width: 400, boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
-          <div style={{ width: 56, height: 56, background: '#e8313a', borderRadius: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+          <div style={{ width: 56, height: 56, background: '#FF3124', borderRadius: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
             <span style={{ fontSize: 24, color: '#fff', fontWeight: 900 }}>AS</span>
           </div>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: '#1a1a2e', margin: '0 0 4px' }}>Again School</h1>
@@ -48,7 +48,7 @@ export default function Login() {
               value={email}
               onChange={e => setEmail(e.target.value)}
               style={{ width: '100%', padding: '12px 14px', border: '1px solid #e0e0e0', borderRadius: 10, fontSize: 14, outline: 'none', boxSizing: 'border-box', transition: 'border 0.15s' }}
-              onFocus={e => e.target.style.borderColor = '#e8313a'}
+              onFocus={e => e.target.style.borderColor = '#FF3124'}
               onBlur={e => e.target.style.borderColor = '#e0e0e0'}
             />
           </div>
@@ -60,15 +60,15 @@ export default function Login() {
               value={password}
               onChange={e => setPassword(e.target.value)}
               style={{ width: '100%', padding: '12px 14px', border: '1px solid #e0e0e0', borderRadius: 10, fontSize: 14, outline: 'none', boxSizing: 'border-box', transition: 'border 0.15s' }}
-              onFocus={e => e.target.style.borderColor = '#e8313a'}
+              onFocus={e => e.target.style.borderColor = '#FF3124'}
               onBlur={e => e.target.style.borderColor = '#e0e0e0'}
             />
           </div>
-          {error && <p style={{ color: '#e8313a', fontSize: 13, marginBottom: 14, background: '#fef2f2', padding: '10px 14px', borderRadius: 8 }}>{error}</p>}
+          {error && <p style={{ color: '#FF3124', fontSize: 13, marginBottom: 14, background: '#fef2f2', padding: '10px 14px', borderRadius: 8 }}>{error}</p>}
           <button
             type="submit"
             disabled={loading}
-            style={{ width: '100%', padding: '13px', background: loading ? '#ccc' : '#e8313a', border: 'none', borderRadius: 10, color: '#fff', fontSize: 15, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', transition: 'background 0.15s' }}
+            style={{ width: '100%', padding: '13px', background: loading ? '#ccc' : '#FF3124', border: 'none', borderRadius: 10, color: '#fff', fontSize: 15, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', transition: 'background 0.15s' }}
           >
             {loading ? '로그인 중...' : '로그인'}
           </button>

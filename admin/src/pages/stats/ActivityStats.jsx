@@ -44,7 +44,7 @@ export default function ActivityStats() {
         if (!d) return;
         const key = d.toISOString().slice(0, 10);
         if (!activeMap[key]) activeMap[key] = new Set();
-        if (p.authorId || p.userId) activeMap[key].add(p.authorId || p.userId);
+        if (p.authorUid || p.authorId || p.userId) activeMap[key].add(p.authorUid || p.authorId || p.userId);
       });
       const activeTrend = Object.entries(activeMap)
         .sort(([a], [b]) => a.localeCompare(b))

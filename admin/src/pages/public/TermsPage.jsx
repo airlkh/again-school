@@ -6,7 +6,7 @@ const S = {
   page: { minHeight: '100vh', background: '#fff', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
   header: { borderBottom: '1px solid #eee', padding: '20px 0', marginBottom: 32 },
   headerInner: { maxWidth: 800, margin: '0 auto', padding: '0 24px', display: 'flex', alignItems: 'center', gap: 12 },
-  logo: { width: 36, height: 36, background: '#e8313a', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 14 },
+  logo: { width: 36, height: 36, background: '#FF3124', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 14 },
   logoText: { fontSize: 16, fontWeight: 700, color: '#1a1a2e' },
   container: { maxWidth: 800, margin: '0 auto', padding: '0 24px 80px' },
   title: { fontSize: 28, fontWeight: 700, color: '#1a1a2e', marginBottom: 8 },

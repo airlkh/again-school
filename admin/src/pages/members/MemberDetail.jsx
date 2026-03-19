@@ -63,14 +63,19 @@ export default function MemberDetail() {
       // 활동 통계
       try {
         const postsSnap = await getDocs(
-          query(collection(db, 'posts'), where('authorId', '==', uid))
+          query(collection(db, 'posts'), where('authorUid', '==', uid))
         );
-        const commentsSnap = await getDocs(
-          query(collection(db, 'comments'), where('authorId', '==', uid))
-        );
+        // 댓글은 posts/{postId}/comments 서브컬렉션이므로 개별 조회 필요
+        let totalComments = 0;
+        for (const postDoc of postsSnap.docs) {
+          const commentsSnap = await getDocs(
+            collection(db, 'posts', postDoc.id, 'comments')
+          );
+          totalComments += commentsSnap.docs.filter(c => c.data().uid === uid).length;
+        }
         setActivityStats({
           posts: postsSnap.size,
-          comments: commentsSnap.size,
+          comments: totalComments,
           likes: 0,
         });
       } catch {
@@ -80,7 +85,7 @@ export default function MemberDetail() {
       // 연결 수
       try {
         const connectSnap = await getDocs(
-          query(collection(db, 'connections'), where('uid', '==', uid))
+          query(collection(db, 'connections'), where('fromUid', '==', uid))
         );
         setConnectionCount(connectSnap.size);
       } catch {
@@ -324,7 +329,7 @@ export default function MemberDetail() {
       <div style={styles.section}>
         <h2 style={styles.sectionTitle}>제재 이력</h2>
         {member.disabled ? (
-          <div style={{ padding: '12px 16px', background: '#fef2f2', borderRadius: 8, color: '#e8313a', fontSize: 13 }}>현재 제재 상태입니다.</div>
+          <div style={{ padding: '12px 16px', background: '#fef2f2', borderRadius: 8, color: '#FF3124', fontSize: 13 }}>현재 제재 상태입니다.</div>
         ) : (
           <p style={styles.emptyText}>제재 이력이 없습니다.</p>
         )}
