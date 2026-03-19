@@ -31,7 +31,6 @@ export async function uploadProfileImage(
     } as any);
     formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
     formData.append('folder', `profiles/${uid}`);
-    formData.append('transformation', 'w_400,h_400,c_fill,g_face,q_auto');
 
     const xhr = new XMLHttpRequest();
     xhr.addEventListener('load', () => {
