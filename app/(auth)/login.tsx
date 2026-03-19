@@ -71,7 +71,7 @@ export default function LoginScreen() {
       const credential = GoogleAuthProvider.credential(idToken);
       const result = await signInWithCredential(auth, credential);
       console.log('[Google Login] 성공:', result.user.email);
-      await setDoc(doc(db, 'users', result.user.uid), { provider: 'google', updatedAt: serverTimestamp() }, { merge: true });
+      await setDoc(doc(db, 'users', result.user.uid), { email: result.user.email || '', provider: 'google', updatedAt: serverTimestamp() }, { merge: true });
     } catch (error: any) {
       if (error.code === statusCodes.SIGN_IN_CANCELLED) {
         console.log('[Google Login] 사용자가 취소함');
@@ -98,7 +98,7 @@ export default function LoginScreen() {
     setIsLoading(true);
     try {
       const result = await signInWithEmail(email.trim(), password);
-      await setDoc(doc(db, 'users', result.user.uid), { provider: 'email', updatedAt: serverTimestamp() }, { merge: true });
+      await setDoc(doc(db, 'users', result.user.uid), { email: result.user.email || '', provider: 'email', updatedAt: serverTimestamp() }, { merge: true });
     } catch (error: any) {
       const message =
         error.code === 'auth/invalid-credential'
@@ -133,7 +133,7 @@ export default function LoginScreen() {
 
       if (credential.identityToken) {
         const result = await signInWithApple(credential.identityToken, nonce);
-        await setDoc(doc(db, 'users', result.user.uid), { provider: 'apple', updatedAt: serverTimestamp() }, { merge: true });
+        await setDoc(doc(db, 'users', result.user.uid), { email: result.user.email || '', provider: 'apple', updatedAt: serverTimestamp() }, { merge: true });
       }
     } catch (error: any) {
       if (error.code !== 'ERR_REQUEST_CANCELED') {
@@ -199,7 +199,7 @@ export default function LoginScreen() {
         result = await signInWithNaverCode(code, state);
       }
       if (result?.user?.uid) {
-        await setDoc(doc(db, 'users', result.user.uid), { provider, updatedAt: serverTimestamp() }, { merge: true });
+        await setDoc(doc(db, 'users', result.user.uid), { email: result.user.email || '', provider, updatedAt: serverTimestamp() }, { merge: true });
       }
     } catch {
       const name = provider === 'kakao' ? '카카오' : '네이버';

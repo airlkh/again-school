@@ -46,7 +46,7 @@ export default function SignupScreen() {
 
       // provider 저장 (실패해도 진행)
       try {
-        await setDoc(doc(db, 'users', userCredential.user.uid), { provider: 'email', updatedAt: serverTimestamp() }, { merge: true });
+        await setDoc(doc(db, 'users', userCredential.user.uid), { email: userCredential.user.email || '', provider: 'email', updatedAt: serverTimestamp() }, { merge: true });
       } catch (e) {
         console.warn('[Signup] provider 저장 실패 (무시):', e);
       }
