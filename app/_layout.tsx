@@ -113,14 +113,35 @@ function RootLayoutNav() {
       return <Redirect href="/(auth)/login" />;
     }
 
-    // 2. 인증됨 + auth 화면 → 온보딩 또는 탭으로 이동
+    // 2. 인증됨 + auth 화면 → 이메일 미인증이면 verify-email 유지, 아니면 이동
     if (user && inAuthGroup) {
-      if (onboardingCompleted) {
-        console.log('[RootLayout] → Redirect: /(tabs) (인증+온보딩완료+auth화면)');
-        return <Redirect href="/(tabs)" />;
+      const isEmailProvider = user.providerData[0]?.providerId === 'password';
+      const inVerifyEmail = segs.includes('verify-email');
+
+      // 이메일 가입 유저가 미인증이면 verify-email에 머무름
+      if (isEmailProvider && !user.emailVerified) {
+        if (!inVerifyEmail) {
+          console.log('[RootLayout] → Redirect: /(auth)/verify-email (이메일 미인증)');
+          return <Redirect href="/(auth)/verify-email" />;
+        }
+        // verify-email에 이미 있으면 그대로 유지
+      } else {
+        if (onboardingCompleted) {
+          console.log('[RootLayout] → Redirect: /(tabs) (인증+온보딩완료+auth화면)');
+          return <Redirect href="/(tabs)" />;
+        }
+        console.log('[RootLayout] → Redirect: /(onboarding)/step1 (인증+온보딩미완료+auth화면)');
+        return <Redirect href="/(onboarding)/step1" />;
       }
-      console.log('[RootLayout] → Redirect: /(onboarding)/step1 (인증+온보딩미완료+auth화면)');
-      return <Redirect href="/(onboarding)/step1" />;
+    }
+
+    // 2-1. 이메일 미인증 유저가 auth 밖으로 나가려는 경우 차단
+    if (user && !inAuthGroup) {
+      const isEmailProvider = user.providerData[0]?.providerId === 'password';
+      if (isEmailProvider && !user.emailVerified) {
+        console.log('[RootLayout] → Redirect: /(auth)/verify-email (이메일 미인증, auth 밖 차단)');
+        return <Redirect href="/(auth)/verify-email" />;
+      }
     }
 
     // 3. 인증됨 + 온보딩 미완료 + 탭 화면 → 온보딩으로
