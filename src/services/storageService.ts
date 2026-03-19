@@ -1,18 +1,26 @@
 import { CLOUDINARY_CONFIG } from '../config/cloudinary';
-import { compressImage } from './mediaService';
+import * as ImageManipulator from 'expo-image-manipulator';
+
+async function compressProfileImage(uri: string): Promise<string> {
+  try {
+    const result = await ImageManipulator.manipulateAsync(
+      uri,
+      [{ resize: { width: 400 } }],
+      { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG },
+    );
+    return result.uri;
+  } catch {
+    return uri;
+  }
+}
 
 export async function uploadProfileImage(
   uri: string,
   uid: string,
 ): Promise<string> {
-  console.log('[uploadProfileImage] 시작, uri:', uri?.substring(0, 50));
+  console.log('[uploadProfileImage] 시작');
 
-  let compressedUri: string;
-  try {
-    compressedUri = await compressImage(uri);
-  } catch {
-    compressedUri = uri;
-  }
+  const compressedUri = await compressProfileImage(uri);
 
   const downloadURL = await new Promise<string>((resolve, reject) => {
     const formData = new FormData();
@@ -23,6 +31,7 @@ export async function uploadProfileImage(
     } as any);
     formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
     formData.append('folder', `profiles/${uid}`);
+    formData.append('transformation', 'w_400,h_400,c_fill,g_face,q_auto');
 
     const xhr = new XMLHttpRequest();
     xhr.addEventListener('load', () => {
@@ -39,11 +48,11 @@ export async function uploadProfileImage(
     });
     xhr.addEventListener('error', () => reject(new Error('네트워크 오류')));
     xhr.addEventListener('timeout', () => reject(new Error('업로드 시간 초과')));
-    xhr.timeout = 60000;
+    xhr.timeout = 30000;
     xhr.open('POST', CLOUDINARY_CONFIG.imageUploadUrl);
     xhr.send(formData);
   });
 
-  console.log('[uploadProfileImage] Cloudinary URL:', downloadURL?.substring(0, 80));
+  console.log('[uploadProfileImage] 완료:', downloadURL?.substring(0, 80));
   return downloadURL;
 }
