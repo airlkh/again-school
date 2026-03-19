@@ -242,6 +242,15 @@ export default function MemberDetail() {
             <span style={styles.detailValue}>{formatDate(member.lastActiveAt || member.lastLoginAt)}</span>
           </div>
           <div style={styles.detailItem}>
+            <span style={styles.detailLabel}>가입경로</span>
+            <span style={styles.detailValue}>
+              {(() => {
+                const badges = { email: '이메일', google: '구글', kakao: '카카오', naver: '네이버', apple: '애플' };
+                return badges[member.provider] || '미확인';
+              })()}
+            </span>
+          </div>
+          <div style={styles.detailItem}>
             <span style={styles.detailLabel}>전화번호</span>
             <span style={styles.detailValue}>{member.phone || member.phoneNumber || '-'}</span>
           </div>

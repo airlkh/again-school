@@ -13,6 +13,9 @@ import { KeyboardScrollView } from '../../src/components/KeyboardScrollView';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../src/constants/colors';
+import { sendEmailVerification } from 'firebase/auth';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../../src/config/firebase';
 import { signUpWithEmail } from '../../src/services/authService';
 
 export default function SignupScreen() {
@@ -40,7 +43,9 @@ export default function SignupScreen() {
       console.log('[Signup] 회원가입 시도:', email.trim());
       const userCredential = await signUpWithEmail(email.trim(), password);
       console.log('[Signup] 회원가입 성공:', userCredential.user.uid);
-      // onAuthStateChanged가 자동으로 온보딩 화면으로 이동
+      await setDoc(doc(db, 'users', userCredential.user.uid), { provider: 'email', updatedAt: serverTimestamp() }, { merge: true });
+      await sendEmailVerification(userCredential.user);
+      router.replace('/(auth)/verify-email');
     } catch (error: any) {
       console.error('[Signup] 회원가입 실패:', error.code, error.message);
       let message = '회원가입에 실패했습니다.';

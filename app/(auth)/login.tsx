@@ -19,7 +19,8 @@ import { Colors } from '../../src/constants/colors';
 import { SocialLoginButton } from '../../src/components/SocialLoginButton';
 import { OAuthWebView } from '../../src/components/OAuthWebView';
 import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
-import { auth } from '../../src/config/firebase';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '../../src/config/firebase';
 import {
   signInWithEmail,
   signInWithApple,
@@ -70,6 +71,7 @@ export default function LoginScreen() {
       const credential = GoogleAuthProvider.credential(idToken);
       const result = await signInWithCredential(auth, credential);
       console.log('[Google Login] 성공:', result.user.email);
+      await setDoc(doc(db, 'users', result.user.uid), { provider: 'google', updatedAt: serverTimestamp() }, { merge: true });
     } catch (error: any) {
       if (error.code === statusCodes.SIGN_IN_CANCELLED) {
         console.log('[Google Login] 사용자가 취소함');
@@ -95,7 +97,8 @@ export default function LoginScreen() {
     }
     setIsLoading(true);
     try {
-      await signInWithEmail(email.trim(), password);
+      const result = await signInWithEmail(email.trim(), password);
+      await setDoc(doc(db, 'users', result.user.uid), { provider: 'email', updatedAt: serverTimestamp() }, { merge: true });
     } catch (error: any) {
       const message =
         error.code === 'auth/invalid-credential'
@@ -129,7 +132,8 @@ export default function LoginScreen() {
       });
 
       if (credential.identityToken) {
-        await signInWithApple(credential.identityToken, nonce);
+        const result = await signInWithApple(credential.identityToken, nonce);
+        await setDoc(doc(db, 'users', result.user.uid), { provider: 'apple', updatedAt: serverTimestamp() }, { merge: true });
       }
     } catch (error: any) {
       if (error.code !== 'ERR_REQUEST_CANCELED') {
@@ -188,10 +192,14 @@ export default function LoginScreen() {
 
     setSocialLoading(provider);
     try {
+      let result;
       if (provider === 'kakao') {
-        await signInWithKakaoCode(code);
+        result = await signInWithKakaoCode(code);
       } else {
-        await signInWithNaverCode(code, state);
+        result = await signInWithNaverCode(code, state);
+      }
+      if (result?.user?.uid) {
+        await setDoc(doc(db, 'users', result.user.uid), { provider, updatedAt: serverTimestamp() }, { merge: true });
       }
     } catch {
       const name = provider === 'kakao' ? '카카오' : '네이버';

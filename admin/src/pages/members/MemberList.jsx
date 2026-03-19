@@ -26,6 +26,23 @@ const STATUS_COLORS = {
   탈퇴: { bg: '#e2e8f0', color: '#4a5568' },
 };
 
+const PROVIDER_BADGES = {
+  email: { label: '이메일', color: '#3B82F6', bg: '#EFF6FF' },
+  google: { label: '구글', color: '#EF4444', bg: '#FEF2F2' },
+  kakao: { label: '카카오', color: '#92400E', bg: '#FEF3C7' },
+  naver: { label: '네이버', color: '#166534', bg: '#F0FDF4' },
+  apple: { label: '애플', color: '#1F2937', bg: '#F9FAFB' },
+};
+
+const PROVIDER_OPTIONS = [
+  { value: '', label: '전체 경로' },
+  { value: 'email', label: '이메일' },
+  { value: 'google', label: '구글' },
+  { value: 'kakao', label: '카카오' },
+  { value: 'naver', label: '네이버' },
+  { value: 'apple', label: '애플' },
+];
+
 const PAGE_SIZE = 20;
 
 export default function MemberList() {
@@ -34,6 +51,7 @@ export default function MemberList() {
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [providerFilter, setProviderFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -111,6 +129,8 @@ export default function MemberList() {
       }
     }
 
+    if (providerFilter && (m.provider || '') !== providerFilter) return false;
+
     if (dateFrom && m.createdAt) {
       const joined = m.createdAt.toDate ? m.createdAt.toDate() : new Date(m.createdAt);
       if (joined < new Date(dateFrom)) return false;
@@ -167,6 +187,17 @@ export default function MemberList() {
             </option>
           ))}
         </select>
+        <select
+          value={providerFilter}
+          onChange={(e) => setProviderFilter(e.target.value)}
+          style={styles.select}
+        >
+          {PROVIDER_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
         <div style={styles.dateRange}>
           <label style={styles.dateLabel}>가입일</label>
           <input
@@ -198,6 +229,7 @@ export default function MemberList() {
                 <th style={styles.th}>회원</th>
                 <th style={styles.th}>이메일</th>
                 <th style={styles.th}>학교</th>
+                <th style={styles.th}>가입경로</th>
                 <th style={styles.th}>가입일</th>
                 <th style={styles.th}>상태</th>
                 <th style={styles.th}>관리</th>
@@ -231,6 +263,16 @@ export default function MemberList() {
                     </td>
                     <td style={styles.td}>{m.email || '-'}</td>
                     <td style={styles.td}>{m.school || m.schoolName || '-'}</td>
+                    <td style={styles.td}>
+                      {(() => {
+                        const badge = PROVIDER_BADGES[m.provider];
+                        return badge ? (
+                          <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600, backgroundColor: badge.bg, color: badge.color }}>{badge.label}</span>
+                        ) : (
+                          <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600, backgroundColor: '#F3F4F6', color: '#9CA3AF' }}>미확인</span>
+                        );
+                      })()}
+                    </td>
                     <td style={styles.td}>{formatDate(m.createdAt)}</td>
                     <td style={styles.td}>
                       <span
