@@ -20,7 +20,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Audio } from 'expo-av';
+import { createAudioPlayer, AudioPlayer } from 'expo-audio';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useGoBack } from '../../src/hooks/useGoBack';
@@ -104,7 +104,7 @@ export default function PostDetailScreen() {
   const [showMenu, setShowMenu] = useState(false);
   const [imageIndex, setImageIndex] = useState(0);
   const [musicPlaying, setMusicPlaying] = useState(false);
-  const musicRef = useRef<Audio.Sound | null>(null);
+  const musicRef = useRef<AudioPlayer | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -135,19 +135,19 @@ export default function PostDetailScreen() {
   // Music auto-play (respects global mute)
   useEffect(() => {
     if (!fsPost?.music) return;
-    (async () => {
-      try {
-        const { sound } = await Audio.Sound.createAsync(
-          { uri: fsPost.music!.url },
-          { shouldPlay: !musicMuted, volume: fsPost.music!.volume, isLooping: true },
-        );
-        musicRef.current = sound;
-        setMusicPlaying(!musicMuted);
-      } catch {}
-    })();
+    try {
+      const player = createAudioPlayer({ uri: fsPost.music!.url });
+      player.volume = fsPost.music!.volume;
+      player.loop = true;
+      if (!musicMuted) {
+        player.play();
+        setMusicPlaying(true);
+      }
+      musicRef.current = player;
+    } catch {}
     return () => {
       if (musicRef.current) {
-        musicRef.current.unloadAsync();
+        musicRef.current.remove();
         musicRef.current = null;
       }
     };
@@ -157,21 +157,21 @@ export default function PostDetailScreen() {
   useEffect(() => {
     if (!musicRef.current) return;
     if (musicMuted) {
-      musicRef.current.pauseAsync();
+      musicRef.current.pause();
       setMusicPlaying(false);
     } else {
-      musicRef.current.playAsync();
+      musicRef.current.play();
       setMusicPlaying(true);
     }
   }, [musicMuted]);
 
-  async function toggleMusic() {
+  function toggleMusic() {
     if (!musicRef.current) return;
     if (musicPlaying) {
-      await musicRef.current.pauseAsync();
+      musicRef.current.pause();
       setMusicPlaying(false);
     } else {
-      await musicRef.current.playAsync();
+      musicRef.current.play();
       setMusicPlaying(true);
     }
   }

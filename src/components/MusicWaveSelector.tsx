@@ -10,7 +10,7 @@ import Slider from '@react-native-community/slider';
 import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useTheme } from '../contexts/ThemeContext';
-import { Audio } from 'expo-av';
+import { createAudioPlayer, setAudioModeAsync, AudioPlayer } from 'expo-audio';
 import { SelectedMusic, MusicItem } from './MusicSelector';
 
 const { width: SW } = Dimensions.get('window');
@@ -49,7 +49,7 @@ export function MusicWaveSelector({ visible, selectedMusic, isVideo = false, onC
 
   // 미리듣기
   const [playingId, setPlayingId] = useState<string | null>(null);
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const soundRef = useRef<AudioPlayer | null>(null);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 볼륨 패널
@@ -98,45 +98,41 @@ export function MusicWaveSelector({ visible, selectedMusic, isVideo = false, onC
     }
   }
 
-  async function stopAll() {
+  function stopAll() {
     if (previewTimerRef.current) { clearTimeout(previewTimerRef.current); previewTimerRef.current = null; }
     if (soundRef.current) {
-      await soundRef.current.stopAsync().catch(() => {});
-      await soundRef.current.unloadAsync().catch(() => {});
+      try { soundRef.current.remove(); } catch {}
       soundRef.current = null;
     }
     setPlayingId(null);
   }
 
   async function togglePreview(item: MusicItem) {
-    if (playingId === item.id) { await stopAll(); return; }
-    await stopAll();
+    if (playingId === item.id) { stopAll(); return; }
+    stopAll();
     try {
-      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: item.url }, { shouldPlay: true, volume: 0.8 }
-      );
-      soundRef.current = sound;
+      await setAudioModeAsync({ playsInSilentMode: true });
+      const player = createAudioPlayer({ uri: item.url });
+      player.volume = 0.8;
+      player.play();
+      soundRef.current = player;
       setPlayingId(item.id);
-      sound.setOnPlaybackStatusUpdate((s) => {
-        if (s.isLoaded && s.didJustFinish) { setPlayingId(null); soundRef.current = null; }
-      });
     } catch {}
   }
 
   const previewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  async function previewFrom(url: string, startTime: number) {
-    // 디바운스: 300ms 내 연속 호출 무시
+  function previewFrom(url: string, startTime: number) {
     if (previewDebounceRef.current) clearTimeout(previewDebounceRef.current);
     previewDebounceRef.current = setTimeout(async () => {
-      await stopAll();
+      stopAll();
       try {
-        await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
-        const { sound } = await Audio.Sound.createAsync(
-          { uri: url }, { shouldPlay: true, positionMillis: startTime * 1000, volume: 0.8 }
-        );
-        soundRef.current = sound;
+        await setAudioModeAsync({ playsInSilentMode: true });
+        const player = createAudioPlayer({ uri: url });
+        player.volume = 0.8;
+        await player.seekTo(startTime);
+        player.play();
+        soundRef.current = player;
         previewTimerRef.current = setTimeout(() => stopAll(), 2000);
       } catch {}
     }, 300);
