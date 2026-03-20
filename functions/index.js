@@ -352,3 +352,31 @@ exports.sendNoticeToAll = functions.region('asia-northeast3').https.onCall(async
     return { success: false, error: String(e) };
   }
 });
+
+// ── 회원 강제 탈퇴 ──────────────────────────────
+exports.deleteUserAccount = functions.region('asia-northeast3').https.onCall(async (data, context) => {
+  const { uid, reason } = data;
+  if (!uid) return { success: false, message: 'uid 없음' };
+  try {
+    await admin.auth().deleteUser(uid);
+    await db.collection('users').doc(uid).delete();
+    await db.collection('deletedUsers').add({
+      uid,
+      reason: reason || '관리자 강제 탈퇴',
+      deletedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    await db.collection('adminAlerts').add({
+      type: 'warning',
+      title: '회원 강제 탈퇴 처리',
+      message: `uid: ${uid} 회원이 강제 탈퇴 처리되었습니다. 사유: ${reason || '없음'}`,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      read: false,
+      category: 'sanction',
+    });
+    console.log(`[deleteUserAccount] ${uid} 강제 탈퇴 완료`);
+    return { success: true };
+  } catch (e) {
+    console.error('[deleteUserAccount] 실패:', e);
+    return { success: false, error: String(e) };
+  }
+});
