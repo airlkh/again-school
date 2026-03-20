@@ -67,6 +67,11 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
     }
 
+    // comments 컬렉션 그룹 읽기 (관리자 페이지용)
+    match /{path=**}/comments/{commentId} {
+      allow read: if isAuthenticated();
+    }
+
     // chatRooms 컬렉션
     match /chatRooms/{roomId} {
       allow read: if isAuthenticated();
