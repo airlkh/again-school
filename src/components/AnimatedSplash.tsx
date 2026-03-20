@@ -54,9 +54,9 @@ export function AnimatedSplash({ onFinish, onReady }: Props) {
       ]),
       Animated.spring(titleScale, { toValue: 1, friction: 5, tension: 60, useNativeDriver: true }),
       // 유지
-      Animated.delay(300),
+      Animated.delay(500),
       // 전체 페이드아웃
-      Animated.timing(containerOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+      Animated.timing(containerOpacity, { toValue: 0, duration: 400, useNativeDriver: true }),
     ]).start(() => onFinish());
   }, []);
 

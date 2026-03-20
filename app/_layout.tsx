@@ -192,12 +192,20 @@ function RootLayoutNav() {
 
 function SplashOverlay() {
   const [show, setShow] = useState(true);
+  const [animDone, setAnimDone] = useState(false);
+  const { isLoading } = useAuth();
+
+  useEffect(() => {
+    if (animDone && !isLoading) {
+      setShow(false);
+    }
+  }, [animDone, isLoading]);
 
   if (!show) return null;
   const AnimatedSplash = require('../src/components/AnimatedSplash').AnimatedSplash;
   return (
     <AnimatedSplash
-      onFinish={() => setShow(false)}
+      onFinish={() => setAnimDone(true)}
       onReady={() => {
         setTimeout(() => SplashScreen.hideAsync().catch(() => {}), 50);
       }}
