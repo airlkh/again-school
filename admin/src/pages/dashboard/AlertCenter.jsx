@@ -114,16 +114,40 @@ export default function AlertCenter() {
       const pending = [];
       snap.forEach((docSnap) => {
         const data = docSnap.data();
-        if (data.teacherVerification === 'pending') {
+        if (data.isTeacher === true && data.teacherVerified === false) {
           pending.push({
             id: `verify-${docSnap.id}`,
             type: 'warning',
             title: '선생님 인증 대기',
             message: `${data.displayName || data.name || data.email || docSnap.id}님의 선생님 인증 요청이 대기중입니다.`,
-            createdAt: data.teacherVerificationRequestedAt || data.createdAt || null,
+            createdAt: data.teacherAppliedAt || data.createdAt || null,
             read: false,
             source: 'computed',
             category: 'verification',
+          });
+        }
+      });
+
+      // 오늘 가입한 유저 안내
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const newUsers = [];
+      snap.forEach((docSnap) => {
+        const data = docSnap.data();
+        const createdAt = data.createdAt;
+        const createdDate = typeof createdAt === 'number'
+          ? new Date(createdAt)
+          : createdAt?.toDate?.();
+        if (createdDate && createdDate >= todayStart) {
+          newUsers.push({
+            id: `newuser-${docSnap.id}`,
+            type: 'info',
+            title: '신규 회원 가입',
+            message: `${data.displayName || data.name || '이름 없음'}님이 오늘 가입했습니다.`,
+            createdAt: data.createdAt?.toDate ? data.createdAt : { toDate: () => createdDate },
+            read: false,
+            source: 'computed',
+            category: 'newuser',
           });
         }
       });
@@ -151,6 +175,18 @@ export default function AlertCenter() {
 
           // 총 대기 건수 요약 알림
           const summaryAlerts = [];
+          if (newUsers.length > 0) {
+            summaryAlerts.push({
+              id: 'summary-newusers',
+              type: 'info',
+              title: '오늘 신규 가입',
+              message: `오늘 ${newUsers.length}명이 새로 가입했습니다.`,
+              createdAt: { toDate: () => new Date() },
+              read: false,
+              source: 'computed',
+              category: 'summary',
+            });
+          }
           if (pending.length > 0) {
             summaryAlerts.push({
               id: 'summary-verification',
@@ -176,7 +212,7 @@ export default function AlertCenter() {
             });
           }
 
-          setComputedAlerts([...pending, ...reportAlerts, ...summaryAlerts]);
+          setComputedAlerts([...newUsers, ...pending, ...reportAlerts, ...summaryAlerts]);
         },
         () => {
           setComputedAlerts(pending);

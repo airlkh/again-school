@@ -301,6 +301,15 @@ exports.sendTeacherVerificationPush = functions.region('asia-northeast3').https.
     const expoJson = await expoRes.json();
     console.log('[sendTeacherVerificationPush] Expo 응답:', JSON.stringify(expoJson));
     console.log('[sendTeacherVerificationPush] pushToken:', pushToken);
+    // adminAlerts에 기록
+    await db.collection('adminAlerts').add({
+      type: approved ? 'info' : 'warning',
+      title: approved ? '선생님 인증 승인 완료' : '선생님 인증 거절',
+      message: `${userSnap.data()?.displayName || toUid}님의 선생님 인증이 ${approved ? '승인' : '거절'}되었습니다.`,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      read: false,
+      category: 'verification',
+    });
     return { success: true };
   } catch (e) {
     console.error('푸시 알림 발송 실패:', e);
