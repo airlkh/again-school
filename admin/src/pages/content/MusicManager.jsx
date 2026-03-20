@@ -36,7 +36,7 @@ const s = {
 };
 
 const GENRES = ['팝', 'R&B', '재즈', '클래식', '힙합', '인디', '발라드', '일렉트로닉', '기타'];
-const emptyForm = { title: '', url: '', duration: '', genre: '' };
+const emptyForm = { title: '', url: '', duration: '', genre: '', category: '일반' };
 
 export default function MusicManager() {
   const [tracks, setTracks] = useState([]);
@@ -46,6 +46,7 @@ export default function MusicManager() {
   const [form, setForm] = useState({ ...emptyForm });
   const [uploading, setUploading] = useState(false);
   const [playingId, setPlayingId] = useState(null);
+  const [categoryFilter, setCategoryFilter] = useState('전체');
   const audioRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -92,6 +93,7 @@ export default function MusicManager() {
         url: form.url,
         duration: Number(form.duration) || 0,
         genre: form.genre || '',
+        category: form.category || '일반',
         updatedAt: Timestamp.now(),
       };
       if (editId) {
@@ -129,7 +131,7 @@ export default function MusicManager() {
 
   const openEdit = (track) => {
     setEditId(track.id);
-    setForm({ title: track.title || '', url: track.url || '', duration: track.duration || '', genre: track.genre || '' });
+    setForm({ title: track.title || '', url: track.url || '', duration: track.duration || '', genre: track.genre || '', category: track.category || '일반' });
     setShowModal(true);
   };
 
@@ -156,6 +158,8 @@ export default function MusicManager() {
           { label: '전체 음악', value: tracks.length },
           { label: '장르 수', value: [...new Set(tracks.map((t) => t.genre).filter(Boolean))].length },
           { label: '총 재생 시간', value: formatDuration(tracks.reduce((sum, t) => sum + (t.duration || 0), 0)) },
+          { label: '인기음악', value: tracks.filter((t) => t.category === '인기음악').length },
+          { label: '추천음악', value: tracks.filter((t) => t.category === '추천음악').length },
         ].map((c) => (
           <div key={c.label} style={s.statCard}>
             <div style={s.statLabel}>{c.label}</div>
@@ -164,11 +168,28 @@ export default function MusicManager() {
         ))}
       </div>
 
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        {['전체', '인기음악', '추천음악', '일반'].map((cat) => (
+          <button
+            key={cat}
+            style={{
+              ...s.btn,
+              ...(categoryFilter === cat ? s.btnPrimary : { backgroundColor: '#fff', border: '1px solid #d0d0d8', color: '#555' }),
+              ...s.btnSmall,
+            }}
+            onClick={() => setCategoryFilter(cat)}
+          >
+            {cat} ({cat === '전체' ? tracks.length : tracks.filter((t) => (t.category || '일반') === cat).length})
+          </button>
+        ))}
+      </div>
+
       <table style={s.table}>
         <thead>
           <tr>
             <th style={s.th}>#</th>
             <th style={s.th}>제목</th>
+            <th style={s.th}>카테고리</th>
             <th style={s.th}>장르</th>
             <th style={s.th}>재생 시간</th>
             <th style={s.th}>미리듣기</th>
@@ -177,17 +198,26 @@ export default function MusicManager() {
         </thead>
         <tbody>
           {loading ? (
-            <tr><td style={s.emptyRow} colSpan={6}>로딩 중...</td></tr>
-          ) : tracks.length === 0 ? (
-            <tr><td style={s.emptyRow} colSpan={6}>등록된 음악이 없습니다.</td></tr>
+            <tr><td style={s.emptyRow} colSpan={7}>로딩 중...</td></tr>
+          ) : (() => {
+            const filteredTracks = categoryFilter === '전체' ? tracks : tracks.filter((t) => (t.category || '일반') === categoryFilter);
+            return filteredTracks.length === 0 ? (
+            <tr><td style={s.emptyRow} colSpan={7}>등록된 음악이 없습니다.</td></tr>
           ) : (
-            tracks.map((track, idx) => (
+            filteredTracks.map((track, idx) => (
               <tr key={track.id}
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9f9fb'}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
                 <td style={{ ...s.td, color: '#888', fontWeight: 600 }}>{idx + 1}</td>
                 <td style={{ ...s.td, fontWeight: 600 }}>
                   {playingId === track.id ? '▶ ' : ''}{track.title}
+                </td>
+                <td style={s.td}>
+                  <span style={{
+                    display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600,
+                    backgroundColor: track.category === '인기음악' ? '#fff0f0' : track.category === '추천음악' ? '#f0fff4' : '#f5f5f5',
+                    color: track.category === '인기음악' ? '#e94560' : track.category === '추천음악' ? '#2e7d32' : '#888',
+                  }}>{track.category || '일반'}</span>
                 </td>
                 <td style={s.td}>
                   {track.genre ? <span style={s.genreBadge}>{track.genre}</span> : '-'}
@@ -209,7 +239,8 @@ export default function MusicManager() {
                 </td>
               </tr>
             ))
-          )}
+          );
+          })()}
         </tbody>
       </table>
 
@@ -236,6 +267,15 @@ export default function MusicManager() {
                 onChange={(e) => setForm((p) => ({ ...p, genre: e.target.value }))}>
                 <option value="">선택 안 함</option>
                 {GENRES.map((g) => <option key={g} value={g}>{g}</option>)}
+              </select>
+            </div>
+            <div style={s.formGroup}>
+              <label style={s.formLabel}>카테고리</label>
+              <select style={{ ...s.input, backgroundColor: '#fff' }} value={form.category}
+                onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))}>
+                <option value="일반">일반</option>
+                <option value="인기음악">🔥 인기음악</option>
+                <option value="추천음악">⭐ 추천음악</option>
               </select>
             </div>
             <div style={s.formGroup}>
