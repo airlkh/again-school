@@ -98,6 +98,24 @@ export function setupNotificationHandlers(): () => void {
     });
   }
 
+  // 앱 종료 후 푸시 탭으로 실행된 경우
+  Notifications.getLastNotificationResponseAsync().then((response) => {
+    if (!response) return;
+    const data = response.notification.request.content.data;
+    setTimeout(() => {
+      if (data?.type === 'teacherVerified') {
+        router.push('/profile/teacher-apply' as any);
+      } else if (data?.postId) {
+        router.push({ pathname: '/post/[id]', params: { id: data.postId as string } });
+      } else if (data?.chatRoomId && data?.otherUid) {
+        router.push({
+          pathname: '/chat/[id]',
+          params: { id: data.otherUid as string, name: (data.otherName as string) || '' },
+        });
+      }
+    }, 1000);
+  });
+
   console.log('[Push] 알림 핸들러 설정 완료');
 
   return () => {
