@@ -10,6 +10,7 @@ import {
   addDoc,
   updateDoc,
   or,
+  limit,
   Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -79,27 +80,24 @@ export async function saveUserProfile(
 
 export async function countClassmates(schools: SchoolEntry[]): Promise<number> {
   if (schools.length === 0) return 0;
-
-  const usersRef = collection(db, 'users');
-  const q = query(usersRef, where('onboardingCompleted', '==', true));
-  const snapshot = await getDocs(q);
-
-  const seenUids = new Set<string>();
-  snapshot.forEach((docSnap) => {
-    const data = docSnap.data() as UserProfile;
-    const hasMatch = data.schools?.some((s) =>
-      schools.some(
-        (mine) =>
-          s.schoolName === mine.schoolName &&
-          s.graduationYear === mine.graduationYear,
-      ),
+  try {
+    const seenUids = new Set<string>();
+    await Promise.all(
+      schools.map(async (school) => {
+        const q = query(
+          collection(db, 'users'),
+          where('schoolNames', 'array-contains', school.schoolName),
+          where('onboardingCompleted', '==', true),
+          limit(200)
+        );
+        const snapshot = await getDocs(q);
+        snapshot.forEach((docSnap) => seenUids.add(docSnap.id));
+      })
     );
-    if (hasMatch) {
-      seenUids.add(docSnap.id);
-    }
-  });
-
-  return seenUids.size;
+    return seenUids.size;
+  } catch {
+    return 0;
+  }
 }
 
 /** 검색 키워드 생성 (이름, 학교명의 부분 문자열) */

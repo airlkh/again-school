@@ -31,16 +31,15 @@ export default function Step1Screen() {
   const [showBirthYearPicker, setShowBirthYearPicker] = useState(false);
 
   async function pickImage() {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
       Alert.alert('권한 필요', '사진 접근 권한을 허용해주세요.');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.7,
+      mediaTypes: ['images'] as ImagePicker.MediaType[],
+      allowsEditing: false,
+      quality: 0.9,
     });
     if (!result.canceled && result.assets[0]) {
       setPhotoURI(result.assets[0].uri);
@@ -93,12 +92,14 @@ export default function Step1Screen() {
                     style={[
                       styles.avatar,
                       {
-                        backgroundColor: colors.card,
-                        borderColor: colors.border,
+                        backgroundColor: 'rgba(0,0,0,0.15)',
+                        borderColor: 'rgba(0,0,0,0.2)',
+                        borderWidth: 2,
+                        borderStyle: 'dashed',
                       },
                     ]}
                   >
-                    <Ionicons name="person" size={48} color={colors.inactive} />
+                    <Ionicons name="person" size={48} color="rgba(0,0,0,0.3)" />
                   </View>
                 )}
                 <View style={[styles.cameraIcon, { backgroundColor: colors.primary }]}>

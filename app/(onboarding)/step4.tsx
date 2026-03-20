@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert,
+  View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,11 +19,24 @@ export default function Step4Screen() {
   const [isSaving, setIsSaving] = useState(true);
   const [classmateCount, setClassmateCount] = useState(0);
   const [error, setError] = useState(false);
+  const [searchStep, setSearchStep] = useState(0);
+  const msgTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const celebrationBg = isDark ? 'rgba(232,49,58,0.15)' : '#fef2f2';
 
   useEffect(() => {
     saveProfile();
+  }, []);
+
+  useEffect(() => {
+    let idx = 0;
+    msgTimer.current = setInterval(() => {
+      idx = (idx + 1) % 4;
+      setSearchStep(idx);
+    }, 1800);
+    return () => {
+      if (msgTimer.current) clearInterval(msgTimer.current);
+    };
   }, []);
 
   async function saveProfile() {
@@ -100,17 +113,41 @@ export default function Step4Screen() {
       <StepIndicator totalSteps={4} currentStep={4} />
       <View style={styles.center}>
         {isSaving ? (
-          <>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={[styles.savingText, { color: colors.textSecondary }]}>
-              잠깐만요...
-            </Text>
-          </>
+          (() => {
+            const msgs = [
+              { text: '프로필을 저장하고 있어요...', image: require('../../assets/onboarding_01.png') },
+              { text: '동창을 찾고 있어요...', image: require('../../assets/onboarding_02.png') },
+              { text: '학교 정보를 확인하고 있어요...', image: require('../../assets/onboarding_03.png') },
+              { text: '거의 다 됐어요!', image: require('../../assets/onboarding_04.png') },
+            ];
+            return (
+              <>
+                <Image
+                  source={msgs[searchStep].image}
+                  style={{ width: 160, height: 160, marginBottom: 24 }}
+                  resizeMode="contain"
+                />
+                <Text style={[styles.savingText, { color: colors.textSecondary }]}>
+                  {msgs[searchStep].text}
+                </Text>
+              </>
+            );
+          })()
         ) : (
           <>
-            <View style={[styles.celebrationCircle, { backgroundColor: celebrationBg }]}>
-              <Ionicons name="people" size={48} color={colors.primary} />
-            </View>
+            {data.photoURI ? (
+              <Image
+                source={{ uri: data.photoURI }}
+                style={{
+                  width: 96, height: 96, borderRadius: 48,
+                  marginBottom: 24,
+                }}
+              />
+            ) : (
+              <View style={[styles.celebrationCircle, { backgroundColor: celebrationBg }]}>
+                <Ionicons name="people" size={48} color={colors.primary} />
+              </View>
+            )}
             <Text style={[styles.welcomeTitle, { color: colors.text }]}>환영합니다!</Text>
             <Text style={[styles.welcomeName, { color: colors.primary }]}>
               {data.displayName}님
