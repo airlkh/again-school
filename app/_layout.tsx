@@ -11,7 +11,6 @@ import { UserProvider } from '../src/contexts/UserContext';
 import { migrateDummyMeetups } from '../src/services/meetupService';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../src/config/firebase';
-import * as Notifications from 'expo-notifications';
 
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -23,6 +22,8 @@ function RootLayoutNav() {
   const rtr = useRouter();
   const pathname = usePathname();
   const splashHidden = useRef(false);
+
+  console.log('[RootLayout] segments:', segments, 'pathname:', pathname, 'isLoading:', isLoading, 'user:', !!user, 'onboardingCompleted:', onboardingCompleted);
 
   // 스플래시 숨기기 — SplashOverlay가 처리하므로 여기서는 안전장치만
   useEffect(() => {
@@ -113,25 +114,7 @@ function RootLayoutNav() {
     // 3. 인증됨 + auth 화면에 있으면 → 온보딩 또는 탭
     if (user && inAuthGroup) {
       if (onboardingCompleted === true) {
-        Notifications.getLastNotificationResponseAsync().then((response) => {
-          if (response) {
-            const nData = response.notification.request.content.data;
-            if (nData?.type === 'teacherVerified') {
-              rtr.replace('/(tabs)');
-              setTimeout(() => rtr.push('/profile/teacher-apply' as any), 300);
-              return;
-            } else if (nData?.postId) {
-              rtr.replace('/(tabs)');
-              setTimeout(() => rtr.push({ pathname: '/post/[id]', params: { id: nData.postId as string } }), 300);
-              return;
-            } else if (nData?.chatRoomId && nData?.otherUid) {
-              rtr.replace('/(tabs)');
-              setTimeout(() => rtr.push({ pathname: '/chat/[id]', params: { id: nData.otherUid as string, name: (nData.otherName as string) || '' } }), 300);
-              return;
-            }
-          }
-          rtr.replace('/(tabs)');
-        });
+        rtr.replace('/(tabs)');
       } else if (onboardingCompleted === false) {
         rtr.replace('/(onboarding)/step1');
       }
