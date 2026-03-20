@@ -32,32 +32,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(firebaseUser);
       if (firebaseUser) {
         // 1. AsyncStorage 캐시에서 빠르게 로드
+        let cachedCompleted = false;
         try {
           const cached = await AsyncStorage.getItem(ONBOARDING_CACHE_KEY);
           if (cached === 'true') {
-            console.log('[AuthContext] 캐시에서 onboardingCompleted=true 로드');
+            cachedCompleted = true;
             setOnboardingCompleted(true);
-          }
-        } catch {}
-
-        // 2. Firestore에서 실제 값 확인 (동기화)
-        try {
-          console.log('[AuthContext] checkOnboardingCompleted 호출 시작:', firebaseUser.uid);
-          const completed = await checkOnboardingCompleted(firebaseUser.uid);
-          console.log('[AuthContext] checkOnboardingCompleted 결과:', completed);
-          setOnboardingCompleted(completed);
-          // 캐시 동기화
-          await AsyncStorage.setItem(ONBOARDING_CACHE_KEY, completed ? 'true' : 'false');
-          // 푸시 알림 등록
-          if (completed) {
+            // 캐시가 true면 바로 푸시 등록 + 서버 조회 스킵
             registerPushToken(firebaseUser.uid).catch(() => {});
             notificationCleanup = setupNotificationHandlers();
           }
-        } catch (error: any) {
-          console.warn('[AuthContext] checkOnboardingCompleted 에러:', error?.code, error?.message);
-          // 캐시가 없을 때만 false로 설정
-          if (onboardingCompleted === null) {
-            setOnboardingCompleted(false);
+        } catch {}
+
+        // 2. 캐시가 false/없으면 Firestore에서 확인
+        if (!cachedCompleted) {
+          try {
+            const completed = await checkOnboardingCompleted(firebaseUser.uid);
+            setOnboardingCompleted(completed);
+            await AsyncStorage.setItem(ONBOARDING_CACHE_KEY, completed ? 'true' : 'false');
+            if (completed) {
+              registerPushToken(firebaseUser.uid).catch(() => {});
+              notificationCleanup = setupNotificationHandlers();
+            }
+          } catch (error: any) {
+            console.warn('[AuthContext] checkOnboardingCompleted 에러:', error?.code, error?.message);
+            if (onboardingCompleted === null) {
+              setOnboardingCompleted(false);
+            }
           }
         }
       } else {

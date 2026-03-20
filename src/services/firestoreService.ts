@@ -29,14 +29,12 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
 
 export async function checkOnboardingCompleted(uid: string): Promise<boolean> {
   try {
-    const { getDocFromServer } = await import('firebase/firestore');
-    const docSnap = await getDocFromServer(doc(db, 'users', uid));
-    console.log('[checkOnboarding] fromServer onboardingCompleted:', docSnap.data()?.onboardingCompleted);
-    return docSnap.exists() ? (docSnap.data()?.onboardingCompleted ?? false) : false;
+    const docSnap = await getDoc(doc(db, 'users', uid));
+    const result = docSnap.exists() ? (docSnap.data()?.onboardingCompleted ?? false) : false;
+    return result;
   } catch (e) {
-    console.warn('[checkOnboarding] getDocFromServer 실패, 캐시 사용:', e);
-    const profile = await getUserProfile(uid);
-    return profile?.onboardingCompleted ?? false;
+    console.warn('[checkOnboarding] 실패:', e);
+    return false;
   }
 }
 
