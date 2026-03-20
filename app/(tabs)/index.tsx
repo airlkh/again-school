@@ -53,11 +53,20 @@ import { useScrollToTop } from '@react-navigation/native';
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
 // ─── 피드 아이템 통합 타입 ─────────────────────────────────────────
+interface BannerItem {
+  id: string;
+  title: string;
+  imageUrl?: string;
+  linkUrl?: string;
+  position: string;
+}
+
 type FeedItem =
   | { type: 'story_bar'; id: 'stories' }
   | { type: 'photo_post'; id: string; data: DummyPost | FirestorePost; isFirestore: boolean }
   | { type: 'classmate_recommend'; id: string }
-  | { type: 'meetup_event'; id: string; data: Meetup };
+  | { type: 'meetup_event'; id: string; data: Meetup }
+  | { type: 'banner'; id: string; data: BannerItem };
 
 // ─── 스토리 바 ─────────────────────────────────────────────────────
 function StoryBar({ fsStories }: { fsStories: FirestoreStory[] }) {
@@ -974,6 +983,34 @@ function MeetupEventCard({ meetup }: { meetup: Meetup }) {
 }
 
 // ─── 메인 화면 ─────────────────────────────────────────────────────
+function BannerCard({ banner }: { banner: BannerItem }) {
+  const { colors } = useTheme();
+  const handlePress = async () => {
+    if (!banner.linkUrl) return;
+    try {
+      const { Linking } = require('react-native');
+      await Linking.openURL(banner.linkUrl);
+      const { doc, updateDoc, increment } = await import('firebase/firestore');
+      const { db } = await import('../../src/config/firebase');
+      updateDoc(doc(db, 'banners', banner.id), { clicks: increment(1) }).catch(() => {});
+    } catch {}
+  };
+  return (
+    <TouchableOpacity style={[styles.bannerCard, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={handlePress} activeOpacity={0.9}>
+      <View style={[styles.adLabel, { backgroundColor: colors.card }]}>
+        <Text style={[styles.adLabelText, { color: colors.inactive }]}>광고</Text>
+      </View>
+      {banner.imageUrl ? (
+        <Image source={{ uri: banner.imageUrl }} style={styles.bannerImage} resizeMode="cover" />
+      ) : (
+        <View style={[styles.bannerPlaceholder, { backgroundColor: colors.card }]}>
+          <Text style={{ color: colors.inactive }}>{banner.title}</Text>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+}
+
 export default function HomeScreen() {
   const { colors } = useTheme();
   const { user: currentUser } = useAuth();
@@ -987,6 +1024,7 @@ export default function HomeScreen() {
   const [hiddenPostIds, setHiddenPostIds] = useState<Set<string>>(new Set());
   const [visiblePostId, setVisiblePostId] = useState<string | null>(null);
   const feedItemsRef = useRef<FeedItem[]>([]);
+  const [banners, setBanners] = useState<BannerItem[]>([]);
   const [unreadChat, setUnreadChat] = useState(0);
   const unreadNotif = useUnreadNotifications(currentUser?.uid);
   const { playMusic, stopMusic } = useMusic();
@@ -1017,7 +1055,7 @@ export default function HomeScreen() {
   }, [currentUser]);
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: Array<{ key: string }> }) => {
-    const postItems = viewableItems.filter((v) => v.key !== 'stories' && !v.key.startsWith('recommend-'));
+    const postItems = viewableItems.filter((v) => v.key !== 'stories' && !v.key.startsWith('recommend-') && !v.key.startsWith('banner-'));
     setVisiblePostId(postItems.length > 0 ? postItems[0].key : null);
   }).current;
 
@@ -1030,6 +1068,27 @@ export default function HomeScreen() {
       }
     }).catch(() => {});
   }, []);
+
+  // 배너 로드
+  useEffect(() => {
+    if (!currentUser) return;
+    (async () => {
+      try {
+        const { collection, getDocs, query: fsQuery, where } = await import('firebase/firestore');
+        const { db } = await import('../../src/config/firebase');
+        const snap = await getDocs(fsQuery(collection(db, 'banners'), where('active', '==', true)));
+        const today = new Date().toISOString().slice(0, 10);
+        const filtered = snap.docs
+          .map((d) => ({ id: d.id, ...d.data() } as BannerItem & { startDate?: string; endDate?: string }))
+          .filter((b) => {
+            if (b.startDate && b.startDate > today) return false;
+            if (b.endDate && b.endDate < today) return false;
+            return true;
+          });
+        setBanners(filtered);
+      } catch {}
+    })();
+  }, [currentUser]);
 
   const hidePost = useCallback((postId: string) => {
     setHiddenPostIds((prev) => {
@@ -1098,6 +1157,12 @@ export default function HomeScreen() {
         const p = allPosts[postIdx];
         items.push({ type: 'photo_post', id: p.data.id, data: p.data, isFirestore: p.isFirestore });
         postIdx++;
+        // 게시물 5개마다 배너 삽입
+        if (postIdx > 0 && postIdx % 5 === 0 && banners.length > 0) {
+          const bannerIdx = Math.floor(postIdx / 5 - 1) % banners.length;
+          const banner = banners[bannerIdx];
+          items.push({ type: 'banner', id: `banner-${banner.id}-${postIdx}`, data: banner });
+        }
       }
 
       if (count % 2 === 0) {
@@ -1211,6 +1276,8 @@ export default function HomeScreen() {
         return <ClassmateRecommendCard />;
       case 'meetup_event':
         return <MeetupEventCard meetup={item.data} />;
+      case 'banner':
+        return <BannerCard banner={item.data} />;
       default:
         return null;
     }
@@ -1552,4 +1619,9 @@ const styles = StyleSheet.create({
   menuItemText: { fontSize: 16, fontWeight: '500' },
   menuCancel: { alignItems: 'center', paddingVertical: 16, marginTop: 8, borderTopWidth: 1 },
   menuCancelText: { fontSize: 16, fontWeight: '600' },
+  bannerCard: { marginBottom: 8, overflow: 'hidden', borderTopWidth: 0.5, borderBottomWidth: 0.5, position: 'relative' as const },
+  bannerImage: { width: SCREEN_WIDTH, height: SCREEN_WIDTH * 0.35 },
+  bannerPlaceholder: { width: SCREEN_WIDTH, height: SCREEN_WIDTH * 0.35, justifyContent: 'center' as const, alignItems: 'center' as const },
+  adLabel: { position: 'absolute' as const, top: 8, right: 8, zIndex: 10, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  adLabelText: { fontSize: 10, fontWeight: '600' as const },
 });
