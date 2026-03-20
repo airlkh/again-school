@@ -288,7 +288,7 @@ exports.sendTeacherVerificationPush = functions.region('asia-northeast3').https.
     const body = approved
       ? '선생님 인증이 승인되었습니다. 이제 선생님 배지가 표시돼요!'
       : `선생님 인증이 거절되었습니다. 사유: ${reason || '사유 없음'}`;
-    await fetch('https://exp.host/--/api/v2/push/send', {
+    const expoRes = await fetch('https://exp.host/--/api/v2/push/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -298,6 +298,9 @@ exports.sendTeacherVerificationPush = functions.region('asia-northeast3').https.
         data: { type: 'teacherVerified', status: approved ? 'approved' : 'rejected' },
       }),
     });
+    const expoJson = await expoRes.json();
+    console.log('[sendTeacherVerificationPush] Expo 응답:', JSON.stringify(expoJson));
+    console.log('[sendTeacherVerificationPush] pushToken:', pushToken);
     return { success: true };
   } catch (e) {
     console.error('푸시 알림 발송 실패:', e);
