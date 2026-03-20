@@ -534,6 +534,7 @@ export default function UploadScreen() {
             x: (pan.x as any)._value ?? 0,
             y: (pan.y as any)._value ?? 0,
           } : undefined,
+          schoolName: profile?.schools?.[0]?.schoolName || undefined,
           visibility,
           visibilitySchools,
           taggedUsers: taggedUsers.length > 0 ? taggedUsers : undefined,
