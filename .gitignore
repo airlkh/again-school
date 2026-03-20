@@ -43,5 +43,8 @@ yarn-error.*
 # Dev Client
 *.dev.apk
 
+# Keystore base64
+keystore_base64.txt
+
 # generated native folders
 /ios
