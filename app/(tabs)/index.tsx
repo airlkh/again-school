@@ -45,7 +45,7 @@ import { getAvatarSource } from '../../src/utils/avatar';
 import { NameWithBadge } from '../../src/utils/badge';
 import { CommentBottomSheet } from '../../src/components/CommentBottomSheet';
 import { VideoView, useVideoPlayer, type VideoPlayer } from 'expo-video';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
 import { db } from '../../src/config/firebase';
 import { useUnreadNotifications } from '../../src/hooks/useUnreadNotifications';
 import { useScrollToTop } from '@react-navigation/native';
@@ -1071,12 +1071,10 @@ export default function HomeScreen() {
 
   // 배너 로드
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser?.uid || banners.length > 0) return;
     (async () => {
       try {
-        const { collection, getDocs, query: fsQuery, where } = await import('firebase/firestore');
-        const { db } = await import('../../src/config/firebase');
-        const snap = await getDocs(fsQuery(collection(db, 'banners'), where('active', '==', true)));
+        const snap = await getDocs(query(collection(db, 'banners'), where('active', '==', true)));
         const today = new Date().toISOString().slice(0, 10);
         const filtered = snap.docs
           .map((d) => ({ id: d.id, ...d.data() } as BannerItem & { startDate?: string; endDate?: string }))
@@ -1085,12 +1083,10 @@ export default function HomeScreen() {
             if (b.endDate && b.endDate < today) return false;
             return true;
           });
-        console.log('[Banner] 로드된 배너 수:', filtered.length);
-        filtered.forEach((b) => console.log('[Banner]', b.id, b.title, b.imageUrl?.substring(0, 50)));
         setBanners(filtered);
       } catch {}
     })();
-  }, [currentUser]);
+  }, [currentUser?.uid]);
 
   const hidePost = useCallback((postId: string) => {
     setHiddenPostIds((prev) => {
