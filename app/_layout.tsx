@@ -8,7 +8,6 @@ import { ThemeProvider, useTheme } from '../src/contexts/ThemeContext';
 import { MusicProvider } from '../src/contexts/MusicContext';
 import { MuteProvider } from '../src/contexts/MuteContext';
 import { UserProvider } from '../src/contexts/UserContext';
-import { migrateDummyMeetups } from '../src/services/meetupService';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../src/config/firebase';
 
@@ -32,16 +31,6 @@ function RootLayoutNav() {
     }
   }, [isLoading]);
 
-  // 더미 모임 데이터를 Firestore에 마이그레이션
-  useEffect(() => {
-    if (user) {
-      try {
-        migrateDummyMeetups().catch((e) => console.warn('[RootLayout] migrateDummyMeetups 오류:', e));
-      } catch (e) {
-        console.warn('[RootLayout] migrateDummyMeetups 동기 오류:', e);
-      }
-    }
-  }, [user]);
 
   // 온라인/오프라인 상태 업데이트
   useEffect(() => {
