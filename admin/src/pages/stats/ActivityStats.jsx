@@ -25,9 +25,11 @@ export default function ActivityStats() {
       const posts = postSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
       // 일별 게시글/댓글 집계
+      const parseDate = (raw) => raw?.toDate?.() || (typeof raw === 'number' ? new Date(raw) : null);
+
       const dayMap = {};
       posts.forEach((p) => {
-        const d = p.createdAt?.toDate?.();
+        const d = parseDate(p.createdAt);
         if (!d) return;
         const key = d.toISOString().slice(0, 10);
         if (!dayMap[key]) dayMap[key] = { date: key, posts: 0, comments: 0 };
@@ -40,7 +42,7 @@ export default function ActivityStats() {
       // 활동 사용자 추이 (일별 고유 작성자)
       const activeMap = {};
       posts.forEach((p) => {
-        const d = p.createdAt?.toDate?.();
+        const d = parseDate(p.createdAt);
         if (!d) return;
         const key = d.toISOString().slice(0, 10);
         if (!activeMap[key]) activeMap[key] = new Set();

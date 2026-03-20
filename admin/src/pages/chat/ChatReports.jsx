@@ -167,14 +167,16 @@ export default function ChatReports() {
     setLoading(true);
     try {
       let q = query(
-        collection(db, 'chatReports'),
+        collection(db, 'reports'),
+        where('targetType', '==', 'chat'),
         orderBy('createdAt', 'desc'),
         limit(PAGE_SIZE)
       );
 
       if (isNextPage && lastDoc) {
         q = query(
-          collection(db, 'chatReports'),
+          collection(db, 'reports'),
+          where('targetType', '==', 'chat'),
           orderBy('createdAt', 'desc'),
           startAfter(lastDoc),
           limit(PAGE_SIZE)
@@ -199,7 +201,7 @@ export default function ChatReports() {
 
   const handleUpdateStatus = async (reportId, newStatus) => {
     try {
-      await updateDoc(doc(db, 'chatReports', reportId), {
+      await updateDoc(doc(db, 'reports', reportId), {
         status: newStatus,
         updatedAt: new Date(),
       });

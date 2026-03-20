@@ -31,7 +31,7 @@ export default function MemberStats() {
       // 가입 추이
       const trendMap = {};
       users.forEach((u) => {
-        const d = u.createdAt?.toDate?.();
+        const d = u.createdAt?.toDate?.() || (typeof u.createdAt === 'number' ? new Date(u.createdAt) : null);
         if (!d) return;
         let key;
         if (period === 'daily') {
@@ -53,7 +53,7 @@ export default function MemberStats() {
       // 학교 유형 분포
       const schoolMap = {};
       users.forEach((u) => {
-        const type = u.schoolType || u.school?.type || '미지정';
+        const type = u.schools?.[0]?.schoolType || u.schoolType || '미지정';
         schoolMap[type] = (schoolMap[type] || 0) + 1;
       });
       setSchoolDist(Object.entries(schoolMap).map(([name, value]) => ({ name, value })));
@@ -61,7 +61,7 @@ export default function MemberStats() {
       // 지역 분포
       const regionMap = {};
       users.forEach((u) => {
-        const region = u.region || u.address?.region || u.sido || '미지정';
+        const region = (typeof u.region === 'object' ? u.region?.sido : u.region) || u.sido || '미지정';
         regionMap[region] = (regionMap[region] || 0) + 1;
       });
       const sorted = Object.entries(regionMap)
