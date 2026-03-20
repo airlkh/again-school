@@ -490,8 +490,8 @@ export default function PendingVerification() {
       result = result.filter((u) => {
         if (u._type === 'teacher') {
           return (
-            (u.name || '').toLowerCase().includes(term) ||
-            (u.school || '').toLowerCase().includes(term)
+            (u.displayName || u.name || '').toLowerCase().includes(term) ||
+            (u.school || u.schools?.[0]?.schoolName || '').toLowerCase().includes(term)
           );
         }
         // official
@@ -546,10 +546,14 @@ export default function PendingVerification() {
     >
       <div style={styles.cardHeader}>
         <div style={styles.avatar}>
-          <User style={{ width: 24, height: 24, color: '#aaa' }} />
+          {user.photoURL ? (
+            <img src={user.photoURL} alt="" style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover' }} />
+          ) : (
+            <User style={{ width: 24, height: 24, color: '#aaa' }} />
+          )}
         </div>
         <div style={{ flex: 1 }}>
-          <p style={styles.cardName}>{user.name || '이름 없음'}</p>
+          <p style={styles.cardName}>{user.displayName || user.name || '이름 없음'}</p>
           <p style={styles.cardEmail}>{user.email || '-'}</p>
         </div>
         {renderTypePill(user)}
@@ -558,7 +562,7 @@ export default function PendingVerification() {
       <div style={styles.infoRow}>
         <School style={styles.infoIcon} />
         <span style={styles.label}>학교</span>
-        <span>{user.school || '-'}</span>
+        <span>{user.school || user.schools?.[0]?.schoolName || '-'}</span>
       </div>
       <div style={styles.infoRow}>
         <BookOpen style={styles.infoIcon} />
@@ -570,8 +574,8 @@ export default function PendingVerification() {
         <span style={styles.label}>경력</span>
         <span>
           {Array.isArray(user.teacherHistory)
-            ? user.teacherHistory.join(', ')
-            : user.teacherHistory || '-'}
+            ? user.teacherHistory.map(h => typeof h === 'object' ? `${h.schoolName || h.school || ''} ${h.startYear || h.year || ''}`.trim() : h).join(', ')
+            : user.teacherHistory || user.teacherExperience || user.experience || '-'}
         </span>
       </div>
 
@@ -715,7 +719,7 @@ export default function PendingVerification() {
             <>
               <div style={styles.modalRow}>
                 <span style={styles.modalLabel}>이름</span>
-                <span style={styles.modalValue}>{detailUser.name || '-'}</span>
+                <span style={styles.modalValue}>{detailUser.displayName || detailUser.name || '-'}</span>
               </div>
               <div style={styles.modalRow}>
                 <span style={styles.modalLabel}>이메일</span>
@@ -723,7 +727,7 @@ export default function PendingVerification() {
               </div>
               <div style={styles.modalRow}>
                 <span style={styles.modalLabel}>학교</span>
-                <span style={styles.modalValue}>{detailUser.school || '-'}</span>
+                <span style={styles.modalValue}>{detailUser.school || detailUser.schools?.[0]?.schoolName || '-'}</span>
               </div>
               <div style={styles.modalRow}>
                 <span style={styles.modalLabel}>과목</span>
@@ -733,8 +737,8 @@ export default function PendingVerification() {
                 <span style={styles.modalLabel}>경력</span>
                 <span style={styles.modalValue}>
                   {Array.isArray(detailUser.teacherHistory)
-                    ? detailUser.teacherHistory.join(', ')
-                    : detailUser.teacherHistory || '-'}
+                    ? detailUser.teacherHistory.map(h => typeof h === 'object' ? `${h.schoolName || h.school || ''} ${h.startYear || h.year || ''}`.trim() : h).join(', ')
+                    : detailUser.teacherHistory || detailUser.teacherExperience || '-'}
                 </span>
               </div>
               {detailUser.teacherMessage && (
