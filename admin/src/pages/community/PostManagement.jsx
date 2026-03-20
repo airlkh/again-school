@@ -86,6 +86,20 @@ export default function PostManagement() {
 
   useEffect(() => { fetchPosts(); }, []);
 
+  useEffect(() => {
+    const hash = window.location.hash.replace('#', '');
+    if (hash) {
+      setTimeout(() => {
+        const el = document.getElementById(`post-${hash}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.style.backgroundColor = '#fff9c4';
+          setTimeout(() => { el.style.backgroundColor = ''; }, 2000);
+        }
+      }, 1000);
+    }
+  }, [posts]);
+
   const handleDelete = async (postId) => {
     if (!window.confirm('정말 이 게시글을 삭제하시겠습니까?')) return;
     try {
@@ -187,7 +201,7 @@ export default function PostManagement() {
             <tr><td style={styles.emptyRow} colSpan={9}>게시글이 없습니다.</td></tr>
           ) : (
             filteredPosts.map((post) => (
-              <tr key={post.id}>
+              <tr key={post.id} id={`post-${post.id}`} style={{ transition: 'background-color 0.5s' }}>
                 <td style={styles.td}>
                   {post.imageUrl || post.videoUrl ? (
                     <img

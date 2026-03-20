@@ -312,12 +312,13 @@ export default function CommentManagement() {
                 </td>
                 <td style={styles.td}>{truncate(comment.text || comment.content)}</td>
                 <td style={styles.td}>
-                  <a
-                    href={`/community/posts?id=${comment.postId}`}
-                    style={{ fontSize: 12, color: '#3b82f6', textDecoration: 'none' }}
+                  <span
+                    style={{ fontSize: 12, color: '#3b82f6', cursor: 'pointer', textDecoration: 'underline' }}
+                    onClick={() => window.open(`/community/posts#${comment.postId}`, '_blank')}
+                    title={comment.postId}
                   >
                     {comment.postId ? comment.postId.substring(0, 10) + '...' : '-'}
-                  </a>
+                  </span>
                 </td>
                 <td style={styles.td}>{formatDate(comment.createdAt)}</td>
                 <td style={styles.td}>
