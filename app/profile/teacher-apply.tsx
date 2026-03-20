@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   Alert, ActivityIndicator, ScrollView,
@@ -10,6 +10,7 @@ import { db } from '../../src/config/firebase';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useGoBack } from '../../src/hooks/useGoBack';
+import { useFocusEffect } from 'expo-router';
 import { TeacherHistory } from '../../src/types/auth';
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -119,27 +120,29 @@ export default function TeacherApplyScreen() {
   const [isEditing, setIsEditing] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
 
-  useEffect(() => {
-    if (!user) return;
-    setPageLoading(true);
-    (async () => {
-      try {
-        const snap = await getDoc(doc(db, 'users', user.uid));
-        if (snap.exists()) {
-          const data = snap.data();
-          setAlreadyApplied(!!data.isTeacher);
-          setIsVerified(!!data.teacherVerified);
-          setIsRejected(!!data.teacherRejected);
-          setRejectedReason(data.teacherRejectedReason || '');
-          if (data.teacherHistory?.length) setHistory(data.teacherHistory);
-          if (data.teacherMessage) setMessage(data.teacherMessage);
+  useFocusEffect(
+    useCallback(() => {
+      if (!user) return;
+      setPageLoading(true);
+      (async () => {
+        try {
+          const snap = await getDoc(doc(db, 'users', user.uid));
+          if (snap.exists()) {
+            const data = snap.data();
+            setAlreadyApplied(!!data.isTeacher);
+            setIsVerified(!!data.teacherVerified);
+            setIsRejected(!!data.teacherRejected);
+            setRejectedReason(data.teacherRejectedReason || '');
+            if (data.teacherHistory?.length) setHistory(data.teacherHistory);
+            if (data.teacherMessage) setMessage(data.teacherMessage);
+          }
+        } catch {}
+        finally {
+          setPageLoading(false);
         }
-      } catch {}
-      finally {
-        setPageLoading(false);
-      }
-    })();
-  }, [user]);
+      })();
+    }, [user])
+  );
 
   function updateItem(index: number, field: keyof TeacherHistory, value: any) {
     setHistory((prev) => {
