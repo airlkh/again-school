@@ -62,7 +62,9 @@ export function setupNotificationHandlers(): () => void {
   responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
     const data = response.notification.request.content.data;
 
-    if (data?.chatRoomId && data?.otherUid) {
+    if (data?.type === 'teacherVerified') {
+      router.push('/profile/teacher-apply' as any);
+    } else if (data?.chatRoomId && data?.otherUid) {
       router.push({
         pathname: '/chat/[id]',
         params: {

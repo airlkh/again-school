@@ -117,9 +117,11 @@ export default function TeacherApplyScreen() {
   const [isRejected, setIsRejected] = useState(false);
   const [rejectedReason, setRejectedReason] = useState('');
   const [isEditing, setIsEditing] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true);
 
   useEffect(() => {
     if (!user) return;
+    setPageLoading(true);
     (async () => {
       try {
         const snap = await getDoc(doc(db, 'users', user.uid));
@@ -133,6 +135,9 @@ export default function TeacherApplyScreen() {
           if (data.teacherMessage) setMessage(data.teacherMessage);
         }
       } catch {}
+      finally {
+        setPageLoading(false);
+      }
     })();
   }, [user]);
 
@@ -203,6 +208,11 @@ export default function TeacherApplyScreen() {
         <View style={styles.backBtn} />
       </View>
 
+      {pageLoading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 }}>
+          <ActivityIndicator size="large" color="#7C3AED" />
+        </View>
+      ) : (
       <ScrollView contentContainerStyle={styles.content}>
         <View style={[styles.infoBanner, { backgroundColor: '#7C3AED18', borderColor: '#7C3AED44' }]}>
           <Text style={styles.infoEmoji}>👩‍🏫</Text>
@@ -327,6 +337,7 @@ export default function TeacherApplyScreen() {
           </>
         )}
       </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
