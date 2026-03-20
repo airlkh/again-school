@@ -217,8 +217,8 @@ export default function CommentManagement() {
     if (statusFilter === 'visible' && c.hidden) return false;
     if (search) {
       const s = search.toLowerCase();
-      const content = (c.content || c.text || '').toLowerCase();
-      const author = (c.authorName || c.authorEmail || '').toLowerCase();
+      const content = (c.text || c.content || '').toLowerCase();
+      const author = (c.name || c.authorName || '').toLowerCase();
       if (!content.includes(s) && !author.includes(s)) return false;
     }
     if (dateFrom) {
@@ -292,7 +292,7 @@ export default function CommentManagement() {
           <tr>
             <th style={styles.th}>작성자</th>
             <th style={styles.th}>댓글 내용</th>
-            <th style={styles.th}>게시글 ID</th>
+            <th style={styles.th}>원본 게시글</th>
             <th style={styles.th}>작성일</th>
             <th style={styles.th}>상태</th>
             <th style={{ ...styles.th, textAlign: 'center' }}>관리</th>
@@ -311,13 +311,16 @@ export default function CommentManagement() {
             filteredComments.map((comment) => (
               <tr key={comment.id}>
                 <td style={styles.td}>
-                  {comment.authorName || comment.authorEmail || comment.authorId || '-'}
+                  {comment.name || comment.authorName || '-'}
                 </td>
-                <td style={styles.td}>{truncate(comment.content || comment.text)}</td>
+                <td style={styles.td}>{truncate(comment.text || comment.content)}</td>
                 <td style={styles.td}>
-                  <span style={{ fontSize: 12, color: '#888', fontFamily: 'monospace' }}>
-                    {comment.postId ? comment.postId.substring(0, 8) + '...' : '-'}
-                  </span>
+                  <a
+                    href={`/community/posts?id=${comment.postId}`}
+                    style={{ fontSize: 12, color: '#3b82f6', textDecoration: 'none' }}
+                  >
+                    {comment.postId ? comment.postId.substring(0, 10) + '...' : '-'}
+                  </a>
                 </td>
                 <td style={styles.td}>{formatDate(comment.createdAt)}</td>
                 <td style={styles.td}>
