@@ -95,6 +95,7 @@ export default function DashboardHome() {
   const [signupTrend, setSignupTrend] = useState([]);
   const [communityActivity, setCommunityActivity] = useState([]);
   const [recentReports, setRecentReports] = useState([]);
+  const [recentPosts, setRecentPosts] = useState([]);
 
   // KPI: 전체 회원수 & 오늘 가입 & 인증 대기
   useEffect(() => {
@@ -194,17 +195,17 @@ export default function DashboardHome() {
         }
 
         try {
-          const commentsSnap = await getDocs(
+          const postsForComment = await getDocs(
             query(
-              collection(db, 'comments'),
+              collection(db, 'posts'),
               where('createdAt', '>=', Timestamp.fromDate(dayStart)),
               where('createdAt', '<', Timestamp.fromDate(dayEnd))
             )
           );
-          commentCount = commentsSnap.size;
-        } catch {
-          // comments 컬렉션 없을 수 있음
-        }
+          postsForComment.forEach((d) => {
+            commentCount += (d.data().commentCount || 0);
+          });
+        } catch {}
 
         days.push({
           date: format(dayStart, 'M/d', { locale: ko }),
@@ -216,6 +217,18 @@ export default function DashboardHome() {
     }
 
     fetchActivity();
+  }, []);
+
+  useEffect(() => {
+    async function fetchRecentPosts() {
+      try {
+        const snap = await getDocs(
+          query(collection(db, 'posts'), orderBy('createdAt', 'desc'), limit(5))
+        );
+        setRecentPosts(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      } catch {}
+    }
+    fetchRecentPosts();
   }, []);
 
   const kpiCards = [
@@ -356,6 +369,51 @@ export default function DashboardHome() {
                       : '-'}
                   </td>
                   <td style={tdStyle}>{statusBadge(report.status)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Recent Posts */}
+      <div style={{ ...sectionStyle, marginTop: 24 }}>
+        <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, color: '#111827' }}>
+          최근 게시물
+        </h2>
+        {recentPosts.length === 0 ? (
+          <p style={{ color: '#9ca3af', fontSize: 14, padding: 20, textAlign: 'center' }}>게시물이 없습니다.</p>
+        ) : (
+          <table style={tableStyle}>
+            <thead>
+              <tr>
+                <th style={thStyle}>미디어</th>
+                <th style={thStyle}>작성자</th>
+                <th style={thStyle}>학교</th>
+                <th style={thStyle}>내용</th>
+                <th style={thStyle}>좋아요</th>
+                <th style={thStyle}>댓글</th>
+                <th style={thStyle}>작성일</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentPosts.map((post) => (
+                <tr key={post.id}>
+                  <td style={tdStyle}>
+                    {post.thumbnailUrl || post.imageUrl ? (
+                      <img src={post.thumbnailUrl || post.imageUrl} style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 6 }} alt="" onError={(e) => { e.target.style.display = 'none'; }} />
+                    ) : '-'}
+                  </td>
+                  <td style={tdStyle}>{post.authorName || '-'}</td>
+                  <td style={tdStyle}>{post.schoolName || '-'}</td>
+                  <td style={tdStyle}>{(post.caption || '').substring(0, 40) || '-'}</td>
+                  <td style={tdStyle}>{post.likes || 0}</td>
+                  <td style={tdStyle}>{post.commentCount || 0}</td>
+                  <td style={tdStyle}>
+                    {post.createdAt?.toDate
+                      ? format(post.createdAt.toDate(), 'yyyy.MM.dd HH:mm', { locale: ko })
+                      : '-'}
+                  </td>
                 </tr>
               ))}
             </tbody>
