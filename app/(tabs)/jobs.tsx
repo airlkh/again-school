@@ -102,7 +102,7 @@ export default function JobsScreen() {
               source={getAvatarSource(item.authorPhotoURL)}
               style={[styles.authorAvatar, { backgroundColor: colors.card }]}
             />
-            <NameWithBadge name={item.authorName} uid={item.authorUid} nameStyle={[styles.authorName, { color: colors.text }]} />
+            <NameWithBadge name={item.authorName} uid={item.authorUid} trustCount={0} nameStyle={[styles.authorName, { color: colors.text }]} />
           </TouchableOpacity>
           <Ionicons name="chevron-forward" size={18} color={colors.inactive} />
         </View>

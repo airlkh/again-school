@@ -255,6 +255,7 @@ export function CommentBottomSheet({ visible, postId, onClose }: Props) {
                     <NameWithBadge
                       name={item.name}
                       uid={item.uid}
+                      trustCount={0}
                       nameStyle={[styles.commentAuthor, { color: colors.text }]}
                     />
                     <Text style={[styles.commentTime, { color: colors.inactive }]}>

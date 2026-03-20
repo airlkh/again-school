@@ -381,7 +381,7 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
             style={[styles.postAvatar, { backgroundColor: colors.card }]}
           />
           <View style={styles.postAuthorInfo}>
-            <NameWithBadge name={authorName} uid={authorUid} nameStyle={[styles.postAuthorName, { color: colors.text }]} />
+            <NameWithBadge name={authorName} uid={authorUid} trustCount={0} nameStyle={[styles.postAuthorName, { color: colors.text }]} />
             <Text style={[styles.postMeta, { color: colors.textSecondary }]}>{postMeta}</Text>
           </View>
         </TouchableOpacity>
@@ -1085,6 +1085,8 @@ export default function HomeScreen() {
             if (b.endDate && b.endDate < today) return false;
             return true;
           });
+        console.log('[Banner] 로드된 배너 수:', filtered.length);
+        filtered.forEach((b) => console.log('[Banner]', b.id, b.title, b.imageUrl?.substring(0, 50)));
         setBanners(filtered);
       } catch {}
     })();

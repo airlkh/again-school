@@ -510,7 +510,7 @@ export default function ChatRoomScreen() {
             style={styles.headerAvatar}
           />
           <View>
-            <NameWithBadge name={name as string} uid={otherUid as string} nameStyle={styles.headerName} />
+            <NameWithBadge name={name as string} uid={otherUid as string} trustCount={0} nameStyle={styles.headerName} />
             <Text style={[styles.headerStatus, isOnline && { color: '#a5f3a6' }]}>
               {isOnline ? '온라인' : '오프라인'}
             </Text>

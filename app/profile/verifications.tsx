@@ -126,6 +126,7 @@ export default function VerificationsScreen() {
               <NameWithBadge
                 name={item.voterName}
                 uid={item.voterUid}
+                trustCount={0}
                 nameStyle={[styles.voterName, { color: colors.text }]}
               />
               {item.message ? (

@@ -111,6 +111,7 @@ export default function ChatListScreen() {
             <NameWithBadge
               name={item.otherName}
               uid={item.otherUid}
+              trustCount={0}
               nameStyle={[styles.roomName, { color: colors.text }]}
               numberOfLines={1}
             />
