@@ -41,6 +41,7 @@ function RootLayoutNav() {
         await setDoc(doc(db, 'users', user.uid), {
           isOnline: online,
           lastSeen: serverTimestamp(),
+          lastActiveAt: serverTimestamp(),
         }, { merge: true });
       } catch (e) {
         console.warn('[RootLayout] 상태 업데이트 실패:', e);

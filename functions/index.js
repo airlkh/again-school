@@ -380,3 +380,45 @@ exports.deleteUserAccount = functions.region('asia-northeast3').https.onCall(asy
     return { success: false, error: String(e) };
   }
 });
+
+// ── 휴면 회원 자동 감지 (매일 새벽 2시) ──────────────────────────────
+exports.checkDormantUsers = functions.region('asia-northeast3').pubsub.schedule('0 2 * * *').timeZone('Asia/Seoul').onRun(async () => {
+  const now = new Date();
+  const oneMonthAgo = new Date(now);
+  oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+  try {
+    const usersSnap = await db.collection('users').get();
+    let dormantCount = 0;
+    let activatedCount = 0;
+    for (const userDoc of usersSnap.docs) {
+      const data = userDoc.data();
+      if (data.disabled || data.withdrawn) continue;
+      const lastSeen = data.lastSeen?.toDate?.() || data.lastActiveAt?.toDate?.() || null;
+      const createdAt = data.createdAt?.toDate?.() || (typeof data.createdAt === 'number' ? new Date(data.createdAt) : null);
+      const lastActive = lastSeen || createdAt;
+      if (!lastActive) continue;
+      if (lastActive < oneMonthAgo && !data.dormant) {
+        await userDoc.ref.update({ dormant: true, dormantAt: admin.firestore.FieldValue.serverTimestamp(), status: '휴면' });
+        dormantCount++;
+      } else if (lastActive >= oneMonthAgo && data.dormant) {
+        await userDoc.ref.update({ dormant: false, dormantAt: null, status: '정상' });
+        activatedCount++;
+      }
+    }
+    if (dormantCount > 0 || activatedCount > 0) {
+      await db.collection('adminAlerts').add({
+        type: 'info',
+        title: '휴면 회원 자동 처리',
+        message: `휴면 전환: ${dormantCount}명, 휴면 해제: ${activatedCount}명`,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        read: false,
+        category: 'dormant',
+      });
+    }
+    console.log(`[checkDormantUsers] 휴면: ${dormantCount}명, 해제: ${activatedCount}명`);
+    return null;
+  } catch (e) {
+    console.error('[checkDormantUsers] 실패:', e);
+    return null;
+  }
+});
