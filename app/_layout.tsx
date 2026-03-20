@@ -190,10 +190,9 @@ function RootLayoutNav() {
   );
 }
 
-function SplashOverlay() {
+function SplashOverlay({ isLoading }: { isLoading: boolean }) {
   const [show, setShow] = useState(true);
   const [animDone, setAnimDone] = useState(false);
-  const { isLoading } = useAuth();
 
   useEffect(() => {
     if (animDone && !isLoading) {
@@ -213,6 +212,16 @@ function SplashOverlay() {
   );
 }
 
+function RootLayoutInner() {
+  const { isLoading } = useAuth();
+  return (
+    <>
+      <RootLayoutNav />
+      <SplashOverlay isLoading={isLoading} />
+    </>
+  );
+}
+
 export default function RootLayout() {
   return (
     <ThemeProvider>
@@ -220,8 +229,7 @@ export default function RootLayout() {
         <UserProvider>
           <MuteProvider>
             <MusicProvider>
-              <RootLayoutNav />
-              <SplashOverlay />
+              <RootLayoutInner />
             </MusicProvider>
           </MuteProvider>
         </UserProvider>
