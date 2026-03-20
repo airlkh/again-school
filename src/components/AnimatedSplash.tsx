@@ -9,9 +9,10 @@ const MOUTH = 100;
 
 interface Props {
   onFinish: () => void;
+  onReady?: () => void;
 }
 
-export function AnimatedSplash({ onFinish }: Props) {
+export function AnimatedSplash({ onFinish, onReady }: Props) {
   const containerOpacity = useRef(new Animated.Value(1)).current;
   const eyeScale = useRef(new Animated.Value(0)).current;
   const eyeOpacity = useRef(new Animated.Value(0)).current;
@@ -22,6 +23,7 @@ export function AnimatedSplash({ onFinish }: Props) {
   const titleOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    onReady?.();
     Animated.sequence([
       // 눈 + 입 팝업 (천천히)
       Animated.parallel([
