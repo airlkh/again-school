@@ -62,7 +62,9 @@ export function setupNotificationHandlers(): () => void {
   responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
     const data = response.notification.request.content.data;
 
-    if (data?.type === 'teacherVerified') {
+    if (data?.type === 'notice' && data?.linkUrl) {
+      import('react-native').then(({ Linking }) => Linking.openURL(data.linkUrl as string));
+    } else if (data?.type === 'teacherVerified') {
       router.push('/profile/teacher-apply' as any);
     } else if (data?.chatRoomId && data?.otherUid) {
       router.push({

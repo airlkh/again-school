@@ -310,7 +310,7 @@ exports.sendTeacherVerificationPush = functions.region('asia-northeast3').https.
 
 // ── 전체 유저 공지사항 푸시 알림 ──────────────────────────────
 exports.sendNoticeToAll = functions.region('asia-northeast3').https.onCall(async (data, context) => {
-  const { title, content } = data;
+  const { title, content, imageUrl, linkUrl } = data;
   try {
     const usersSnap = await db.collection('users').get();
     const tokens = [];
@@ -331,7 +331,8 @@ exports.sendNoticeToAll = functions.region('asia-northeast3').https.onCall(async
           to: token,
           title: `📢 ${title}`,
           body: content,
-          data: { type: 'notice' },
+          ...(imageUrl ? { image: imageUrl } : {}),
+          data: { type: 'notice', linkUrl: linkUrl || '' },
         }))),
       });
     }
