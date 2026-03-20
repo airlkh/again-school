@@ -5,6 +5,7 @@ import {
   query,
   where,
   getDocs,
+  getDoc,
   updateDoc,
   doc,
   Timestamp,
@@ -412,11 +413,30 @@ export default function PendingVerification() {
   const handleApprove = async (userId) => {
     if (!window.confirm('이 선생님의 인증을 승인하시겠습니까?')) return;
     try {
+      const userSnap = await getDoc(doc(db, 'users', userId));
+      const userData = userSnap.data();
+      const pushToken = userData?.pushToken;
+
       await updateDoc(doc(db, 'users', userId), {
         teacherVerified: true,
         verifiedAt: Timestamp.now(),
       });
+
+      if (pushToken) {
+        await fetch('https://exp.host/--/api/v2/push/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: pushToken,
+            title: '선생님 인증 승인 ✅',
+            body: '선생님 인증이 승인되었습니다. 이제 선생님 배지가 표시돼요!',
+            data: { type: 'teacherVerified', status: 'approved' },
+          }),
+        });
+      }
+
       setTeacherUsers((prev) => prev.filter((u) => u.id !== userId));
+      alert('승인이 완료됐습니다.');
     } catch (err) {
       console.error('승인 실패:', err);
       alert('승인 처리 중 오류가 발생했습니다.');
@@ -427,13 +447,33 @@ export default function PendingVerification() {
     const reason = window.prompt('거절 사유를 입력해주세요:');
     if (reason === null) return;
     try {
+      const userSnap = await getDoc(doc(db, 'users', userId));
+      const userData = userSnap.data();
+      const pushToken = userData?.pushToken;
+
       await updateDoc(doc(db, 'users', userId), {
         isTeacher: false,
         teacherVerified: false,
+        teacherRejected: true,
+        teacherRejectedReason: reason,
         rejectedAt: Timestamp.now(),
-        rejectionReason: reason,
       });
+
+      if (pushToken) {
+        await fetch('https://exp.host/--/api/v2/push/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: pushToken,
+            title: '선생님 인증 거절 ❌',
+            body: `선생님 인증이 거절되었습니다. 사유: ${reason}`,
+            data: { type: 'teacherVerified', status: 'rejected' },
+          }),
+        });
+      }
+
       setTeacherUsers((prev) => prev.filter((u) => u.id !== userId));
+      alert('거절 처리가 완료됐습니다.');
     } catch (err) {
       console.error('거절 실패:', err);
       alert('거절 처리 중 오류가 발생했습니다.');
