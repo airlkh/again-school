@@ -91,6 +91,7 @@ const menuData = [
       { label: '스토리 관리', path: '/content/stories' },
       { label: '모임 관리', path: '/content/meetups' },
       { label: '구인/구직 관리', path: '/content/jobs' },
+      { label: '음악 관리', path: '/content/music' },
     ],
   },
   {

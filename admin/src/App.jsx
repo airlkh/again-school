@@ -53,6 +53,7 @@ import Events from './pages/content/Events';
 import Banners from './pages/content/Banners';
 import FAQ from './pages/content/FAQ';
 import Policies from './pages/content/Policies';
+import MusicManager from './pages/content/MusicManager';
 
 // Content - Additional
 import Stories from './pages/content/Stories';
@@ -188,6 +189,7 @@ function App() {
           <Route path="content/stories" element={<Stories />} />
           <Route path="content/meetups" element={<Meetups />} />
           <Route path="content/jobs" element={<Jobs />} />
+          <Route path="content/music" element={<MusicManager />} />
 
           <Route path="settlement/revenue" element={<RevenueDashboard />} />
           <Route path="settlement/targets" element={<SettlementTargets />} />
