@@ -192,9 +192,9 @@ service cloud.firestore {
 
     // verificationRequests 컬렉션
     match /verificationRequests/{requestId} {
-      allow read: if isAdmin() || isOwner(resource.data.userId);
+      allow read: if isAuthenticated();
       allow create: if isAuthenticated();
-      allow update: if isAdmin();
+      allow update: if isAuthenticated();
       allow delete: if isAdmin();
     }
 
