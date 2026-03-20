@@ -307,3 +307,38 @@ exports.sendTeacherVerificationPush = functions.region('asia-northeast3').https.
     return { success: false, error: String(e) };
   }
 });
+
+// ── 전체 유저 공지사항 푸시 알림 ──────────────────────────────
+exports.sendNoticeToAll = functions.region('asia-northeast3').https.onCall(async (data, context) => {
+  const { title, content } = data;
+  try {
+    const usersSnap = await db.collection('users').get();
+    const tokens = [];
+    usersSnap.forEach((doc) => {
+      const pushToken = doc.data()?.pushToken;
+      if (pushToken) tokens.push(pushToken);
+    });
+    if (tokens.length === 0) return { success: false, message: '푸시 토큰 없음' };
+    const chunks = [];
+    for (let i = 0; i < tokens.length; i += 100) {
+      chunks.push(tokens.slice(i, i + 100));
+    }
+    for (const chunk of chunks) {
+      await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(chunk.map((token) => ({
+          to: token,
+          title: `📢 ${title}`,
+          body: content,
+          data: { type: 'notice' },
+        }))),
+      });
+    }
+    console.log(`[sendNoticeToAll] ${tokens.length}명에게 푸시 발송 완료`);
+    return { success: true, count: tokens.length };
+  } catch (e) {
+    console.error('[sendNoticeToAll] 실패:', e);
+    return { success: false, error: String(e) };
+  }
+});

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { collection, getDocs, query, orderBy, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { db, app } from '../../firebase';
 
 const styles = {
   container: { padding: 0 },
@@ -158,9 +159,24 @@ export default function Notices() {
 
   const togglePublish = async (notice) => {
     try {
+      const newPublished = !notice.published;
       await updateDoc(doc(db, 'notices', notice.id), {
-        published: !notice.published, updatedAt: new Date(),
+        published: newPublished, updatedAt: new Date(),
       });
+
+      // 게시로 변경 시 전체 푸시 알림 발송
+      if (newPublished && notice.title) {
+        try {
+          const functions = getFunctions(app, 'asia-northeast3');
+          const sendNotice = httpsCallable(functions, 'sendNoticeToAll');
+          const result = await sendNotice({ title: notice.title, content: (notice.content || '').substring(0, 100) });
+          alert(`공지사항이 게시되었습니다. ${result.data?.count || 0}명에게 알림 발송`);
+        } catch (pushErr) {
+          console.warn('푸시 발송 실패:', pushErr);
+          alert('공지사항이 게시되었지만 푸시 알림 발송에 실패했습니다.');
+        }
+      }
+
       fetchNotices();
     } catch (err) {
       alert('상태 변경 실패: ' + err.message);
