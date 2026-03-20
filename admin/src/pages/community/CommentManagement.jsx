@@ -138,23 +138,15 @@ export default function CommentManagement() {
   const [hasMore, setHasMore] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
 
+  const allCommentsRef = React.useRef([]);
+
   const fetchComments = async (isNextPage = false) => {
     setLoading(true);
     try {
-      let q = query(
+      const q = query(
         collectionGroup(db, 'comments'),
-        orderBy('createdAt', 'desc'),
-        limit(PAGE_SIZE)
+        limit(500)
       );
-
-      if (isNextPage && lastDoc) {
-        q = query(
-          collectionGroup(db, 'comments'),
-          orderBy('createdAt', 'desc'),
-          startAfter(lastDoc),
-          limit(PAGE_SIZE)
-        );
-      }
 
       const snapshot = await getDocs(q);
       const data = snapshot.docs.map((d) => {
@@ -163,14 +155,19 @@ export default function CommentManagement() {
         return { id: d.id, postId, ...d.data(), _doc: d };
       });
 
-      if (!isNextPage) {
-        const countSnap = await getDocs(collectionGroup(db, 'comments'));
-        setTotalCount(countSnap.size);
-      }
+      // 클라이언트에서 createdAt 기준 내림차순 정렬
+      data.sort((a, b) => {
+        const ta = typeof a.createdAt === 'number' ? a.createdAt : (a.createdAt?.toDate?.()?.getTime() || 0);
+        const tb = typeof b.createdAt === 'number' ? b.createdAt : (b.createdAt?.toDate?.()?.getTime() || 0);
+        return tb - ta;
+      });
 
-      setComments(data);
-      setLastDoc(snapshot.docs[snapshot.docs.length - 1] || null);
-      setHasMore(snapshot.docs.length === PAGE_SIZE);
+      allCommentsRef.current = data;
+      setTotalCount(data.length);
+      const start = isNextPage ? (page - 1) * PAGE_SIZE : 0;
+      const paged = data.slice(start, start + PAGE_SIZE);
+      setComments(paged);
+      setHasMore(data.length > start + PAGE_SIZE);
     } catch (err) {
       console.error('댓글 로드 실패:', err);
     }
