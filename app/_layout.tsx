@@ -198,7 +198,9 @@ function SplashOverlay() {
   return (
     <AnimatedSplash
       onFinish={() => setShow(false)}
-      onReady={() => SplashScreen.hideAsync().catch(() => {})}
+      onReady={() => {
+        setTimeout(() => SplashScreen.hideAsync().catch(() => {}), 50);
+      }}
     />
   );
 }

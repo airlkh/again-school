@@ -23,6 +23,7 @@ export function AnimatedSplash({ onFinish, onReady }: Props) {
   const titleOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    onReady?.();
     Animated.sequence([
       // 눈 + 입 팝업 (천천히)
       Animated.parallel([
@@ -53,9 +54,9 @@ export function AnimatedSplash({ onFinish, onReady }: Props) {
       ]),
       Animated.spring(titleScale, { toValue: 1, friction: 5, tension: 60, useNativeDriver: true }),
       // 유지
-      Animated.delay(800),
+      Animated.delay(300),
       // 전체 페이드아웃
-      Animated.timing(containerOpacity, { toValue: 0, duration: 400, useNativeDriver: true }),
+      Animated.timing(containerOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
     ]).start(() => onFinish());
   }, []);
 
@@ -63,7 +64,6 @@ export function AnimatedSplash({ onFinish, onReady }: Props) {
     <Animated.View
       style={[styles.container, { opacity: containerOpacity }]}
       pointerEvents="none"
-      onLayout={() => onReady?.()}
     >
       {/* 눈 왼쪽 - 화면 정중앙 기준 */}
       <Animated.View style={{
