@@ -114,6 +114,8 @@ export default function TeacherApplyScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [alreadyApplied, setAlreadyApplied] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
+  const [isRejected, setIsRejected] = useState(false);
+  const [rejectedReason, setRejectedReason] = useState('');
   const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
@@ -125,6 +127,8 @@ export default function TeacherApplyScreen() {
           const data = snap.data();
           setAlreadyApplied(!!data.isTeacher);
           setIsVerified(!!data.teacherVerified);
+          setIsRejected(!!data.teacherRejected);
+          setRejectedReason(data.teacherRejectedReason || '');
           if (data.teacherHistory?.length) setHistory(data.teacherHistory);
           if (data.teacherMessage) setMessage(data.teacherMessage);
         }
@@ -171,6 +175,8 @@ export default function TeacherApplyScreen() {
       await updateDoc(doc(db, 'users', user.uid), {
         isTeacher: true,
         teacherVerified: false,
+        teacherRejected: false,
+        teacherRejectedReason: '',
         teacherHistory: history,
         teacherSchoolName: currentHistory?.schoolName ?? history[0].schoolName,
         teacherSubject: currentHistory?.subject ?? history[0].subject,
@@ -208,7 +214,31 @@ export default function TeacherApplyScreen() {
           </View>
         </View>
 
-        {isVerified && !isEditing ? (
+        {isRejected && !isEditing ? (
+          <View style={[styles.pendingBox, { backgroundColor: '#FFF0F0', borderColor: '#FFCCCC' }]}>
+            <Ionicons name="close-circle-outline" size={40} color="#e94560" />
+            <Text style={[styles.pendingTitle, { color: '#e94560' }]}>인증 거절</Text>
+            <Text style={[styles.pendingDesc, { color: colors.textSecondary }]}>
+              선생님 인증 신청이 거절되었어요.
+            </Text>
+            {rejectedReason ? (
+              <View style={[styles.appliedInfo, { borderColor: colors.border }]}>
+                <Text style={[styles.appliedInfoLabel, { color: colors.textSecondary }]}>거절 사유</Text>
+                <Text style={[styles.appliedInfoValue, { color: '#e94560' }]}>{rejectedReason}</Text>
+              </View>
+            ) : null}
+            <TouchableOpacity
+              style={[styles.editBtn, { borderColor: '#e94560', marginTop: 8 }]}
+              onPress={() => {
+                setIsRejected(false);
+                setIsEditing(true);
+              }}
+            >
+              <Ionicons name="refresh-outline" size={16} color="#e94560" />
+              <Text style={{ fontSize: 14, color: '#e94560', fontWeight: '600' }}>다시 신청하기</Text>
+            </TouchableOpacity>
+          </View>
+        ) : isVerified && !isEditing ? (
           <View style={[styles.verifiedBox, { backgroundColor: '#7C3AED18' }]}>
             <Text style={{ fontSize: 40, textAlign: 'center' }}>👩‍🏫</Text>
             <Text style={[styles.verifiedTitle, { color: '#7C3AED' }]}>인증 완료!</Text>
