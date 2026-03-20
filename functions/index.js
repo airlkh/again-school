@@ -275,3 +275,32 @@ exports.scheduledAlumniRecommendations = functions.region("asia-northeast3").pub
   console.log(`추천 갱신 완료: ${count}명`);
   return null;
 });
+
+// ── 선생님 인증 결과 푸시 알림 ──────────────────────────────
+exports.sendTeacherVerificationPush = functions.region('asia-northeast3').https.onCall(async (data, context) => {
+  const { toUid, approved, reason } = data;
+  try {
+    const userSnap = await db.doc(`users/${toUid}`).get();
+    if (!userSnap.exists) return { success: false };
+    const pushToken = userSnap.data()?.pushToken;
+    if (!pushToken) return { success: false, message: 'pushToken 없음' };
+    const title = approved ? '선생님 인증 승인 ✅' : '선생님 인증 거절 ❌';
+    const body = approved
+      ? '선생님 인증이 승인되었습니다. 이제 선생님 배지가 표시돼요!'
+      : `선생님 인증이 거절되었습니다. 사유: ${reason || '사유 없음'}`;
+    await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: pushToken,
+        title,
+        body,
+        data: { type: 'teacherVerified', status: approved ? 'approved' : 'rejected' },
+      }),
+    });
+    return { success: true };
+  } catch (e) {
+    console.error('푸시 알림 발송 실패:', e);
+    return { success: false, error: String(e) };
+  }
+});

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { db } from '../../firebase';
+import { db, app } from '../../firebase';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import {
   collection,
   query,
@@ -413,27 +414,16 @@ export default function PendingVerification() {
   const handleApprove = async (userId) => {
     if (!window.confirm('이 선생님의 인증을 승인하시겠습니까?')) return;
     try {
-      const userSnap = await getDoc(doc(db, 'users', userId));
-      const userData = userSnap.data();
-      const pushToken = userData?.pushToken;
-
       await updateDoc(doc(db, 'users', userId), {
         teacherVerified: true,
         verifiedAt: Timestamp.now(),
       });
 
-      if (pushToken) {
-        await fetch('https://exp.host/--/api/v2/push/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            to: pushToken,
-            title: '선생님 인증 승인 ✅',
-            body: '선생님 인증이 승인되었습니다. 이제 선생님 배지가 표시돼요!',
-            data: { type: 'teacherVerified', status: 'approved' },
-          }),
-        });
-      }
+      try {
+        const functions = getFunctions(app, 'asia-northeast3');
+        const sendPush = httpsCallable(functions, 'sendTeacherVerificationPush');
+        await sendPush({ toUid: userId, approved: true });
+      } catch {}
 
       setTeacherUsers((prev) => prev.filter((u) => u.id !== userId));
       alert('승인이 완료됐습니다.');
@@ -447,10 +437,6 @@ export default function PendingVerification() {
     const reason = window.prompt('거절 사유를 입력해주세요:');
     if (reason === null) return;
     try {
-      const userSnap = await getDoc(doc(db, 'users', userId));
-      const userData = userSnap.data();
-      const pushToken = userData?.pushToken;
-
       await updateDoc(doc(db, 'users', userId), {
         isTeacher: false,
         teacherVerified: false,
@@ -459,18 +445,11 @@ export default function PendingVerification() {
         rejectedAt: Timestamp.now(),
       });
 
-      if (pushToken) {
-        await fetch('https://exp.host/--/api/v2/push/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            to: pushToken,
-            title: '선생님 인증 거절 ❌',
-            body: `선생님 인증이 거절되었습니다. 사유: ${reason}`,
-            data: { type: 'teacherVerified', status: 'rejected' },
-          }),
-        });
-      }
+      try {
+        const functions = getFunctions(app, 'asia-northeast3');
+        const sendPush = httpsCallable(functions, 'sendTeacherVerificationPush');
+        await sendPush({ toUid: userId, approved: false, reason });
+      } catch {}
 
       setTeacherUsers((prev) => prev.filter((u) => u.id !== userId));
       alert('거절 처리가 완료됐습니다.');
