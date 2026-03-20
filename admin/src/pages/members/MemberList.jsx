@@ -8,8 +8,11 @@ import {
   limit,
   startAfter,
   where,
+  doc,
+  updateDoc,
 } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { db, app } from '../../firebase';
 
 const STATUS_OPTIONS = [
   { value: '', label: '전체' },
@@ -58,6 +61,46 @@ export default function MemberList() {
   const [lastDocs, setLastDocs] = useState([]);
   const [hasMore, setHasMore] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
+
+  const handleDisable = async (e, member) => {
+    e.stopPropagation();
+    const isDisabled = !!member.disabled;
+    const action = isDisabled ? '정지 해제' : '정지';
+    if (!window.confirm(`${member.displayName || member.name}님을 ${action}하시겠습니까?`)) return;
+    try {
+      await updateDoc(doc(db, 'users', member.uid), {
+        disabled: !isDisabled,
+        status: !isDisabled ? '제재' : '정상',
+      });
+      setMembers((prev) => prev.map((m) =>
+        m.uid === member.uid ? { ...m, disabled: !isDisabled, status: !isDisabled ? '제재' : '정상' } : m
+      ));
+      alert(`${action} 처리 완료`);
+    } catch (err) {
+      alert('처리 실패');
+    }
+  };
+
+  const handleDeleteUser = async (e, member) => {
+    e.stopPropagation();
+    const reason = window.prompt(`${member.displayName || member.name}님을 강제 탈퇴 처리합니다.\n사유를 입력해주세요:`);
+    if (reason === null) return;
+    if (!window.confirm('정말 강제 탈퇴 처리하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
+    try {
+      const functions = getFunctions(app, 'asia-northeast3');
+      const fn = httpsCallable(functions, 'deleteUserAccount');
+      const result = await fn({ uid: member.uid, reason });
+      if (result.data?.success) {
+        setMembers((prev) => prev.filter((m) => m.uid !== member.uid));
+        setTotalCount((c) => c - 1);
+        alert('강제 탈퇴 처리 완료');
+      } else {
+        alert('강제 탈퇴 실패: ' + (result.data?.error || '알 수 없는 오류'));
+      }
+    } catch (err) {
+      alert('강제 탈퇴 실패');
+    }
+  };
 
   const fetchMembers = useCallback(async (page = 1) => {
     setLoading(true);
@@ -286,15 +329,30 @@ export default function MemberList() {
                       </span>
                     </td>
                     <td style={styles.td}>
-                      <button
-                        style={styles.actionBtn}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/members/${m.uid}`);
-                        }}
-                      >
-                        상세보기
-                      </button>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button
+                          style={styles.actionBtn}
+                          onClick={(e) => { e.stopPropagation(); navigate(`/members/${m.uid}`); }}
+                        >
+                          상세
+                        </button>
+                        <button
+                          style={{
+                            ...styles.actionBtn,
+                            backgroundColor: m.disabled ? '#f0fff4' : '#fff5f5',
+                            color: m.disabled ? '#276749' : '#c53030',
+                          }}
+                          onClick={(e) => handleDisable(e, m)}
+                        >
+                          {m.disabled ? '정지해제' : '정지'}
+                        </button>
+                        <button
+                          style={{ ...styles.actionBtn, backgroundColor: '#1a202c', color: '#fff' }}
+                          onClick={(e) => handleDeleteUser(e, m)}
+                        >
+                          탈퇴
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
