@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../../firebase';
+import { db, app } from '../../firebase';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import {
   collection,
   query,
@@ -171,8 +172,7 @@ export default function NoticePosts() {
     setLoading(true);
     try {
       const q = query(
-        collection(db, 'posts'),
-        where('type', '==', 'notice'),
+        collection(db, 'notices'),
         orderBy('createdAt', 'desc')
       );
       const snapshot = await getDocs(q);
@@ -180,15 +180,6 @@ export default function NoticePosts() {
       setNotices(data);
     } catch (err) {
       console.error('공지 로드 실패:', err);
-      // fallback: try notices collection
-      try {
-        const q2 = query(collection(db, 'notices'), orderBy('createdAt', 'desc'));
-        const snapshot2 = await getDocs(q2);
-        const data2 = snapshot2.docs.map((d) => ({ id: d.id, ...d.data() }));
-        setNotices(data2);
-      } catch (err2) {
-        console.error('notices 컬렉션 로드 실패:', err2);
-      }
     }
     setLoading(false);
   };
@@ -205,7 +196,7 @@ export default function NoticePosts() {
     setSaving(true);
     try {
       if (editingId) {
-        await updateDoc(doc(db, 'posts', editingId), {
+        await updateDoc(doc(db, 'notices', editingId), {
           title: form.title,
           content: form.content,
           pinned: form.pinned,
@@ -219,20 +210,27 @@ export default function NoticePosts() {
           )
         );
       } else {
-        const docRef = await addDoc(collection(db, 'posts'), {
+        const docRef = await addDoc(collection(db, 'notices'), {
           title: form.title,
           content: form.content,
           pinned: form.pinned,
-          type: 'notice',
+          published: true,
           createdAt: Timestamp.now(),
           updatedAt: Timestamp.now(),
-          likeCount: 0,
-          commentCount: 0,
         });
         setNotices((prev) => [
-          { id: docRef.id, title: form.title, content: form.content, pinned: form.pinned, type: 'notice', createdAt: Timestamp.now() },
+          { id: docRef.id, title: form.title, content: form.content, pinned: form.pinned, createdAt: Timestamp.now() },
           ...prev,
         ]);
+        // 전체 유저 푸시 알림
+        try {
+          const functions = getFunctions(app, 'asia-northeast3');
+          const sendPush = httpsCallable(functions, 'sendNoticeToAll');
+          const result = await sendPush({ title: form.title, content: form.content.substring(0, 100) });
+          alert(`공지가 등록되었습니다. ${result.data?.count || 0}명에게 알림 발송`);
+        } catch (e) {
+          alert('공지가 등록되었습니다. (푸시 알림 실패)');
+        }
       }
       setForm({ ...emptyForm });
       setEditingId(null);
@@ -253,7 +251,7 @@ export default function NoticePosts() {
   const handleDelete = async (id) => {
     if (!window.confirm('정말 이 공지를 삭제하시겠습니까?')) return;
     try {
-      await deleteDoc(doc(db, 'posts', id));
+      await deleteDoc(doc(db, 'notices', id));
       setNotices((prev) => prev.filter((n) => n.id !== id));
     } catch (err) {
       console.error('삭제 실패:', err);
