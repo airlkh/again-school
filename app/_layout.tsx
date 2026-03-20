@@ -22,6 +22,7 @@ function RootLayoutNav() {
   const rtr = useRouter();
   const pathname = usePathname();
   const splashHidden = useRef(false);
+  const [handledPushNotification, setHandledPushNotification] = useState(false);
 
   // 스플래시 숨기기 — SplashOverlay가 처리하므로 여기서는 안전장치만
   useEffect(() => {
@@ -134,22 +135,25 @@ function RootLayoutNav() {
 
   // ─── 앱 종료 상태에서 푸시 탭으로 실행된 경우 처리 ───
   useEffect(() => {
-    if (isLoading || !user) return;
+    if (isLoading || !user || handledPushNotification) return;
     Notifications.getLastNotificationResponseAsync().then((response) => {
+      setHandledPushNotification(true);
       if (!response) return;
       const data = response.notification.request.content.data;
-      if (data?.type === 'teacherVerified') {
-        rtr.push('/profile/teacher-apply' as any);
-      } else if (data?.postId) {
-        rtr.push({ pathname: '/post/[id]', params: { id: data.postId as string } });
-      } else if (data?.chatRoomId && data?.otherUid) {
-        rtr.push({
-          pathname: '/chat/[id]',
-          params: { id: data.otherUid as string, name: (data.otherName as string) || '' },
-        });
-      }
+      setTimeout(() => {
+        if (data?.type === 'teacherVerified') {
+          rtr.push('/profile/teacher-apply' as any);
+        } else if (data?.postId) {
+          rtr.push({ pathname: '/post/[id]', params: { id: data.postId as string } });
+        } else if (data?.chatRoomId && data?.otherUid) {
+          rtr.push({
+            pathname: '/chat/[id]',
+            params: { id: data.otherUid as string, name: (data.otherName as string) || '' },
+          });
+        }
+      }, 500);
     });
-  }, [isLoading, user]);
+  }, [isLoading, user, handledPushNotification]);
 
   // ─── 로딩 중 표시 ───
   const segs = (segments || []) as string[];
