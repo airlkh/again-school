@@ -72,6 +72,7 @@ export function MusicWaveSelector({ visible, selectedMusic, isVideo = false, onC
     } else {
       stopAll();
     }
+    return () => { stopAll(); };
   }, [visible]);
 
   useEffect(() => {
@@ -101,6 +102,7 @@ export function MusicWaveSelector({ visible, selectedMusic, isVideo = false, onC
   function stopAll() {
     if (previewTimerRef.current) { clearTimeout(previewTimerRef.current); previewTimerRef.current = null; }
     if (soundRef.current) {
+      try { soundRef.current.pause(); } catch {}
       try { soundRef.current.remove(); } catch {}
       soundRef.current = null;
     }

@@ -164,8 +164,10 @@ export function MusicTrimmer({ visible, selectedMusic, isVideo = false, onConfir
         setTotalSec(180);
       }
     } else {
+      stopAllSound();
       onStopBgMusic?.();
     }
+    return () => { stopAllSound(); };
   }, [visible]);
 
   useEffect(() => {
@@ -198,7 +200,10 @@ export function MusicTrimmer({ visible, selectedMusic, isVideo = false, onConfir
     }
     const s = soundRef.current;
     soundRef.current = null;
-    if (s) { try { s.remove(); } catch {} }
+    if (s) {
+      try { s.pause(); } catch {}
+      try { s.remove(); } catch {}
+    }
     setPlayingId(null);
   }
 
