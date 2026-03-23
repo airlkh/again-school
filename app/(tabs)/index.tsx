@@ -24,6 +24,7 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Colors } from '../../src/constants/colors';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useAuth } from '../../src/contexts/AuthContext';
+import { useCurrentUser } from '../../src/hooks/useCurrentUser';
 import {
   DUMMY_STORIES,
   DUMMY_POSTS,
@@ -73,6 +74,7 @@ function StoryBar({ fsStories }: { fsStories: FirestoreStory[] }) {
   const [dummyStories, setDummyStories] = useState(DUMMY_STORIES);
   const { colors } = useTheme();
   const { user } = useAuth();
+  const { photoURL: myPhotoURL } = useCurrentUser();
 
   // Group Firestore stories by user
   const groupedFsStories = (fsStories || []).reduce((acc, s) => {
@@ -99,9 +101,9 @@ function StoryBar({ fsStories }: { fsStories: FirestoreStory[] }) {
           onPress={() => router.push('/upload')}
         >
           <View style={styles.myStoryRing}>
-            {user?.photoURL ? (
+            {myPhotoURL ? (
               <Image
-                source={{ uri: user.photoURL }}
+                source={{ uri: myPhotoURL }}
                 style={[styles.myStoryAvatarImg, { backgroundColor: colors.card, borderColor: colors.border }]}
               />
             ) : (

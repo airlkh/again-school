@@ -11,6 +11,6 @@ const defaultAvatar = require('../../assets/default-avatar.png') as number;
 export function getAvatarSource(
   photoURL?: string | null,
 ): ImageSourcePropType {
-  if (photoURL) return { uri: photoURL };
+  if (photoURL) return { uri: photoURL, cache: 'reload' } as any;
   return defaultAvatar;
 }
