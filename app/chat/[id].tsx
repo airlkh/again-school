@@ -20,6 +20,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import * as ImagePicker from 'expo-image-picker';
+import { useFocusEffect } from 'expo-router';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useGoBack } from '../../src/hooks/useGoBack';
@@ -143,11 +144,26 @@ export default function ChatRoomScreen() {
     })();
   }, [user, otherUid]);
 
+  // 화면 포커스 시 읽음 처리 (백그라운드 복귀 포함)
+  useFocusEffect(
+    useCallback(() => {
+      if (roomId && user?.uid) {
+        markAsRead(roomId, user.uid).catch(() => {});
+      }
+    }, [roomId, user?.uid])
+  );
+
   // Firestore 메시지 구독
   useEffect(() => {
     if (!roomId) return;
-    return subscribeMessages(roomId, setFirestoreMessages);
-  }, [roomId]);
+    return subscribeMessages(roomId, (msgs) => {
+      setFirestoreMessages(msgs);
+      // 새 메시지 수신 시 즉시 읽음 처리
+      if (user?.uid && msgs.some((m) => m.senderUid !== user.uid && !m.readBy?.includes(user.uid))) {
+        markAsRead(roomId, user.uid).catch(() => {});
+      }
+    });
+  }, [roomId, user?.uid]);
 
   // 메시지 합치기 (inverted용으로 역순)
   useEffect(() => {
