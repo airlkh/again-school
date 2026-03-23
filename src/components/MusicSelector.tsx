@@ -9,7 +9,7 @@ import Slider from '@react-native-community/slider';
 import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useTheme } from '../contexts/ThemeContext';
-import { createAudioPlayer, setAudioModeAsync, preload, AudioPlayer } from 'expo-audio';
+import { createAudioPlayer, setAudioModeAsync, AudioPlayer } from 'expo-audio';
 
 export interface MusicItem {
   id: string;
@@ -45,20 +45,27 @@ export function MusicSelector({ selectedMusic, onChange, isVideo = false }: Prop
   const [searchQuery, setSearchQuery] = useState('');
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'추천' | '인기' | '저장됨'>('추천');
-  const soundRef = useRef<AudioPlayer | null>(null);
-  const previewSoundRef = useRef<AudioPlayer | null>(null);
-  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const playerRef = useRef<AudioPlayer | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 단일 플레이어 정리 (모든 재생 중지)
+  function cleanupPlayer() {
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+    if (playerRef.current) {
+      try { playerRef.current.pause(); } catch {}
+      try { playerRef.current.remove(); } catch {}
+      playerRef.current = null;
+    }
+    setPlayingId(null);
+  }
 
   useEffect(() => {
     if (visible) {
       loadMusic();
     } else {
-      stopSound();
+      cleanupPlayer();
     }
-    return () => {
-      stopSound();
-      stopPreview();
-    };
+    return () => { cleanupPlayer(); };
   }, [visible]);
 
   useEffect(() => {
@@ -77,30 +84,6 @@ export function MusicSelector({ selectedMusic, onChange, isVideo = false }: Prop
       const items: MusicItem[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as MusicItem));
       setMusicList(items);
       setFiltered(items);
-
-      // 상위 10개 프리로드 + duration 보정
-      await setAudioModeAsync({ playsInSilentMode: true });
-      items.slice(0, 10).forEach((item) => {
-        if (item.url) {
-          preload({ uri: item.url }).catch(() => {});
-        }
-        // duration이 0이면 오디오에서 가져오기
-        if (!item.duration || item.duration <= 0) {
-          try {
-            const p = createAudioPlayer({ uri: item.url });
-            const check = setInterval(() => {
-              if (p.isLoaded && p.duration > 0) {
-                clearInterval(check);
-                item.duration = Math.round(p.duration);
-                setMusicList((prev) => prev.map((m) => m.id === item.id ? { ...m, duration: item.duration } : m));
-                setFiltered((prev) => prev.map((m) => m.id === item.id ? { ...m, duration: item.duration } : m));
-                p.remove();
-              }
-            }, 200);
-            setTimeout(() => { clearInterval(check); try { p.remove(); } catch {} }, 5000);
-          } catch {}
-        }
-      });
     } catch (e) {
       console.warn('음악 로드 실패:', e);
     } finally {
@@ -108,44 +91,38 @@ export function MusicSelector({ selectedMusic, onChange, isVideo = false }: Prop
     }
   }
 
-  function stopSound() {
-    const s = soundRef.current;
-    soundRef.current = null;
-    setPlayingId(null);
-    if (s) { try { s.remove(); } catch {} }
-  }
-
-  function stopPreview() {
-    if (previewTimerRef.current) {
-      clearTimeout(previewTimerRef.current);
-      previewTimerRef.current = null;
-    }
-    if (previewSoundRef.current) {
-      try { previewSoundRef.current.remove(); } catch {}
-      previewSoundRef.current = null;
-    }
-  }
-
   async function previewFromPosition(url: string, startTime: number) {
-    stopPreview();
+    cleanupPlayer();
     try {
       await setAudioModeAsync({ playsInSilentMode: true });
       const player = createAudioPlayer({ uri: url });
-      previewSoundRef.current = player;
+      playerRef.current = player;
       if (startTime > 0) await player.seekTo(startTime);
       player.play();
-      previewTimerRef.current = setTimeout(() => { stopPreview(); }, 2000);
+      timerRef.current = setTimeout(() => { cleanupPlayer(); }, 2000);
     } catch {}
   }
 
   async function togglePlay(item: MusicItem) {
-    if (playingId === item.id) { stopSound(); return; }
-    stopSound();
+    if (playingId === item.id) { cleanupPlayer(); return; }
+    cleanupPlayer();
     try {
       await setAudioModeAsync({ playsInSilentMode: true });
       const player = createAudioPlayer({ uri: item.url });
-      soundRef.current = player;
+      playerRef.current = player;
       setPlayingId(item.id);
+      // duration 보정: 로드 완료 시 업데이트
+      if (!item.duration || item.duration <= 0) {
+        const check = setInterval(() => {
+          if (player.isLoaded && player.duration > 0) {
+            clearInterval(check);
+            const dur = Math.round(player.duration);
+            setMusicList((prev) => prev.map((m) => m.id === item.id ? { ...m, duration: dur } : m));
+            setFiltered((prev) => prev.map((m) => m.id === item.id ? { ...m, duration: dur } : m));
+          }
+        }, 300);
+        setTimeout(() => clearInterval(check), 5000);
+      }
       player.play();
     } catch (e) {
       console.warn('재생 실패:', e);
@@ -153,7 +130,7 @@ export function MusicSelector({ selectedMusic, onChange, isVideo = false }: Prop
   }
 
   function selectMusic(item: MusicItem) {
-    stopSound();
+    cleanupPlayer();
     onChange({
       id: item.id,
       title: item.title,
@@ -256,10 +233,10 @@ export function MusicSelector({ selectedMusic, onChange, isVideo = false }: Prop
       )}
 
       {/* 음악 선택 모달 */}
-      <Modal visible={visible} animationType="slide" onRequestClose={() => { stopSound(); setVisible(false); }}>
+      <Modal visible={visible} animationType="slide" onRequestClose={() => { cleanupPlayer(); setVisible(false); }}>
         <SafeAreaView style={[styles.modal, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
           <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-            <TouchableOpacity onPress={() => { stopSound(); setVisible(false); }}>
+            <TouchableOpacity onPress={() => { cleanupPlayer(); setVisible(false); }}>
               <Ionicons name="close" size={26} color={colors.text} />
             </TouchableOpacity>
             <Text style={[styles.modalTitle, { color: colors.text }]}>음악 선택</Text>
