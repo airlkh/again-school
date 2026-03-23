@@ -83,14 +83,17 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     const sub = AppState.addEventListener('change', (state) => {
       if (state !== 'active' && musicPlayer) {
         try { musicPlayer.pause(); } catch {}
-      } else if (state === 'active' && musicPlayer && musicUrl && !isMutedRef.current) {
-        try { musicPlayer.play(); } catch {}
       }
+      // 포그라운드 복귀 시 자동 재생 안 함 (OFF 유지)
     });
     return () => sub.remove();
   }, [musicUrl]);
 
   function playMusic(postId: string, music: PostMusic) {
+    // 이전 음악 즉시 중지
+    if (musicPlayer && currentPostIdRef.current && currentPostIdRef.current !== postId) {
+      try { musicPlayer.pause(); } catch {}
+    }
     currentPostIdRef.current = postId;
     currentMusicRef.current = music;
     setCurrentPostId(postId);

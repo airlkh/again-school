@@ -16,6 +16,7 @@ import {
   ActionSheetIOS,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  AppState,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -147,11 +148,24 @@ export default function PostDetailScreen() {
     } catch {}
     return () => {
       if (musicRef.current) {
+        try { musicRef.current.pause(); } catch {}
         musicRef.current.remove();
         musicRef.current = null;
+        setMusicPlaying(false);
       }
     };
   }, [fsPost?.music?.url]);
+
+  // 백그라운드 전환 시 음악 즉시 중지
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' && musicRef.current) {
+        try { musicRef.current.pause(); } catch {}
+        setMusicPlaying(false);
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   // Sync mute state
   useEffect(() => {
