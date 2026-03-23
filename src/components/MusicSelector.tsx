@@ -44,6 +44,7 @@ export function MusicSelector({ selectedMusic, onChange, isVideo = false }: Prop
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const playingIdRef = useRef<string | null>(null);
   const [activeTab, setActiveTab] = useState<'추천' | '인기' | '저장됨'>('추천');
   const playerRef = useRef<AudioPlayer | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -56,6 +57,7 @@ export function MusicSelector({ selectedMusic, onChange, isVideo = false }: Prop
       try { playerRef.current.remove(); } catch {}
       playerRef.current = null;
     }
+    playingIdRef.current = null;
     setPlayingId(null);
   }
 
@@ -104,12 +106,18 @@ export function MusicSelector({ selectedMusic, onChange, isVideo = false }: Prop
   }
 
   async function togglePlay(item: MusicItem) {
-    if (playingId === item.id) { cleanupPlayer(); return; }
+    // 같은 음악 → 정지
+    if (playingIdRef.current === item.id) {
+      cleanupPlayer();
+      return;
+    }
+    // 다른 음악 → 이전 정지 후 새 재생
     cleanupPlayer();
     try {
       await setAudioModeAsync({ playsInSilentMode: true });
       const player = createAudioPlayer({ uri: item.url });
       playerRef.current = player;
+      playingIdRef.current = item.id;
       setPlayingId(item.id);
       // duration 보정: 로드 완료 시 업데이트
       if (!item.duration || item.duration <= 0) {
