@@ -137,7 +137,8 @@ export default function ChatRoomScreen() {
           avatarImg,
         );
         setRoomId(rid);
-        markAsRead(rid, user.uid).catch(() => {});
+        console.log('[Chat] markAsRead 호출 (초기화):', rid, user.uid);
+        markAsRead(rid, user.uid).catch((e) => console.warn('[Chat] markAsRead 실패:', e));
       } catch {
         // Firestore 에러 시 더미 모드
       }
@@ -148,7 +149,8 @@ export default function ChatRoomScreen() {
   useFocusEffect(
     useCallback(() => {
       if (roomId && user?.uid) {
-        markAsRead(roomId, user.uid).catch(() => {});
+        console.log('[Chat] markAsRead 호출 (포커스):', roomId, user.uid);
+        markAsRead(roomId, user.uid).catch((e) => console.warn('[Chat] markAsRead 포커스 실패:', e));
       }
     }, [roomId, user?.uid])
   );

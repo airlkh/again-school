@@ -176,27 +176,30 @@ export async function markAsRead(
   roomId: string,
   myUid: string,
 ): Promise<void> {
-  const roomRef = doc(db, 'chatRooms', roomId);
-  await updateDoc(roomRef, {
-    [`unreadCount.${myUid}`]: 0,
-  });
+  try {
+    // 1. unreadCount 즉시 0으로 업데이트
+    const roomRef = doc(db, 'chatRooms', roomId);
+    await updateDoc(roomRef, {
+      [`unreadCount.${myUid}`]: 0,
+    });
 
-  // 해당 방의 안 읽은 메시지도 read: true로 업데이트
-  const messagesRef = collection(db, 'chatRooms', roomId, 'messages');
-  const q = query(
-    messagesRef,
-    where('read', '==', false),
-    where('senderUid', '!=', myUid),
-  );
-  const snapshot = await getDocs(q);
+    // 2. 안 읽은 메시지를 read: true로 업데이트 (senderUid != myUid)
+    const messagesRef = collection(db, 'chatRooms', roomId, 'messages');
+    const snapshot = await getDocs(query(messagesRef, where('read', '==', false)));
 
-  if (snapshot.empty) return;
+    if (snapshot.empty) return;
 
-  const batch = writeBatch(db);
-  snapshot.forEach((docSnap) => {
-    batch.update(docSnap.ref, { read: true, readBy: arrayUnion(myUid) });
-  });
-  await batch.commit();
+    const batch = writeBatch(db);
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      // 내가 보낸 메시지는 스킵
+      if (data.senderUid === myUid) return;
+      batch.update(docSnap.ref, { read: true, readBy: arrayUnion(myUid) });
+    });
+    await batch.commit();
+  } catch (e) {
+    console.warn('[chatService] markAsRead 실패:', e);
+  }
 }
 
 /** 전체 안 읽은 메시지 수 계산 */
