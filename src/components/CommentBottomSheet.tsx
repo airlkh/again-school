@@ -106,6 +106,7 @@ export function CommentBottomSheet({ visible, postId, postAuthorUid, onClose }: 
     if (!visible) {
       setInputText('');
       setShowEmoji(false);
+      setEditingId(null);
     }
   }, [visible]);
 
@@ -241,6 +242,7 @@ export function CommentBottomSheet({ visible, postId, postAuthorUid, onClose }: 
     Keyboard.dismiss();
     setShowEmoji(false);
     setInputText('');
+    setEditingId(null);
     onClose();
   }
 
@@ -300,7 +302,9 @@ export function CommentBottomSheet({ visible, postId, postAuthorUid, onClose }: 
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => {
             const isLiked = likedComments.has(item.id);
-            const canMenu = item.uid === user?.uid || user?.uid === postAuthorUid;
+            const isMyComment = item.uid === user?.uid;
+            const isPostAuthor = user?.uid === postAuthorUid;
+            const canMenu = isMyComment || isPostAuthor;
             return (
               <TouchableOpacity
                 style={styles.commentRow}
@@ -329,28 +333,27 @@ export function CommentBottomSheet({ visible, postId, postAuthorUid, onClose }: 
                       <Text style={{ fontSize: 11, color: colors.inactive }}> (수정됨)</Text>
                     ) : null}
                   </Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                    <TouchableOpacity style={styles.replyTouchable}>
-                      <Text style={[styles.replyBtn, { color: colors.inactive }]}>답글 달기</Text>
-                    </TouchableOpacity>
-                    {canMenu && (
-                      <TouchableOpacity onPress={() => handleCommentMenu(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                        <Text style={{ fontSize: 12, color: colors.inactive }}>···</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
+                  <TouchableOpacity style={styles.replyTouchable}>
+                    <Text style={[styles.replyBtn, { color: colors.inactive }]}>답글 달기</Text>
+                  </TouchableOpacity>
                 </View>
-                <TouchableOpacity
-                  onPress={() => toggleCommentLike(item.id)}
-                  style={styles.commentLikeBtn}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Ionicons
-                    name={isLiked ? 'heart' : 'heart-outline'}
-                    size={14}
-                    color={isLiked ? colors.primary : colors.inactive}
-                  />
-                </TouchableOpacity>
+                <View style={{ alignItems: 'center', gap: 6 }}>
+                  {canMenu && (
+                    <TouchableOpacity onPress={() => handleCommentMenu(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Ionicons name="ellipsis-horizontal" size={16} color={colors.text} />
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    onPress={() => toggleCommentLike(item.id)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons
+                      name={isLiked ? 'heart' : 'heart-outline'}
+                      size={14}
+                      color={isLiked ? colors.primary : colors.inactive}
+                    />
+                  </TouchableOpacity>
+                </View>
               </TouchableOpacity>
             );
           }}
