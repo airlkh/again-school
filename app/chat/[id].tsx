@@ -100,9 +100,10 @@ export default function ChatRoomScreen() {
   }, [previewMedia, chatVideoPlayer]);
 
   const [isOnline, setIsOnline] = useState(online === '1');
+  const [otherPhotoURL, setOtherPhotoURL] = useState<string | null>(null);
   const avatarImg = Number(avatar) || 1;
 
-  // 상대방 온라인 상태 실시간 구독
+  // 상대방 온라인 상태 + 프로필 사진 실시간 구독
   useEffect(() => {
     if (!otherUid) {
       console.log('[Chat] otherUid 없음 — 온라인 상태 구독 스킵');
@@ -111,8 +112,9 @@ export default function ChatRoomScreen() {
     console.log('[Chat] 상대방 온라인 상태 구독 시작:', otherUid);
     return onSnapshot(doc(db, 'users', otherUid), (snap) => {
       if (snap.exists()) {
-        const online = snap.data()?.isOnline === true;
-        setIsOnline(online);
+        const data = snap.data();
+        setIsOnline(data?.isOnline === true);
+        setOtherPhotoURL(data?.photoURL || null);
       }
     }, (error) => {
       console.warn('[Chat] 온라인 상태 구독 오류:', error);
@@ -457,7 +459,7 @@ export default function ChatRoomScreen() {
           ) : (
             <View style={[styles.bubbleRow, styles.bubbleRowLeft]}>
               <Image
-                source={getAvatarSource(null)}
+                source={getAvatarSource(otherPhotoURL)}
                 style={styles.bubbleAvatar}
               />
               <View style={{ maxWidth: '72%' }}>
@@ -506,7 +508,7 @@ export default function ChatRoomScreen() {
           activeOpacity={0.7}
         >
           <Image
-            source={getAvatarSource(null)}
+            source={getAvatarSource(otherPhotoURL)}
             style={styles.headerAvatar}
           />
           <View>
