@@ -9,7 +9,7 @@ import Slider from '@react-native-community/slider';
 import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useTheme } from '../contexts/ThemeContext';
-import { createAudioPlayer, setAudioModeAsync, AudioPlayer } from 'expo-audio';
+import { createAudioPlayer, setAudioModeAsync, preload, AudioPlayer } from 'expo-audio';
 
 export interface MusicItem {
   id: string;
@@ -77,6 +77,30 @@ export function MusicSelector({ selectedMusic, onChange, isVideo = false }: Prop
       const items: MusicItem[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as MusicItem));
       setMusicList(items);
       setFiltered(items);
+
+      // 상위 10개 프리로드 + duration 보정
+      await setAudioModeAsync({ playsInSilentMode: true });
+      items.slice(0, 10).forEach((item) => {
+        if (item.url) {
+          preload({ uri: item.url }).catch(() => {});
+        }
+        // duration이 0이면 오디오에서 가져오기
+        if (!item.duration || item.duration <= 0) {
+          try {
+            const p = createAudioPlayer({ uri: item.url });
+            const check = setInterval(() => {
+              if (p.isLoaded && p.duration > 0) {
+                clearInterval(check);
+                item.duration = Math.round(p.duration);
+                setMusicList((prev) => prev.map((m) => m.id === item.id ? { ...m, duration: item.duration } : m));
+                setFiltered((prev) => prev.map((m) => m.id === item.id ? { ...m, duration: item.duration } : m));
+                p.remove();
+              }
+            }, 200);
+            setTimeout(() => { clearInterval(check); try { p.remove(); } catch {} }, 5000);
+          } catch {}
+        }
+      });
     } catch (e) {
       console.warn('음악 로드 실패:', e);
     } finally {
@@ -108,13 +132,9 @@ export function MusicSelector({ selectedMusic, onChange, isVideo = false }: Prop
       await setAudioModeAsync({ playsInSilentMode: true });
       const player = createAudioPlayer({ uri: url });
       previewSoundRef.current = player;
-      setTimeout(async () => {
-        try {
-          if (startTime > 0) await player.seekTo(startTime);
-          player.play();
-          previewTimerRef.current = setTimeout(() => { stopPreview(); }, 2000);
-        } catch {}
-      }, 300);
+      if (startTime > 0) await player.seekTo(startTime);
+      player.play();
+      previewTimerRef.current = setTimeout(() => { stopPreview(); }, 2000);
     } catch {}
   }
 
@@ -126,9 +146,7 @@ export function MusicSelector({ selectedMusic, onChange, isVideo = false }: Prop
       const player = createAudioPlayer({ uri: item.url });
       soundRef.current = player;
       setPlayingId(item.id);
-      setTimeout(() => {
-        try { player.play(); } catch {}
-      }, 300);
+      player.play();
     } catch (e) {
       console.warn('재생 실패:', e);
     }
@@ -150,6 +168,7 @@ export function MusicSelector({ selectedMusic, onChange, isVideo = false }: Prop
   }
 
   function formatDuration(sec: number): string {
+    if (!sec || sec <= 0) return '--:--';
     const m = Math.floor(sec / 60);
     const s = Math.floor(sec % 60);
     return `${m}:${s.toString().padStart(2, '0')}`;
