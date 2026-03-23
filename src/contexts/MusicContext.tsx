@@ -84,7 +84,13 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
       if (state !== 'active' && musicPlayer) {
         try { musicPlayer.pause(); } catch {}
       }
-      // 포그라운드 복귀 시 자동 재생 안 함 (OFF 유지)
+      if (state === 'active' && musicPlayer) {
+        // 포그라운드 복귀 시 음소거 상태로 동기화
+        try { musicPlayer.muted = true; } catch {}
+        isMutedRef.current = true;
+        setIsMuted(true);
+        AsyncStorage.setItem(MUTE_KEY, 'true');
+      }
     });
     return () => sub.remove();
   }, [musicUrl]);

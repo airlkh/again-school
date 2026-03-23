@@ -156,11 +156,15 @@ export default function PostDetailScreen() {
     };
   }, [fsPost?.music?.url]);
 
-  // 백그라운드 전환 시 음악 즉시 중지
+  // 백그라운드 전환 시 음악 즉시 중지 + 포그라운드 복귀 시 음소거 유지
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
       if (state !== 'active' && musicRef.current) {
         try { musicRef.current.pause(); } catch {}
+        setMusicPlaying(false);
+      }
+      if (state === 'active') {
+        // 포그라운드 복귀 시 음소거 상태 유지 (자동 재생 안 함)
         setMusicPlaying(false);
       }
     });
