@@ -23,6 +23,8 @@ import { useCurrentUser } from '../hooks/useCurrentUser';
 import {
   FirestoreComment,
   addComment,
+  deleteComment,
+  updateComment,
   subscribeComments,
 } from '../services/postService';
 import { sendPushNotification } from '../services/notificationService';
@@ -36,6 +38,7 @@ const SCREEN_HEIGHT = Dimensions.get('window').height;
 interface Props {
   visible: boolean;
   postId: string;
+  postAuthorUid?: string;
   onClose: () => void;
 }
 
@@ -58,7 +61,7 @@ const EMOJI_LIST = [
   '😤', '🤔', '😏', '🫶', '💝', '🌟', '😘', '🤣',
 ];
 
-export function CommentBottomSheet({ visible, postId, onClose }: Props) {
+export function CommentBottomSheet({ visible, postId, postAuthorUid, onClose }: Props) {
   const { colors } = useTheme();
   const { user } = useAuth();
   const { displayName, photoURL, avatarImg } = useCurrentUser();
@@ -69,6 +72,7 @@ export function CommentBottomSheet({ visible, postId, onClose }: Props) {
   const [inputText, setInputText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
@@ -117,9 +121,61 @@ export function CommentBottomSheet({ visible, postId, onClose }: Props) {
     });
   }
 
+  function handleCommentMenu(item: FirestoreComment) {
+    const isMyComment = item.uid === user?.uid;
+    const isPostAuthor = user?.uid === postAuthorUid;
+    if (!isMyComment && !isPostAuthor) return;
+
+    const options: string[] = [];
+    if (isMyComment) options.push('수정');
+    options.push('삭제');
+    options.push('취소');
+
+    Alert.alert('댓글', '', options.map((label, idx) => ({
+      text: label,
+      style: label === '삭제' ? 'destructive' as const : label === '취소' ? 'cancel' as const : 'default' as const,
+      onPress: () => {
+        if (label === '수정') {
+          setEditingId(item.id);
+          setInputText(item.text);
+          inputRef.current?.focus();
+        } else if (label === '삭제') {
+          Alert.alert('댓글 삭제', '댓글을 삭제하시겠습니까?', [
+            { text: '취소', style: 'cancel' },
+            {
+              text: '삭제', style: 'destructive',
+              onPress: async () => {
+                try {
+                  await deleteComment(postId, item.id);
+                } catch {
+                  Alert.alert('오류', '댓글 삭제에 실패했습니다.');
+                }
+              },
+            },
+          ]);
+        }
+      },
+    })));
+  }
+
   async function handleSubmitComment() {
     const text = inputText.trim();
     if (!text || !user) return;
+
+    // 수정 모드
+    if (editingId) {
+      setSubmitting(true);
+      try {
+        await updateComment(postId, editingId, text);
+        setInputText('');
+        setEditingId(null);
+      } catch {
+        Alert.alert('오류', '댓글 수정에 실패했습니다.');
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
 
     // 댓글 권한 체크
     try {
@@ -244,8 +300,13 @@ export function CommentBottomSheet({ visible, postId, onClose }: Props) {
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => {
             const isLiked = likedComments.has(item.id);
+            const canMenu = item.uid === user?.uid || user?.uid === postAuthorUid;
             return (
-              <View style={styles.commentRow}>
+              <TouchableOpacity
+                style={styles.commentRow}
+                activeOpacity={0.7}
+                onLongPress={() => canMenu && handleCommentMenu(item)}
+              >
                 <Image
                   source={getAvatarSource(item.photoURL)}
                   style={[styles.commentAvatar, { backgroundColor: colors.card }]}
@@ -264,12 +325,20 @@ export function CommentBottomSheet({ visible, postId, onClose }: Props) {
                   </View>
                   <Text style={[styles.commentText, { color: colors.text }]}>
                     {item.text}
+                    {(item as any).editedAt ? (
+                      <Text style={{ fontSize: 11, color: colors.inactive }}> (수정됨)</Text>
+                    ) : null}
                   </Text>
-                  <TouchableOpacity style={styles.replyTouchable}>
-                    <Text style={[styles.replyBtn, { color: colors.inactive }]}>
-                      답글 달기
-                    </Text>
-                  </TouchableOpacity>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <TouchableOpacity style={styles.replyTouchable}>
+                      <Text style={[styles.replyBtn, { color: colors.inactive }]}>답글 달기</Text>
+                    </TouchableOpacity>
+                    {canMenu && (
+                      <TouchableOpacity onPress={() => handleCommentMenu(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <Text style={{ fontSize: 12, color: colors.inactive }}>···</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 </View>
                 <TouchableOpacity
                   onPress={() => toggleCommentLike(item.id)}
@@ -282,7 +351,7 @@ export function CommentBottomSheet({ visible, postId, onClose }: Props) {
                     color={isLiked ? colors.primary : colors.inactive}
                   />
                 </TouchableOpacity>
-              </View>
+              </TouchableOpacity>
             );
           }}
           ListEmptyComponent={
@@ -310,6 +379,14 @@ export function CommentBottomSheet({ visible, postId, onClose }: Props) {
             style={[styles.myAvatar, { backgroundColor: colors.card }]}
           />
 
+          {editingId && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 6, backgroundColor: colors.surface }}>
+              <Text style={{ flex: 1, fontSize: 12, color: colors.primary }}>댓글 수정 중...</Text>
+              <TouchableOpacity onPress={() => { setEditingId(null); setInputText(''); }}>
+                <Text style={{ fontSize: 12, color: colors.inactive }}>취소</Text>
+              </TouchableOpacity>
+            </View>
+          )}
           <View
             style={[
               styles.inputWrap,

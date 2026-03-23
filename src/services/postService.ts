@@ -224,6 +224,20 @@ export async function addComment(
   return docRef.id;
 }
 
+/** 댓글 삭제 */
+export async function deleteComment(postId: string, commentId: string): Promise<void> {
+  const commentRef = doc(db, 'posts', postId, 'comments', commentId);
+  await deleteDoc(commentRef);
+  const postRef = doc(db, 'posts', postId);
+  await updateDoc(postRef, { commentCount: increment(-1) });
+}
+
+/** 댓글 수정 */
+export async function updateComment(postId: string, commentId: string, text: string): Promise<void> {
+  const commentRef = doc(db, 'posts', postId, 'comments', commentId);
+  await updateDoc(commentRef, { text, editedAt: Date.now() });
+}
+
 /** 댓글 실시간 구독 */
 export function subscribeComments(
   postId: string,
