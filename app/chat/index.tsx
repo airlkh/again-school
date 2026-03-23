@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../../src/config/firebase';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useGoBack } from '../../src/hooks/useGoBack';
@@ -40,12 +42,44 @@ export default function ChatListScreen() {
   const { user } = useAuth();
   const { colors, isDark } = useTheme();
   const [firestoreRooms, setFirestoreRooms] = useState<ChatRoom[]>([]);
+  const [livePhotos, setLivePhotos] = useState<Record<string, string | null>>({});
+  const photoSubsRef = useRef<Record<string, () => void>>({});
 
   // Firestore 채팅방 구독
   useEffect(() => {
     if (!user) return;
     return subscribeChatRooms(user.uid, setFirestoreRooms);
   }, [user]);
+
+  // 상대방 프로필 사진 실시간 구독
+  useEffect(() => {
+    const otherUids = firestoreRooms
+      .map((r) => r.participants.find((p) => p !== user?.uid))
+      .filter(Boolean) as string[];
+
+    // 새로운 uid만 구독 추가
+    otherUids.forEach((uid) => {
+      if (photoSubsRef.current[uid]) return;
+      photoSubsRef.current[uid] = onSnapshot(doc(db, 'users', uid), (snap) => {
+        if (snap.exists()) {
+          setLivePhotos((prev) => ({ ...prev, [uid]: snap.data()?.photoURL || null }));
+        }
+      });
+    });
+
+    // 더 이상 없는 uid 구독 해제
+    Object.keys(photoSubsRef.current).forEach((uid) => {
+      if (!otherUids.includes(uid)) {
+        photoSubsRef.current[uid]();
+        delete photoSubsRef.current[uid];
+      }
+    });
+
+    return () => {
+      Object.values(photoSubsRef.current).forEach((unsub) => unsub());
+      photoSubsRef.current = {};
+    };
+  }, [firestoreRooms, user?.uid]);
 
   // Firestore + 더미 합치기
   const firestoreDisplay: DisplayRoom[] = firestoreRooms.map((room) => {
@@ -55,7 +89,7 @@ export default function ChatListScreen() {
       otherUid,
       otherName: room.participantNames?.[otherUid] ?? '알 수 없음',
       otherAvatarImg: room.participantAvatars?.[otherUid] ?? 1,
-      otherPhotoURL: (room as any).participantPhotos?.[otherUid] ?? null,
+      otherPhotoURL: livePhotos[otherUid] ?? (room as any).participantPhotos?.[otherUid] ?? null,
       lastMessage: room.lastMessage ?? '',
       lastTime: formatTime(room.lastMessageAt),
       unread: room.unreadCount?.[user?.uid ?? ''] ?? 0,
