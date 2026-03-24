@@ -22,6 +22,8 @@ export interface FirestoreStory {
   mediaUrl: string;
   mediaType: 'image' | 'video';
   caption: string;
+  visibility?: string;
+  visibilitySchools?: any[];
   viewers: string[];
   createdAt: number;
   expiresAt: number; // 24시간 후 자동 만료

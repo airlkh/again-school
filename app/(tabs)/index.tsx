@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -74,10 +74,24 @@ function StoryBar({ fsStories }: { fsStories: FirestoreStory[] }) {
   const [dummyStories, setDummyStories] = useState(DUMMY_STORIES);
   const { colors } = useTheme();
   const { user } = useAuth();
-  const { photoURL: myPhotoURL } = useCurrentUser();
+  const { photoURL: myPhotoURL, profile: myStoryProfile } = useCurrentUser();
+  const myStorySchools = ((myStoryProfile as any)?.schools ?? []).map((s: any) => s?.schoolName?.toLowerCase?.() ?? '').filter(Boolean);
+
+  // 공개범위 필터링
+  const filteredStories = (fsStories || []).filter((s) => {
+    const v = (s as any).visibility;
+    if (!v || v === 'public') return true;
+    if (v === 'private') return s.uid === user?.uid;
+    if (v === 'school' || v === 'grade') {
+      if (s.uid === user?.uid) return true;
+      const postSchool = (s as any).schoolName?.toLowerCase?.() ?? '';
+      return postSchool ? myStorySchools.includes(postSchool) : true;
+    }
+    return true;
+  });
 
   // Group Firestore stories by user
-  const groupedFsStories = (fsStories || []).reduce((acc, s) => {
+  const groupedFsStories = (filteredStories || []).reduce((acc, s) => {
     if (!s?.uid) return acc;
     if (!acc[s.uid]) {
       acc[s.uid] = { uid: s.uid, name: s.name, avatarImg: s.avatarImg, photoURL: s.photoURL ?? null, stories: [] };
@@ -860,6 +874,7 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
         <CommentBottomSheet
           visible={commentSheetVisible}
           postId={post.id}
+          postAuthorUid={post.authorUid}
           onClose={() => setCommentSheetVisible(false)}
         />
       )}
@@ -1016,6 +1031,7 @@ function BannerCard({ banner }: { banner: BannerItem }) {
 export default function HomeScreen() {
   const { colors } = useTheme();
   const { user: currentUser } = useAuth();
+  const { profile: myProfile } = useCurrentUser();
   const { postId: scrollToPostId } = useLocalSearchParams<{ postId?: string }>();
   const flatListRef = useRef<FlatList>(null);
   useScrollToTop(flatListRef);
@@ -1029,7 +1045,7 @@ export default function HomeScreen() {
   const [banners, setBanners] = useState<BannerItem[]>([]);
   const [unreadChat, setUnreadChat] = useState(0);
   const unreadNotif = useUnreadNotifications(currentUser?.uid);
-  const { playMusic, stopMusic } = useMusic();
+  const { playMusic, stopMusic, isMuted: musicMutedGlobal, toggleMute: toggleMusicMuteGlobal } = useMusic();
   const { isMuted: videoMuted, toggleMute: toggleVideoMute } = useMute();
 
   // 읽지 않은 채팅 수 구독
@@ -1135,9 +1151,23 @@ export default function HomeScreen() {
   const feedItems: FeedItem[] = (() => {
     const items: FeedItem[] = [{ type: 'story_bar', id: 'stories' }];
 
+    // 공개범위 필터링 함수
+    const mySchoolNames = (myProfile?.schools ?? []).map((s: any) => s?.schoolName?.toLowerCase?.() ?? '').filter(Boolean);
+    const isVisiblePost = (post: any): boolean => {
+      const v = post.visibility;
+      if (!v || v === 'public') return true;
+      if (v === 'private') return post.authorUid === currentUser?.uid;
+      if (v === 'school' || v === 'grade') {
+        if (post.authorUid === currentUser?.uid) return true;
+        const postSchool = post.schoolName?.toLowerCase?.() ?? '';
+        return postSchool ? mySchoolNames.includes(postSchool) : true;
+      }
+      return true;
+    };
+
     // Merge Firestore posts first, then dummy posts
     const allPosts: { data: DummyPost | FirestorePost; isFirestore: boolean }[] = [
-      ...(fsPosts || []).filter((p) => p && p.id).map((p) => ({ data: p, isFirestore: true })),
+      ...(fsPosts || []).filter((p) => p && p.id && isVisiblePost(p)).map((p) => ({ data: p, isFirestore: true })),
       ...DUMMY_POSTS.map((p) => ({ data: p, isFirestore: false })),
     ];
 
@@ -1248,12 +1278,16 @@ export default function HomeScreen() {
       const music = (item as any)?.data?.music;
       if (music?.url && visiblePostId) playMusic(visiblePostId, music);
       return () => {
-        // 탭 벗어날 때 동영상 + 음악 정지
+        // 탭 벗어날 때 동영상 + 음악 정지 + 음소거
         try { inlinePlayer.pause(); } catch {}
         stopMusic();
+        if (!musicMutedGlobal) toggleMusicMuteGlobal();
       };
-    }, [inlinePlayer, visibleVideoUrl, visiblePostId, playMusic, stopMusic])
+    }, [inlinePlayer, visibleVideoUrl, visiblePostId])
   );
+
+  const blockedUsers: string[] = (myProfile as any)?.blockedUsers ?? [];
+  const blockedSet = useMemo(() => new Set(blockedUsers), [blockedUsers]);
 
   const renderItem = useCallback(({ item }: { item: FeedItem }) => {
     switch (item.type) {
@@ -1261,6 +1295,7 @@ export default function HomeScreen() {
         return <StoryBar fsStories={fsStories} />;
       case 'photo_post':
         if (hiddenPostIds.has(item.data.id)) return null;
+        if (blockedSet.has((item.data as any).authorUid)) return null;
         return (
           <PostCard
             post={item.data}
@@ -1281,7 +1316,7 @@ export default function HomeScreen() {
       default:
         return null;
     }
-  }, [fsStories, hiddenPostIds, hidePost, visiblePostId, inlinePlayer, videoMuted, toggleVideoMute]);
+  }, [fsStories, hiddenPostIds, hidePost, visiblePostId, inlinePlayer, videoMuted, toggleVideoMute, blockedSet]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>

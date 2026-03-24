@@ -6,6 +6,7 @@ import {
   FlatList,
   TouchableOpacity,
   Image,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -15,7 +16,7 @@ import { db } from '../../src/config/firebase';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useGoBack } from '../../src/hooks/useGoBack';
-import { subscribeChatRooms } from '../../src/services/chatService';
+import { subscribeChatRooms, deleteChatRoom, getChatRoomId } from '../../src/services/chatService';
 import { ChatRoom } from '../../src/types/auth';
 import {
   DUMMY_CHAT_ROOMS,
@@ -23,6 +24,7 @@ import {
 } from '../../src/data/dummyClassmates';
 import { getAvatarSource } from '../../src/utils/avatar';
 import { NameWithBadge } from '../../src/utils/badge';
+import { useCurrentUser } from '../../src/hooks/useCurrentUser';
 
 // 통합 표시 타입
 interface DisplayRoom {
@@ -40,6 +42,7 @@ interface DisplayRoom {
 export default function ChatListScreen() {
   const goBack = useGoBack();
   const { user } = useAuth();
+  const { profile: myProfile } = useCurrentUser();
   const { colors, isDark } = useTheme();
   const [firestoreRooms, setFirestoreRooms] = useState<ChatRoom[]>([]);
   const [livePhotos, setLivePhotos] = useState<Record<string, string | null>>({});
@@ -112,8 +115,28 @@ export default function ChatListScreen() {
       online: d.online,
     }));
 
-  const allRooms = [...firestoreDisplay, ...dummyDisplay];
+  const blockedUsers: string[] = (myProfile as any)?.blockedUsers ?? [];
+  const allRooms = [...firestoreDisplay, ...dummyDisplay].filter((r) => !blockedUsers.includes(r.otherUid));
   const totalUnread = allRooms.reduce((s, r) => s + r.unread, 0);
+
+  function handleDeleteRoom(item: DisplayRoom) {
+    Alert.alert('채팅방을 삭제하시겠습니까?', '삭제 후에도 상대방의 채팅은 유지됩니다.', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '삭제',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            if (!user) return;
+            const roomId = getChatRoomId(user.uid, item.otherUid);
+            await deleteChatRoom(roomId, user.uid);
+          } catch (e) {
+            Alert.alert('오류', '채팅방 삭제에 실패했습니다.');
+          }
+        },
+      },
+    ]);
+  }
 
   function renderItem({ item }: { item: DisplayRoom }) {
     return (
@@ -130,6 +153,7 @@ export default function ChatListScreen() {
             },
           })
         }
+        onLongPress={() => handleDeleteRoom(item)}
         activeOpacity={0.7}
       >
         <View style={styles.avatarWrap}>

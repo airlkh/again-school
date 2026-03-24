@@ -1,0 +1,66 @@
+name: Android APK Build
+
+on:
+  workflow_dispatch:
+
+env:
+  NODE_OPTIONS: "--max-old-space-size=4096"
+
+jobs:
+  build-apk:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Fix Gradle permissions
+        run: chmod +x android/gradlew
+
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/again-school.keystore
+
+      - name: Build APK
+        run: |
+          export ANDROID_HOME=$ANDROID_SDK_ROOT
+          cd android && ./gradlew assembleRelease \
+            --no-daemon \
+            --warning-mode none \
+            -Dorg.gradle.jvmargs="-Xmx4g" \
+            -Pandroid.injected.signing.store.file=${{ github.workspace }}/android/app/again-school.keystore \
+            -Pandroid.injected.signing.store.password=${{ secrets.STORE_PASSWORD }} \
+            -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
+            -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
+        env:
+          NODE_ENV: "production"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: again-school-release-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 30
+
+      - name: Build Summary
+        run: |
+          echo "## Android APK Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "- **Format:** APK" >> $GITHUB_STEP_SUMMARY
+          echo "- **Profile:** Release (Signed)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Download:** Check Artifacts tab" >> $GITHUB_STEP_SUMMARY

@@ -23,6 +23,7 @@ import {
   getDocs,
 } from 'firebase/firestore';
 import { db, auth } from '../src/config/firebase';
+import { useCurrentUser } from '../src/hooks/useCurrentUser';
 
 type NotificationType = 'like' | 'comment' | 'chat' | 'connection';
 
@@ -73,6 +74,7 @@ function getActionText(item: NotificationItem): string {
 export default function NotificationsScreen() {
   const router = useRouter();
   const uid = auth.currentUser?.uid;
+  const { profile: myProfile } = useCurrentUser();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -181,7 +183,7 @@ export default function NotificationsScreen() {
         </View>
       ) : (
         <FlatList
-          data={notifications}
+          data={notifications.filter((n) => !((myProfile as any)?.blockedUsers ?? []).includes(n.fromUid))}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.list}

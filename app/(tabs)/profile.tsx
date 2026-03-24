@@ -906,6 +906,8 @@ export default function ProfileScreen() {
         <SettingItem icon="eye-outline" label="공개 범위 설정"
           detail={privacySettings?.showSchools && privacySettings?.showWorkplace ? '전체 공개' : '일부 비공개'}
           onPress={() => router.push('/settings/visibility' as any)} />
+        <SettingItem icon="ban-outline" label="차단 목록"
+          onPress={() => router.push('/settings/blocked' as any)} />
         <SettingItem icon="document-text-outline" label="이용약관"
           onPress={() => router.push('/settings/terms' as any)} />
         <SettingItem icon="shield-checkmark-outline" label="개인정보처리방침"

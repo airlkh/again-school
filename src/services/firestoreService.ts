@@ -11,6 +11,8 @@ import {
   updateDoc,
   or,
   limit,
+  orderBy,
+  writeBatch,
   Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -156,7 +158,7 @@ export async function updateUserProfile(
   await updateDoc(docRef, updateData);
 }
 
-/** 기본 공개범위 저장 */
+/** 기본 공개범위 저장 + 기존 게시물/스토리 일괄 업데이트 */
 export async function saveDefaultVisibility(
   uid: string,
   type: 'post' | 'story',
@@ -171,6 +173,25 @@ export async function saveDefaultVisibility(
     [schoolsKey]: visibilitySchools ?? [],
     updatedAt: Date.now(),
   });
+
+  // 기존 게시물/스토리 visibility 일괄 업데이트 (마스터 설정)
+  try {
+    const colName = type === 'post' ? 'posts' : 'stories';
+    const uidField = type === 'post' ? 'authorUid' : 'uid';
+    const snap = await getDocs(query(collection(db, colName), where(uidField, '==', uid)));
+    if (!snap.empty) {
+      const batch = writeBatch(db);
+      snap.forEach((d) => {
+        batch.update(d.ref, {
+          visibility,
+          visibilitySchools: visibilitySchools ?? [],
+        });
+      });
+      await batch.commit();
+    }
+  } catch (e) {
+    console.warn('[firestoreService] 일괄 visibility 업데이트 실패:', e);
+  }
 }
 
 /** 사용자 프로필 실시간 구독 */

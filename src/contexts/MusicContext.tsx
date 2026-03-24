@@ -33,12 +33,12 @@ const MUTE_KEY = '@music_muted';
 export async function resetAudioSession() {}
 
 export function MusicProvider({ children }: { children: React.ReactNode }) {
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
   const [currentPostId, setCurrentPostId] = useState<string | null>(null);
   const endTimeRef = useRef<number>(0);
   const startTimeRef = useRef<number>(0);
   const [musicUrl, setMusicUrl] = useState('');
-  const isMutedRef = useRef(false);
+  const isMutedRef = useRef(true);
   const currentPostIdRef = useRef<string | null>(null);
   const currentMusicRef = useRef<PostMusic | null>(null);
 
@@ -55,16 +55,16 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     AsyncStorage.getItem(MUTE_KEY).then((val) => {
-      const muted = val === 'true';
+      const muted = true;
       setIsMuted(muted);
       isMutedRef.current = muted;
-      if (musicPlayer) musicPlayer.muted = muted;
+      try { if (musicPlayer) musicPlayer.muted = muted; } catch {}
     });
   }, []);
 
   useEffect(() => {
     if (!musicPlayer) return;
-    musicPlayer.timeUpdateEventInterval = 0.5;
+    try { musicPlayer.timeUpdateEventInterval = 0.5; } catch {}
     const sub = musicPlayer.addListener('timeUpdate', (payload) => {
       const current = payload.currentTime;
       const end = endTimeRef.current;
@@ -104,8 +104,10 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     currentMusicRef.current = music;
     setCurrentPostId(postId);
     if (musicPlayer) {
-      musicPlayer.volume = music.volume ?? 0.8;
-      musicPlayer.muted = isMutedRef.current;
+      try {
+        musicPlayer.volume = music.volume ?? 0.8;
+        musicPlayer.muted = isMutedRef.current;
+      } catch {}
     }
     const startTime = music.startTime ?? 0;
     const duration = music.duration ?? 0;
@@ -146,10 +148,10 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     isMutedRef.current = next;
     AsyncStorage.setItem(MUTE_KEY, String(next));
     if (musicPlayer) {
-      musicPlayer.muted = next;
-      if (!next && musicUrl) {
-        try { musicPlayer.play(); } catch {}
-      }
+      try {
+        musicPlayer.muted = next;
+        if (!next && musicUrl) musicPlayer.play();
+      } catch {}
     }
   }
 

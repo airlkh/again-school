@@ -9,6 +9,7 @@ import {
   updateDoc,
   onSnapshot,
   arrayUnion,
+  arrayRemove,
   Unsubscribe,
   getDocs,
   getDoc,
@@ -51,6 +52,11 @@ export async function getOrCreateChatRoom(
     { merge: true },
   );
 
+  // 채팅방 진입 시 양쪽 모두 deletedFor 초기화하여 복원
+  await updateDoc(roomRef, {
+    deletedFor: [],
+  });
+
   return roomId;
 }
 
@@ -61,12 +67,13 @@ export async function sendMessage(
   text: string,
   imageUrl?: string,
   mediaType?: 'image' | 'video',
+  originalVideoUrl?: string,
 ): Promise<void> {
   const now = Date.now();
 
   // 메시지 추가
   const messagesRef = collection(db, 'chatRooms', roomId, 'messages');
-  await addDoc(messagesRef, {
+  const msgData: any = {
     senderUid,
     text,
     imageUrl: imageUrl ?? null,
@@ -74,7 +81,9 @@ export async function sendMessage(
     createdAt: now,
     read: false,
     readBy: [senderUid],
-  });
+  };
+  if (originalVideoUrl) msgData.originalVideoUrl = originalVideoUrl;
+  await addDoc(messagesRef, msgData);
 
   // 채팅방 lastMessage 업데이트
   const roomRef = doc(db, 'chatRooms', roomId);
@@ -82,14 +91,16 @@ export async function sendMessage(
     query(collection(db, 'chatRooms'), where('__name__', '==', roomId)),
   );
 
-  // 상대방 unread 카운트 증가
+  // 상대방 unread 카운트 증가 + 수신자 UID 추출
   let unreadCount: { [uid: string]: number } = {};
+  const receiverUids: string[] = [];
   roomSnap.forEach((d) => {
     const data = d.data() as ChatRoom;
     unreadCount = { ...data.unreadCount };
     data.participants.forEach((uid) => {
       if (uid !== senderUid) {
         unreadCount[uid] = (unreadCount[uid] ?? 0) + 1;
+        receiverUids.push(uid);
       }
     });
   });
@@ -103,6 +114,7 @@ export async function sendMessage(
     lastMessageAt: now,
     lastSenderUid: senderUid,
     unreadCount,
+    deletedFor: arrayRemove(...receiverUids),
   });
 
   // 채팅 알림 발송
@@ -161,7 +173,10 @@ export function subscribeChatRooms(
   return onSnapshot(q, (snapshot) => {
     const rooms: ChatRoom[] = [];
     snapshot.forEach((docSnap) => {
-      rooms.push({ id: docSnap.id, ...docSnap.data() } as ChatRoom);
+      const data = { id: docSnap.id, ...docSnap.data() } as ChatRoom;
+      // deletedFor에 포함된 유저는 목록에서 제외
+      if (data.deletedFor?.includes(myUid)) return;
+      rooms.push(data);
     });
     // 최신 메시지 순 정렬
     rooms.sort((a, b) => (b.lastMessageAt ?? 0) - (a.lastMessageAt ?? 0));
@@ -205,4 +220,20 @@ export async function markAsRead(
 /** 전체 안 읽은 메시지 수 계산 */
 export function getTotalUnread(rooms: ChatRoom[], myUid: string): number {
   return rooms.reduce((sum, room) => sum + (room.unreadCount?.[myUid] ?? 0), 0);
+}
+
+/** 채팅방 삭제 (내 목록에서만 제거, 상대방 유지) */
+export async function deleteChatRoom(roomId: string, myUid: string): Promise<void> {
+  const roomRef = doc(db, 'chatRooms', roomId);
+  await updateDoc(roomRef, {
+    deletedFor: arrayUnion(myUid),
+  });
+}
+
+/** 채팅방 나가기 (목록에서 제거, participants는 유지) */
+export async function leaveChatRoom(roomId: string, myUid: string): Promise<void> {
+  const roomRef = doc(db, 'chatRooms', roomId);
+  await updateDoc(roomRef, {
+    deletedFor: arrayUnion(myUid),
+  });
 }

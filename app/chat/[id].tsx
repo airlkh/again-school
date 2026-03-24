@@ -23,17 +23,21 @@ import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from 'expo-router';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useAuth } from '../../src/contexts/AuthContext';
+import { useCurrentUser } from '../../src/hooks/useCurrentUser';
 import { useGoBack } from '../../src/hooks/useGoBack';
+import * as ImageManipulator from 'expo-image-manipulator';
+import * as FileSystem from 'expo-file-system/legacy';
+import { Video as VideoCompressor } from 'react-native-compressor';
 import {
   getOrCreateChatRoom,
   sendMessage,
   subscribeMessages,
   markAsRead,
+  leaveChatRoom,
 } from '../../src/services/chatService';
 import { getUserProfile } from '../../src/services/firestoreService';
 import { uploadToCloudinary } from '../../src/services/uploadService';
-import { uploadVideoToCloudinary } from '../../src/utils/uploadVideo';
-import { CropEditor } from '../../src/components/CropEditor';
+import { uploadVideoToStorage } from '../../src/services/uploadVideoToStorage';
 import { ChatMessage } from '../../src/types/auth';
 import { getDummyMessages } from '../../src/data/dummyClassmates';
 import { getAvatarSource } from '../../src/utils/avatar';
@@ -49,6 +53,7 @@ interface DisplayMessage {
   senderUid: string;
   text: string;
   imageUrl?: string;
+  originalVideoUrl?: string;
   mediaType?: 'image' | 'video';
   time: string;
   date: string;
@@ -70,6 +75,7 @@ export default function ChatRoomScreen() {
   }>();
 
   const { user } = useAuth();
+  const { profile: myProfile } = useCurrentUser();
   const { colors } = useTheme();
   const goBack = useGoBack();
   const insets = useSafeAreaInsets();
@@ -81,8 +87,6 @@ export default function ChatRoomScreen() {
   const [sending, setSending] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState('');
-  const [cropVisible, setCropVisible] = useState(false);
-  const [cropTargetUri, setCropTargetUri] = useState('');
   const [imageHeights, setImageHeights] = useState<Record<string, number>>({});
   const flatListRef = useRef<FlatList>(null);
   const chatVideoPlayer = useVideoPlayer(null, (p) => {
@@ -170,12 +174,14 @@ export default function ChatRoomScreen() {
   // 메시지 합치기 (inverted용으로 역순)
   useEffect(() => {
     const myUid = user?.uid ?? 'me';
+    const blockedUsers: string[] = (myProfile as any)?.blockedUsers ?? [];
 
-    const fsDisplay: DisplayMessage[] = firestoreMessages.map((m) => ({
+    const fsDisplay: DisplayMessage[] = firestoreMessages.filter((m) => !blockedUsers.includes(m.senderUid)).map((m) => ({
       id: m.id,
       senderUid: m.senderUid,
       text: m.text,
       imageUrl: m.imageUrl,
+      originalVideoUrl: (m as any).originalVideoUrl,
       mediaType: m.mediaType,
       time: formatMsgTime(m.createdAt),
       date: formatMsgDate(m.createdAt),
@@ -277,11 +283,11 @@ export default function ChatRoomScreen() {
     }
     const result = await ImagePicker.launchCameraAsync({
       quality: 0.7,
+      allowsEditing: false,
     });
     if (!result.canceled && result.assets[0]) {
-      // 카메라 촬영 = 항상 이미지 → 자르기 화면
-      setCropTargetUri(result.assets[0].uri);
-      setCropVisible(true);
+      const compressed = await compressImage(result.assets[0].uri);
+      await uploadAndSendMedia(compressed, 'image');
     }
   }
 
@@ -303,6 +309,7 @@ export default function ChatRoomScreen() {
       mediaTypes,
       allowsMultipleSelection: false,
       videoMaxDuration: 60,
+      videoQuality: ImagePicker.UIImagePickerControllerQualityType.Medium,
     });
 
     if (result.canceled || !result.assets[0]) return;
@@ -327,18 +334,95 @@ export default function ChatRoomScreen() {
     });
 
     if (isVideo) {
-      await uploadAndSendMedia(asset.uri, 'video');
+      // 영상 용량 체크 (최대 200MB)
+      try {
+        const info = await FileSystem.getInfoAsync(asset.uri);
+        if (info.exists && (info as any).size && (info as any).size > 200 * 1024 * 1024) {
+          Alert.alert('영상 크기 초과', '영상 크기가 너무 큽니다 (최대 200MB).\n짧은 영상으로 다시 시도해주세요.');
+          return;
+        }
+      } catch {}
+      await uploadAndSendVideo(asset.uri);
     } else {
-      setCropTargetUri(asset.uri);
-      setCropVisible(true);
+      const compressed = await compressImage(asset.uri);
+      await uploadAndSendMedia(compressed, 'image');
     }
   }
 
-  // 자르기 완료 후 전송
-  async function handleCropDone(croppedUri: string) {
-    setCropVisible(false);
-    setCropTargetUri('');
-    await uploadAndSendMedia(croppedUri, 'image');
+  // 이미지 자동 압축
+  async function compressImage(uri: string): Promise<string> {
+    try {
+      const info = await FileSystem.getInfoAsync(uri);
+      const size = (info.exists && (info as any).size) ? (info as any).size : 0;
+
+      // 1MB 이하: 원본 전송
+      if (size <= 1 * 1024 * 1024) return uri;
+
+      // 5MB 이상: 품질 60% + 최대 1920px 리사이징
+      if (size > 5 * 1024 * 1024) {
+        const result = await ImageManipulator.manipulateAsync(
+          uri,
+          [{ resize: { width: 1920 } }],
+          { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG },
+        );
+        return result.uri;
+      }
+
+      // 1MB ~ 5MB: 품질 80%로 압축
+      const result = await ImageManipulator.manipulateAsync(
+        uri,
+        [],
+        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG },
+      );
+      return result.uri;
+    } catch (e) {
+      console.warn('[Chat] 이미지 압축 실패, 원본 사용:', e);
+      return uri;
+    }
+  }
+
+  // 동영상 압축 후 업로드
+  async function uploadAndSendVideo(originalUri: string) {
+    if (!originalUri || originalUri.trim() === '') {
+      Alert.alert('오류', '파일을 찾을 수 없습니다.');
+      return;
+    }
+
+    setSending(true);
+    setUploadProgress(0);
+    setUploadStatus('동영상 압축 중...');
+
+    try {
+      // 압축 (실패 시 원본 fallback)
+      let uploadUri = originalUri;
+      try {
+        const compressed = await VideoCompressor.compress(originalUri, {
+          compressionMethod: 'auto',
+          maxSize: 1280,
+          minimumFileSizeForCompress: 10,
+        });
+        if (compressed) uploadUri = compressed;
+      } catch (e) {
+        console.warn('[Chat] 동영상 압축 실패, 원본 사용:', e);
+      }
+
+      // 업로드
+      setUploadStatus('업로드 중...');
+      const ts = Date.now();
+      const path = `videos/chat/${roomId || 'unknown'}/${ts}.mp4`;
+      const url = await uploadVideoToStorage(uploadUri, path, (pct) => setUploadProgress(pct));
+
+      if (roomId && user) {
+        await sendMessage(roomId, user.uid, '', url, 'video');
+      }
+    } catch (err: any) {
+      console.error('채팅 동영상 업로드 실패:', err);
+      Alert.alert('전송 실패', err?.message || '동영상 전송에 실패했습니다.');
+    } finally {
+      setSending(false);
+      setUploadProgress(0);
+      setUploadStatus('');
+    }
   }
 
   // 실제 업로드 + 메시지 전송
@@ -360,7 +444,8 @@ export default function ChatRoomScreen() {
 
       let url: string;
       if (type === 'video') {
-        url = await uploadVideoToCloudinary(finalUri, (pct) => setUploadProgress(pct));
+        const path = `videos/chat/${roomId || 'unknown'}/${Date.now()}.mp4`;
+        url = await uploadVideoToStorage(finalUri, path, (pct) => setUploadProgress(pct));
       } else {
         url = await uploadToCloudinary(finalUri, 'image', (pct) => setUploadProgress(pct));
       }
@@ -414,6 +499,31 @@ export default function ChatRoomScreen() {
     return messages[index].date !== messages[index + 1].date;
   }
 
+  // 동영상 저장 옵션
+  function handleVideoLongPress(item: DisplayMessage) {
+    const hasOriginal = !!item.originalVideoUrl;
+    const options = hasOriginal
+      ? [
+          { text: '압축본 저장', onPress: () => handleSaveVideo(item.imageUrl!) },
+          { text: '원본 저장', onPress: () => handleSaveVideo(item.originalVideoUrl!) },
+          { text: '취소', style: 'cancel' as const },
+        ]
+      : [
+          { text: '동영상 저장', onPress: () => handleSaveVideo(item.imageUrl!) },
+          { text: '취소', style: 'cancel' as const },
+        ];
+    Alert.alert('저장 방식을 선택하세요', '', options);
+  }
+
+  async function handleSaveVideo(url: string) {
+    try {
+      const { Linking } = await import('react-native');
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('오류', '동영상을 열 수 없습니다.');
+    }
+  }
+
   // 미디어 버블 렌더
   function renderMediaBubble(item: DisplayMessage) {
     const isVideo = item.mediaType === 'video';
@@ -425,6 +535,7 @@ export default function ChatRoomScreen() {
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={() => setPreviewMedia({ url, type: 'video' })}
+          onLongPress={() => handleVideoLongPress(item)}
         >
           <View style={[styles.mediaBubble, { width: MAX_BUBBLE_IMAGE_WIDTH, height: 180, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }]}>
             <View style={styles.videoPlayOverlay}>
@@ -476,10 +587,12 @@ export default function ChatRoomScreen() {
             </View>
           ) : (
             <View style={[styles.bubbleRow, styles.bubbleRowLeft]}>
-              <Image
-                source={getAvatarSource(otherPhotoURL)}
-                style={styles.bubbleAvatar}
-              />
+              <TouchableOpacity activeOpacity={0.7} onPress={() => router.push(`/profile/${otherUid}`)}>
+                <Image
+                  source={getAvatarSource(otherPhotoURL)}
+                  style={styles.bubbleAvatar}
+                />
+              </TouchableOpacity>
               <View style={{ maxWidth: '72%' }}>
                 <Text style={[styles.bubbleSender, { color: colors.textSecondary }]}>{name}</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6 }}>
@@ -537,7 +650,30 @@ export default function ChatRoomScreen() {
           </View>
           {isOnline && <View style={styles.headerOnline} />}
         </TouchableOpacity>
-        <View style={styles.backBtn} />
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => {
+            Alert.alert('채팅방 나가기', '채팅방을 나가시겠습니까?\n나가면 대화 내용이 목록에서 사라집니다.', [
+              { text: '취소', style: 'cancel' },
+              {
+                text: '나가기',
+                style: 'destructive',
+                onPress: async () => {
+                  try {
+                    if (roomId && user) {
+                      await leaveChatRoom(roomId, user.uid);
+                    }
+                    goBack();
+                  } catch (e) {
+                    Alert.alert('오류', '채팅방 나가기에 실패했습니다.');
+                  }
+                },
+              },
+            ]);
+          }}
+        >
+          <Ionicons name="ellipsis-vertical" size={22} color="#fff" />
+        </TouchableOpacity>
       </View>
 
       <KeyboardAvoidingView
@@ -606,17 +742,6 @@ export default function ChatRoomScreen() {
         </TouchableOpacity>
       </View>
       </KeyboardAvoidingView>
-
-      {/* 자르기 모달 */}
-      {cropVisible && cropTargetUri !== '' && (
-        <Modal visible animationType="slide" statusBarTranslucent>
-          <CropEditor
-            imageUri={cropTargetUri}
-            onCropDone={handleCropDone}
-            onCancel={() => { setCropVisible(false); setCropTargetUri(''); }}
-          />
-        </Modal>
-      )}
 
       {/* 업로드 진행 오버레이 */}
       {sending && uploadProgress > 0 && (

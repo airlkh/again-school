@@ -39,6 +39,7 @@ import { useCurrentUser } from '../../src/hooks/useCurrentUser';
 import { createStory } from '../../src/services/storyService';
 import { createPost, PostVisibility, VisibilitySchool } from '../../src/services/postService';
 import { CLOUDINARY_CONFIG } from '../../src/config/cloudinary';
+import { uploadVideoToStorage } from '../../src/services/uploadVideoToStorage';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import * as VideoThumbnails from 'expo-video-thumbnails';
 
@@ -164,6 +165,7 @@ export default function UploadScreen() {
   const showVisibilityModalRef = useRef(false);
   const [showSchoolPicker, setShowSchoolPicker] = useState(false);
   const [pendingVisibility, setPendingVisibility] = useState<PostVisibility>('public');
+  const [defaultLoaded, setDefaultLoaded] = useState(false);
 
   const getVisibilityLabel = (v: PostVisibility): string => {
     switch(v) {
@@ -202,6 +204,22 @@ export default function UploadScreen() {
     const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardH(0));
     return () => { showSub.remove(); hideSub.remove(); };
   }, []);
+
+  // 유저 기본 공개범위 적용
+  useEffect(() => {
+    if (defaultLoaded) return;
+    const vis = (uploadTarget === 'story'
+      ? (profile as any)?.defaultStoryVisibility
+      : (profile as any)?.defaultPostVisibility) as PostVisibility | undefined;
+    const schools = (uploadTarget === 'story'
+      ? (profile as any)?.defaultStoryVisibilitySchools
+      : (profile as any)?.defaultPostVisibilitySchools) as VisibilitySchool[] | undefined;
+    if (vis) {
+      setVisibility(vis);
+      setVisibilitySchools(schools ?? []);
+      setDefaultLoaded(true);
+    }
+  }, [profile, uploadTarget, defaultLoaded]);
 
   // 갤러리 로드
   useEffect(() => {
@@ -406,54 +424,52 @@ export default function UploadScreen() {
       }
     }
 
-    const videoUrl: string = await new Promise((resolve, reject) => {
-      const formData = new FormData();
+    let mediaUrl: string;
 
-      formData.append('file', {
-        uri: uri,
-        type: isVideo ? 'video/mp4' : 'image/jpeg',
-        name: isVideo
-          ? `video_${Date.now()}.mp4`
-          : `image_${Date.now()}.jpg`,
-      } as any);
+    if (isVideo) {
+      // 동영상: Firebase Storage 업로드
+      const category = uploadTarget === 'story' ? 'stories' : 'posts';
+      const path = `videos/${category}/${uid}/${Date.now()}.mp4`;
+      mediaUrl = await uploadVideoToStorage(uri, path, onProgress);
+    } else {
+      // 이미지: Cloudinary 업로드 (기존 유지)
+      mediaUrl = await new Promise((resolve, reject) => {
+        const formData = new FormData();
+        formData.append('file', {
+          uri: uri,
+          type: 'image/jpeg',
+          name: `image_${Date.now()}.jpg`,
+        } as any);
+        formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
 
-      formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+        const xhr = new XMLHttpRequest();
+        xhr.timeout = 600000;
 
-      if (isVideo) {
-        formData.append('resource_type', 'video');
-      }
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            onProgress?.(Math.round((e.loaded / e.total) * 100));
+          }
+        };
 
-      const xhr = new XMLHttpRequest();
-      xhr.timeout = 600000;
+        xhr.onload = () => {
+          if (xhr.status === 200) {
+            const res = JSON.parse(xhr.responseText);
+            resolve(optimizeCloudinaryUrl(res.secure_url));
+          } else {
+            console.error('Cloudinary 오류:', xhr.status, xhr.responseText);
+            reject(new Error(`업로드 실패: ${xhr.status}`));
+          }
+        };
 
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) {
-          onProgress?.(Math.round((e.loaded / e.total) * 100));
-        }
-      };
+        xhr.onerror = () => reject(new Error('네트워크 오류'));
+        xhr.ontimeout = () => reject(new Error('시간 초과'));
 
-      xhr.onload = () => {
-        if (xhr.status === 200) {
-          const res = JSON.parse(xhr.responseText);
-          resolve(optimizeCloudinaryUrl(res.secure_url));
-        } else {
-          console.error('Cloudinary 오류:', xhr.status, xhr.responseText);
-          reject(new Error(`업로드 실패: ${xhr.status}`));
-        }
-      };
+        xhr.open('POST', CLOUDINARY_CONFIG.imageUploadUrl);
+        xhr.send(formData);
+      });
+    }
 
-      xhr.onerror = () => reject(new Error('네트워크 오류'));
-      xhr.ontimeout = () => reject(new Error('시간 초과'));
-
-      const url = isVideo
-        ? CLOUDINARY_CONFIG.videoUploadUrl
-        : CLOUDINARY_CONFIG.imageUploadUrl;
-
-      xhr.open('POST', url);
-      xhr.send(formData);
-    });
-
-    return { url: videoUrl, thumbnailUrl: thumbnailCloudinaryUrl };
+    return { url: mediaUrl, thumbnailUrl: thumbnailCloudinaryUrl };
   };
 
   // 최종 업로드
@@ -561,6 +577,8 @@ export default function UploadScreen() {
             mediaUrl: item.url,
             mediaType: item.type,
             caption: caption || '',
+            visibility,
+            visibilitySchools,
           });
         }
       }

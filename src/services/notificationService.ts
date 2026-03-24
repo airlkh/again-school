@@ -119,6 +119,11 @@ export async function sendPushNotification(
     const userSnap = await getDoc(doc(db, 'users', toUid));
     if (!userSnap.exists()) return;
 
+    // 수신자가 발신자를 차단한 경우 알림 차단
+    const blockedUsers: string[] = userSnap.data()?.blockedUsers ?? [];
+    const fromUid = data?.fromUid || data?.otherUid;
+    if (fromUid && blockedUsers.includes(fromUid)) return;
+
     const pushToken = userSnap.data()?.pushToken;
     if (!pushToken) return;
 

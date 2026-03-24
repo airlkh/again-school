@@ -65,8 +65,12 @@ export default function LoginScreen() {
     try {
       setSocialLoading('google');
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-      const userInfo = await GoogleSignin.signIn();
-      const idToken = userInfo.data?.idToken ?? (userInfo as any).idToken;
+      const response = await GoogleSignin.signIn();
+      if ((response as any).type && (response as any).type !== 'success') {
+        console.log('[Google Login] 사용자가 취소함');
+        return;
+      }
+      const idToken = response.data?.idToken ?? (response as any).idToken;
       if (!idToken) throw new Error('idToken을 가져올 수 없습니다');
       const credential = GoogleAuthProvider.credential(idToken);
       const result = await signInWithCredential(auth, credential);
@@ -260,6 +264,10 @@ export default function LoginScreen() {
               )}
             </TouchableOpacity>
 
+            <TouchableOpacity onPress={() => router.push('/(auth)/reset-password')} style={styles.forgotRow}>
+              <Text style={styles.forgotText}>비밀번호를 잊으셨나요?</Text>
+            </TouchableOpacity>
+
             {/* 구분선 */}
             <View style={styles.divider}>
               <View style={styles.dividerLine} />
@@ -401,6 +409,14 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 17,
     fontWeight: '700',
+  },
+
+  forgotRow: {
+    alignItems: 'flex-end',
+  },
+  forgotText: {
+    color: Colors.inactive,
+    fontSize: 13,
   },
 
   // 구분선

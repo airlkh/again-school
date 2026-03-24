@@ -64,7 +64,7 @@ const EMOJI_LIST = [
 export function CommentBottomSheet({ visible, postId, postAuthorUid, onClose }: Props) {
   const { colors } = useTheme();
   const { user } = useAuth();
-  const { displayName, photoURL, avatarImg } = useCurrentUser();
+  const { displayName, photoURL, avatarImg, profile: myProfileData } = useCurrentUser();
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
 
@@ -137,9 +137,12 @@ export function CommentBottomSheet({ visible, postId, postAuthorUid, onClose }: 
       style: label === '삭제' ? 'destructive' as const : label === '취소' ? 'cancel' as const : 'default' as const,
       onPress: () => {
         if (label === '수정') {
-          setEditingId(item.id);
-          setInputText(item.text);
-          inputRef.current?.focus();
+          // Alert dismiss 후 state 반영 + focus 보장을 위해 setTimeout
+          setTimeout(() => {
+            setEditingId(item.id);
+            setInputText(item.text);
+            setTimeout(() => inputRef.current?.focus(), 100);
+          }, 300);
         } else if (label === '삭제') {
           Alert.alert('댓글 삭제', '댓글을 삭제하시겠습니까?', [
             { text: '취소', style: 'cancel' },
@@ -294,7 +297,7 @@ export function CommentBottomSheet({ visible, postId, postAuthorUid, onClose }: 
 
         {/* 댓글 목록 */}
         <FlatList
-          data={comments}
+          data={comments.filter((c) => !((myProfileData as any)?.blockedUsers ?? []).includes(c.uid))}
           keyExtractor={(item) => item.id}
           style={styles.commentList}
           contentContainerStyle={styles.commentListContent}
@@ -366,6 +369,16 @@ export function CommentBottomSheet({ visible, postId, postAuthorUid, onClose }: 
           }
         />
 
+        {/* 수정중 표시 */}
+        {editingId && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 6, backgroundColor: colors.surface, borderTopWidth: 0.5, borderTopColor: colors.border }}>
+            <Text style={{ flex: 1, fontSize: 12, color: colors.primary }}>댓글 수정 중...</Text>
+            <TouchableOpacity onPress={() => { setEditingId(null); setInputText(''); }}>
+              <Text style={{ fontSize: 12, color: colors.inactive }}>취소</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* 입력창 — 항상 키보드 바로 위에 고정 */}
         <View
           style={[
@@ -382,14 +395,6 @@ export function CommentBottomSheet({ visible, postId, postAuthorUid, onClose }: 
             style={[styles.myAvatar, { backgroundColor: colors.card }]}
           />
 
-          {editingId && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 6, backgroundColor: colors.surface }}>
-              <Text style={{ flex: 1, fontSize: 12, color: colors.primary }}>댓글 수정 중...</Text>
-              <TouchableOpacity onPress={() => { setEditingId(null); setInputText(''); }}>
-                <Text style={{ fontSize: 12, color: colors.inactive }}>취소</Text>
-              </TouchableOpacity>
-            </View>
-          )}
           <View
             style={[
               styles.inputWrap,

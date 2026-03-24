@@ -40,6 +40,11 @@ export interface UserProfile {
   teacherHistory?: TeacherHistory[];
   teacherSubject?: string;
   teacherSchoolName?: string;
+  blockedUsers?: string[];
+  defaultPostVisibility?: string;
+  defaultStoryVisibility?: string;
+  defaultPostVisibilitySchools?: any[];
+  defaultStoryVisibilitySchools?: any[];
   onboardingCompleted: boolean;
   createdAt: number;
   updatedAt: number;
@@ -65,6 +70,7 @@ export interface ChatRoom {
   lastMessageAt: number;
   lastSenderUid: string;
   unreadCount: { [uid: string]: number };
+  deletedFor?: string[];
   createdAt: number;
 }
 
@@ -73,6 +79,7 @@ export interface ChatMessage {
   senderUid: string;
   text: string;
   imageUrl?: string;
+  originalVideoUrl?: string;
   mediaType?: 'image' | 'video';
   createdAt: number;
   read: boolean;

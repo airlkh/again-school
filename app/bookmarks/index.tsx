@@ -78,6 +78,7 @@ export default function BookmarksPage() {
 
   // 댓글 바텀시트
   const [commentPostId, setCommentPostId] = useState<string | null>(null);
+  const [commentAuthorUid, setCommentAuthorUid] = useState<string | undefined>(undefined);
 
 
   useEffect(() => {
@@ -303,9 +304,11 @@ export default function BookmarksPage() {
               <TouchableOpacity
                 onPress={() => {
                   const postId = selectedPost?.id || '';
+                  const authorUid = selectedPost?.authorUid;
                   setSelectedPost(null);
                   setTimeout(() => {
                     setCommentPostId(postId);
+                    setCommentAuthorUid(authorUid);
                   }, 350);
                 }}
               >
@@ -345,9 +348,11 @@ export default function BookmarksPage() {
                 style={styles.commentCountWrap}
                 onPress={() => {
                   const postId = selectedPost.id;
+                  const authorUid = selectedPost.authorUid;
                   setSelectedPost(null);
                   setTimeout(() => {
                     setCommentPostId(postId);
+                    setCommentAuthorUid(authorUid);
                   }, 350);
                 }}
               >
@@ -365,7 +370,8 @@ export default function BookmarksPage() {
         <CommentBottomSheet
           visible={!!commentPostId}
           postId={commentPostId}
-          onClose={() => setCommentPostId(null)}
+          postAuthorUid={commentAuthorUid}
+          onClose={() => { setCommentPostId(null); setCommentAuthorUid(undefined); }}
         />
       )}
     </SafeAreaView>

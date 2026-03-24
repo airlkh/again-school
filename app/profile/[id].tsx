@@ -19,6 +19,7 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 import { useGoBack } from '../../src/hooks/useGoBack';
 import { useCurrentUser } from '../../src/hooks/useCurrentUser';
 import { useTrust, getTrustBadge, TRUST_BADGE_INFO } from '../../src/hooks/useTrust';
+import { blockUser, unblockUser } from '../../src/services/blockService';
 import {
   getUserProfile,
   sendConnectionRequest,
@@ -71,6 +72,34 @@ export default function ProfileDetailScreen() {
   const [showTrustModal, setShowTrustModal] = useState(false);
   const [trustMessage, setTrustMessage] = useState('');
   const { trustCount, isTrustedByMe, toggleTrust, loading: trustLoading } = useTrust(id ?? '');
+  const isMe = user?.uid === id;
+  const myBlockedUsers: string[] = (myProfile as any)?.blockedUsers ?? [];
+  const isBlocked = !isMe && !!id && myBlockedUsers.includes(id);
+
+  function handleMoreMenu() {
+    if (!user || !id || isMe) return;
+    const label = isBlocked ? '차단 해제' : '차단하기';
+    Alert.alert('', '', [
+      {
+        text: label,
+        style: isBlocked ? 'default' : 'destructive',
+        onPress: () => {
+          if (isBlocked) {
+            Alert.alert('차단 해제', '이 유저의 차단을 해제하시겠습니까?', [
+              { text: '취소', style: 'cancel' },
+              { text: '해제', onPress: () => unblockUser(user.uid, id).catch(() => Alert.alert('오류', '차단 해제에 실패했습니다.')) },
+            ]);
+          } else {
+            Alert.alert('유저 차단', '이 유저를 차단하시겠습니까?\n차단하면 게시물, 댓글, 채팅이 숨겨집니다.', [
+              { text: '취소', style: 'cancel' },
+              { text: '차단', style: 'destructive', onPress: () => blockUser(user.uid, id).catch(() => Alert.alert('오류', '차단에 실패했습니다.')) },
+            ]);
+          }
+        },
+      },
+      { text: '취소', style: 'cancel' },
+    ]);
+  }
 
   // 프로필 실시간 구독 (Firestore 먼저, 없으면 더미)
   useEffect(() => {
@@ -166,7 +195,6 @@ export default function ProfileDetailScreen() {
   const avatarImg = profile?.avatarImg ?? 1;
   const allSchools = firestoreProfile?.schools ?? profile?.schools ?? [];
   const mySchools = myProfile?.schools ?? [];
-  const isMe = user?.uid === id;
   const { canSeeSchools, canSeeWorkplace } = isMe
     ? { canSeeSchools: true, canSeeWorkplace: true }
     : checkPrivacy(firestoreProfile?.privacySettings, allSchools, mySchools);
@@ -196,7 +224,13 @@ export default function ProfileDetailScreen() {
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>프로필</Text>
-        <View style={styles.backBtn} />
+        {!isMe ? (
+          <TouchableOpacity onPress={handleMoreMenu} style={styles.backBtn}>
+            <Ionicons name="ellipsis-vertical" size={22} color="#fff" />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.backBtn} />
+        )}
       </View>
 
       <ScrollView
