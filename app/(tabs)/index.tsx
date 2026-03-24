@@ -15,6 +15,7 @@ import {
   Platform,
   Modal,
   Animated,
+  ActivityIndicator,
   Easing,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -196,6 +197,8 @@ function getVideoThumbnail(post: { thumbnailUrl?: string | null; imageUrl?: stri
       .replace('/video/upload/', '/video/upload/so_0,w_600/')
       .replace(/\.(mp4|mov)(\?|$)/i, '.jpg$2');
   }
+  // Firebase Storage URL인 경우 imageUrl이 이미지일 때만 썸네일로 사용
+  if (post.imageUrl && !post.imageUrl.includes('.mp4') && !post.imageUrl.includes('.mov') && !post.imageUrl.includes('.avi') && !post.imageUrl.includes('video/upload')) return post.imageUrl;
   return null;
 }
 
@@ -218,6 +221,12 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
   const [imgHeight, setImgHeight] = useState(SCREEN_WIDTH);
   const [multiImgHeights, setMultiImgHeights] = useState<Record<number, number>>({});
   const [imgLoadFailed, setImgLoadFailed] = useState(false);
+  const [videoReady, setVideoReady] = useState(false);
+
+  // 보이지 않는 상태로 전환 시 videoReady 리셋
+  useEffect(() => {
+    if (!isVisible) setVideoReady(false);
+  }, [isVisible]);
 
   // 음악 제목 marquee + 음표 bounce
   const marqueeAnim = useRef(new Animated.Value(0)).current;
@@ -581,7 +590,19 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
                   style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH }}
                   contentFit="cover"
                   nativeControls={false}
+                  onFirstFrameRender={() => setVideoReady(true)}
                 />
+                {/* 로드 전 썸네일 오버레이 또는 로딩 스피너 */}
+                {!videoReady && (() => {
+                  const thumb = getVideoThumbnail({ thumbnailUrl, imageUrl, videoUrl });
+                  return thumb ? (
+                    <Image source={{ uri: thumb }} style={{ position: 'absolute', top: 0, left: 0, width: SCREEN_WIDTH, height: SCREEN_WIDTH }} resizeMode="cover" />
+                  ) : (
+                    <View style={{ position: 'absolute', top: 0, left: 0, width: SCREEN_WIDTH, height: SCREEN_WIDTH, justifyContent: 'flex-end', alignItems: 'center', paddingBottom: 16, backgroundColor: colors.background }}>
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    </View>
+                  );
+                })()}
                 <TouchableOpacity
                   style={{
                     position: 'absolute',
@@ -1071,7 +1092,7 @@ export default function HomeScreen() {
       console.warn('[HomeScreen] 채팅 onSnapshot 오류:', error);
     });
   }, [currentUser]);
-  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 30 }).current;
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: Array<{ key: string }> }) => {
     const postItems = viewableItems.filter((v) => v.key !== 'stories' && !v.key.startsWith('recommend-') && !v.key.startsWith('banner-'));
     setVisiblePostId(postItems.length > 0 ? postItems[0].key : null);
@@ -1212,6 +1233,13 @@ export default function HomeScreen() {
   useEffect(() => { feedItemsRef.current = feedItems; }, [feedItems]);
 
   useEffect(() => {
+    // 게시물 전환 시 이전 inlinePlayer 즉시 음소거 + 정지
+    try { inlinePlayer.muted = true; } catch {}
+    try { inlinePlayer.pause(); } catch {}
+    // videoMuted state도 true로 동기화
+    if (!videoMuted) toggleVideoMute();
+    // 동영상 로드 상태 리셋은 PostCard 내부에서 처리
+
     if (!visiblePostId) { stopMusic(); return; }
     const item = feedItemsRef.current.find((f) => f.id === visiblePostId);
     const music = (item as any)?.data?.music;
@@ -1257,15 +1285,18 @@ export default function HomeScreen() {
 
   useEffect(() => {
     if (!visibleVideoUrl) {
+      try { inlinePlayer.muted = true; } catch {}
       try { inlinePlayer.pause(); } catch {}
       return;
     }
+    // 새 URL 로드 시 음소거 상태로 재생 시작
+    try { inlinePlayer.muted = true; } catch {}
     try { inlinePlayer.play(); } catch {}
-  }, [visibleVideoUrl, inlinePlayer]);
+  }, [visibleVideoUrl]);
 
   useEffect(() => {
     try { inlinePlayer.muted = videoMuted; } catch {}
-  }, [videoMuted, inlinePlayer]);
+  }, [videoMuted]);
 
   // 탭 벗어날 때 동영상 정지
   useFocusEffect(
@@ -1399,6 +1430,10 @@ export default function HomeScreen() {
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.feedContainer}
+        windowSize={5}
+        initialNumToRender={3}
+        maxToRenderPerBatch={3}
+        removeClippedSubviews={true}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         onScrollToIndexFailed={(info) => {

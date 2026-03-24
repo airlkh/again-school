@@ -39,9 +39,11 @@ import { useCurrentUser } from '../../src/hooks/useCurrentUser';
 import { createStory } from '../../src/services/storyService';
 import { createPost, PostVisibility, VisibilitySchool } from '../../src/services/postService';
 import { CLOUDINARY_CONFIG } from '../../src/config/cloudinary';
-import { uploadVideoToStorage } from '../../src/services/uploadVideoToStorage';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import * as VideoThumbnails from 'expo-video-thumbnails';
+import * as FileSystem from 'expo-file-system/legacy';
+import { getAuth } from 'firebase/auth';
+import { Video as VideoCompressor } from 'react-native-compressor';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 
@@ -407,8 +409,10 @@ export default function UploadScreen() {
     let thumbnailCloudinaryUrl: string | undefined;
     if (isVideo) {
       try {
-        const { uri: thumbUri } = await VideoThumbnails.getThumbnailAsync(uri, { time: 0 });
+        const { uri: thumbUri } = await VideoThumbnails.getThumbnailAsync(uri, { time: 1000 });
         console.log('[uploadMedia] 썸네일 추출:', thumbUri);
+
+        // Cloudinary 업로드 시도
         const thumbForm = new FormData();
         thumbForm.append('file', { uri: thumbUri, type: 'image/jpeg', name: 'thumb.jpg' } as any);
         thumbForm.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
@@ -416,21 +420,94 @@ export default function UploadScreen() {
           method: 'POST',
           body: thumbForm,
         });
+        console.log('[uploadMedia] Cloudinary 썸네일 응답:', thumbRes.status);
         const thumbData = await thumbRes.json();
-        thumbnailCloudinaryUrl = thumbData.secure_url;
-        console.log('[uploadMedia] 썸네일 URL:', thumbnailCloudinaryUrl);
+        console.log('[uploadMedia] Cloudinary 썸네일 데이터:', JSON.stringify(thumbData).substring(0, 200));
+
+        if (thumbRes.ok && thumbData.secure_url) {
+          thumbnailCloudinaryUrl = thumbData.secure_url;
+        } else {
+          console.warn('[uploadMedia] Cloudinary 썸네일 업로드 실패, Firebase Storage fallback');
+          // Firebase Storage에 썸네일 업로드 (fallback)
+          const auth = getAuth();
+          const token = await auth.currentUser?.getIdToken();
+          if (token) {
+            const thumbPath = `thumbnails/${uid}/${Date.now()}.jpg`;
+            const encodedPath = encodeURIComponent(thumbPath);
+            const bucket = 'again-school-bfea8.firebasestorage.app';
+            const uploadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o?uploadType=media&name=${encodedPath}`;
+            const result = await FileSystem.uploadAsync(uploadUrl, thumbUri, {
+              httpMethod: 'POST',
+              uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+              headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'image/jpeg' },
+            });
+            if (result.status === 200) {
+              const data = JSON.parse(result.body);
+              const dlToken = data.downloadTokens;
+              thumbnailCloudinaryUrl = dlToken
+                ? `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(data.name)}?alt=media&token=${dlToken}`
+                : `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedPath}?alt=media`;
+            }
+          }
+        }
+        console.log('[uploadMedia] 최종 썸네일 URL:', thumbnailCloudinaryUrl);
       } catch (e) {
-        console.warn('[uploadMedia] 썸네일 추출 실패:', e);
+        console.warn('[uploadMedia] 썸네일 처리 실패:', e);
       }
     }
 
     let mediaUrl: string;
 
     if (isVideo) {
-      // 동영상: Firebase Storage 업로드
-      const category = uploadTarget === 'story' ? 'stories' : 'posts';
-      const path = `videos/${category}/${uid}/${Date.now()}.mp4`;
-      mediaUrl = await uploadVideoToStorage(uri, path, onProgress);
+      // 동영상: 압축 후 Cloudinary 업로드
+      let videoUri = uri;
+      try {
+        onProgress?.(0);
+        const compressed = await VideoCompressor.compress(uri, {
+          compressionMethod: 'auto',
+          maxSize: 1280,
+          minimumFileSizeForCompress: 10,
+        });
+        if (compressed) videoUri = compressed;
+      } catch (e) {
+        console.warn('[uploadMedia] 동영상 압축 실패, 원본 사용:', e);
+      }
+
+      mediaUrl = await new Promise((resolve, reject) => {
+        const formData = new FormData();
+        formData.append('file', {
+          uri: videoUri,
+          type: 'video/mp4',
+          name: `video_${Date.now()}.mp4`,
+        } as any);
+        formData.append('upload_preset', 'again_school_video_uploads');
+        formData.append('resource_type', 'video');
+
+        const xhr = new XMLHttpRequest();
+        xhr.timeout = 600000;
+
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            onProgress?.(Math.round((e.loaded / e.total) * 100));
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status === 200) {
+            const res = JSON.parse(xhr.responseText);
+            resolve(res.secure_url);
+          } else {
+            console.error('Cloudinary 동영상 오류:', xhr.status, xhr.responseText);
+            reject(new Error(`동영상 업로드 실패: ${xhr.status}`));
+          }
+        };
+
+        xhr.onerror = () => reject(new Error('네트워크 오류'));
+        xhr.ontimeout = () => reject(new Error('시간 초과'));
+
+        xhr.open('POST', CLOUDINARY_CONFIG.videoUploadUrl);
+        xhr.send(formData);
+      });
     } else {
       // 이미지: Cloudinary 업로드 (기존 유지)
       mediaUrl = await new Promise((resolve, reject) => {
@@ -536,7 +613,7 @@ export default function UploadScreen() {
           authorName: displayName || '사용자',
           authorAvatarImg: avatarImg,
           authorPhotoURL: photoURL,
-          imageUrl: firstIsVideo ? (videoThumbnail || firstResult?.url || '') : (firstResult?.url || ''),
+          imageUrl: firstIsVideo ? (videoThumbnail || '') : (firstResult?.url || ''),
           mediaType: firstResult?.type || 'image',
           videoUrl: firstIsVideo ? firstResult?.url : undefined,
           thumbnailUrl: videoThumbnail,
