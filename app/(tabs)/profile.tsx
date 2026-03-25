@@ -34,6 +34,7 @@ import { FirestorePost } from '../../src/services/postService';
 import { UserProfile, SchoolEntry, UserPrivacySettings, ConnectionRequest } from '../../src/types/auth';
 import { useSchoolMemberCounts } from '../../src/hooks/useSchoolMemberCount';
 import { getAvatarSource } from '../../src/utils/avatar';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CropEditor } from '../../src/components/CropEditor';
 import { doc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs, writeBatch, onSnapshot, orderBy, limit, startAfter, QueryDocumentSnapshot, DocumentData, getCountFromServer } from 'firebase/firestore';
 import { updateProfile } from 'firebase/auth';
@@ -119,7 +120,7 @@ const PostGrid = React.memo(function PostGrid({
   const renderPostItem = useCallback(({ item: post }: { item: FirestorePost }) => {
     const thumbUri = getVideoThumbnail(post);
     return (
-      <TouchableOpacity style={styles.postGridItem} onPress={() => router.push(`/post/${post.id}`)}>
+      <TouchableOpacity style={styles.postGridItem} onPress={async () => { await AsyncStorage.setItem('scrollToPostId', post.id); router.navigate('/(tabs)'); }}>
         <Image key={thumbUri ?? post.id} source={thumbUri ? { uri: thumbUri } : undefined} style={styles.postGridImage} resizeMode="cover" fadeDuration={0} />
         {post.mediaItems && post.mediaItems.length > 1 && (
           <View style={styles.multiImageIcon}>

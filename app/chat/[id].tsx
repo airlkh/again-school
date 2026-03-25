@@ -87,6 +87,7 @@ export default function ChatRoomScreen() {
   const [sending, setSending] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState('');
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [imageHeights, setImageHeights] = useState<Record<string, number>>({});
   const flatListRef = useRef<FlatList>(null);
   const chatVideoPlayer = useVideoPlayer(null, (p) => {
@@ -164,6 +165,7 @@ export default function ChatRoomScreen() {
     if (!roomId) return;
     return subscribeMessages(roomId, (msgs) => {
       setFirestoreMessages(msgs);
+      setIsInitialLoading(false);
       // 새 메시지 수신 시 즉시 읽음 처리
       if (user?.uid && msgs.some((m) => m.senderUid !== user.uid && !m.readBy?.includes(user.uid))) {
         markAsRead(roomId, user.uid).catch(() => {});
@@ -537,10 +539,11 @@ export default function ChatRoomScreen() {
           onPress={() => setPreviewMedia({ url, type: 'video' })}
           onLongPress={() => handleVideoLongPress(item)}
         >
-          <View style={[styles.mediaBubble, { width: MAX_BUBBLE_IMAGE_WIDTH, height: 180, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }]}>
-            <View style={styles.videoPlayOverlay}>
-              <Ionicons name="play-circle" size={48} color="rgba(255,255,255,0.9)" />
+          <View style={[styles.mediaBubble, { width: MAX_BUBBLE_IMAGE_WIDTH, height: 180, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' }]}>
+            <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="play" size={28} color="#fff" style={{ marginLeft: 3 }} />
             </View>
+            <Text style={{ color: colors.inactive, fontSize: 11, marginTop: 8 }}>동영상</Text>
           </View>
         </TouchableOpacity>
       );
@@ -682,6 +685,11 @@ export default function ChatRoomScreen() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 46 : 0}
       >
       {/* 메시지 목록 */}
+      {isInitialLoading && roomId ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="small" color={colors.primary} />
+        </View>
+      ) : (
       <FlatList
         ref={flatListRef}
         data={messages}
@@ -692,12 +700,13 @@ export default function ChatRoomScreen() {
         inverted
         keyboardShouldPersistTaps="handled"
       />
+      )}
 
       {/* 전송 중 표시 */}
       {sending && (
         <View style={[styles.sendingBar, { backgroundColor: colors.surface }]}>
           <ActivityIndicator size="small" color={colors.primary} />
-          <Text style={[styles.sendingText, { color: colors.textSecondary }]}>전송 중...</Text>
+          <Text style={[styles.sendingText, { color: colors.textSecondary }]}>{uploadStatus || '전송 중...'}</Text>
         </View>
       )}
 

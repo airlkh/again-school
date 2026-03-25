@@ -1264,6 +1264,25 @@ export default function HomeScreen() {
     }, 800);
   }, [scrollToPostId, feedItems.length]);
 
+  // 내정보/북마크에서 전달된 postId로 스크롤 (AsyncStorage 방식)
+  useFocusEffect(
+    useCallback(() => {
+      if (feedItems.length === 0) return;
+      AsyncStorage.getItem('scrollToPostId').then((postId) => {
+        if (!postId) return;
+        AsyncStorage.removeItem('scrollToPostId');
+        const index = feedItems.findIndex((item) => item.id === postId);
+        if (index === -1) return;
+        setTimeout(() => {
+          try {
+            flatListRef.current?.scrollToIndex({ index, animated: false, viewPosition: 0 });
+            setVisiblePostId(postId);
+          } catch {}
+        }, 200);
+      });
+    }, [feedItems.length])
+  );
+
   // 현재 보이는 게시물의 동영상 URL 찾기
   const visibleVideoUrl = (() => {
     if (!visiblePostId) return '';
@@ -1437,9 +1456,11 @@ export default function HomeScreen() {
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         onScrollToIndexFailed={(info) => {
+          const offset = info.averageItemLength * info.index;
+          flatListRef.current?.scrollToOffset({ offset, animated: false });
           setTimeout(() => {
             try { flatListRef.current?.scrollToIndex({ index: info.index, animated: false }); } catch {}
-          }, 500);
+          }, 300);
         }}
         refreshControl={
           <RefreshControl

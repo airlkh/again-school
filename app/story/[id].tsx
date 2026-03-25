@@ -10,6 +10,7 @@ import {
   Animated,
   Platform,
   KeyboardAvoidingView,
+  ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -37,6 +38,7 @@ export default function StoryViewerScreen() {
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [replyText, setReplyText] = useState('');
+  const [videoReady, setVideoReady] = useState(false);
   const progressAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -130,6 +132,11 @@ export default function StoryViewerScreen() {
     return '어제';
   }
 
+  // 스토리 전환 시 videoReady 리셋
+  useEffect(() => {
+    setVideoReady(false);
+  }, [currentIndex]);
+
   // Progress animation
   useEffect(() => {
     if (totalItems === 0) return;
@@ -193,14 +200,23 @@ export default function StoryViewerScreen() {
         onPress={(e) => handleTap(e.nativeEvent.locationX)}
       >
         {isCurrentVideo && storyVideoPlayer ? (
-          <VideoView
-            player={storyVideoPlayer}
-            style={styles.storyImage}
-            contentFit="cover"
-            nativeControls={false}
-          />
+          <View style={{ flex: 1 }}>
+            <VideoView
+              player={storyVideoPlayer}
+              style={styles.storyImage}
+              contentFit="cover"
+              nativeControls={false}
+              onFirstFrameRender={() => setVideoReady(true)}
+            />
+            {!videoReady && (
+              <View style={[styles.storyImage, { position: 'absolute', top: 0, left: 0, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 40, backgroundColor: '#111' }]}>
+                <ActivityIndicator size="small" color="rgba(255,255,255,0.6)" />
+              </View>
+            )}
+          </View>
         ) : (
           <Image
+            key={`story-img-${currentIndex}`}
             source={{ uri: currentImage }}
             style={styles.storyImage}
             resizeMode="cover"

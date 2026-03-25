@@ -17,9 +17,10 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
   AppState,
+  Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { createAudioPlayer, AudioPlayer } from 'expo-audio';
 import { VideoView, useVideoPlayer } from 'expo-video';
@@ -66,21 +67,19 @@ function VideoMediaItem({ uri, style, isMuted, onToggleMute }: { uri: string; st
   }, [isMuted, player]);
 
   return (
-    <View>
-      <VideoView
-        player={player}
-        style={style}
-        contentFit="cover"
-        nativeControls={false}
-      />
-      <TouchableOpacity
-        style={styles.muteBtn}
-        onPress={onToggleMute}
-        activeOpacity={0.8}
-      >
-        <Ionicons name={isMuted ? 'volume-mute' : 'volume-high'} size={18} color="#fff" />
-      </TouchableOpacity>
-    </View>
+    <Pressable onPress={onToggleMute}>
+      <View>
+        <VideoView
+          player={player}
+          style={style}
+          contentFit="cover"
+          nativeControls={false}
+        />
+        <View style={styles.muteBtn} pointerEvents="none">
+          <Ionicons name={isMuted ? 'volume-mute' : 'volume-high'} size={18} color="#fff" />
+        </View>
+      </View>
+    </Pressable>
   );
 }
 
@@ -170,6 +169,18 @@ export default function PostDetailScreen() {
     });
     return () => sub.remove();
   }, []);
+
+  // 화면 이탈 시 모든 소리 정지
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        if (musicRef.current) {
+          try { musicRef.current.pause(); } catch {}
+          setMusicPlaying(false);
+        }
+      };
+    }, [])
+  );
 
   // Sync mute state
   useEffect(() => {
@@ -391,7 +402,9 @@ export default function PostDetailScreen() {
                       onToggleMute={toggleVideoMute}
                     />
                   ) : (
-                    <Image source={{ uri: mediaItem.url }} style={[styles.postImage, { backgroundColor: colors.card }]} />
+                    <Pressable onPress={() => { if (musicRef.current) toggleMusic(); }}>
+                      <Image source={{ uri: mediaItem.url }} style={[styles.postImage, { backgroundColor: colors.card }]} />
+                    </Pressable>
                   )}
                   {imgIdx === 0 && isFirestore && (fsPost as FirestorePost).textOverlays?.map((overlay, oi) => (
                     <View key={oi} style={[styles.overlayPos, { left: `${overlay.x}%`, top: `${overlay.y}%` }]}>
