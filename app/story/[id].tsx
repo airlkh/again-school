@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,17 +10,19 @@ import {
   Animated,
   Platform,
   KeyboardAvoidingView,
-  ActivityIndicator,
+  Alert,
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../src/constants/colors';
 import { useGoBack } from '../../src/hooks/useGoBack';
 import { DUMMY_STORIES, DummyStory } from '../../src/data/dummyClassmates';
 import { subscribeUserStories, FirestoreStory, markStoryViewed } from '../../src/services/storyService';
 import { useAuth } from '../../src/contexts/AuthContext';
+import { useCurrentUser } from '../../src/hooks/useCurrentUser';
 import { getAvatarSource } from '../../src/utils/avatar';
 import { VideoView, useVideoPlayer } from 'expo-video';
+import { getOrCreateChatRoom, sendMessage } from '../../src/services/chatService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PROGRESS_DURATION = 5000;
@@ -28,6 +30,7 @@ const PROGRESS_DURATION = 5000;
 export default function StoryViewerScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
+  const { displayName: myName, avatarImg: myAvatarImg, photoURL: myPhotoURL } = useCurrentUser();
   const goBack = useGoBack();
 
   // Firestore stories
@@ -38,14 +41,14 @@ export default function StoryViewerScreen() {
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [replyText, setReplyText] = useState('');
-  const [videoReady, setVideoReady] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [videoDuration, setVideoDuration] = useState(0);
   const progressAnim = useRef(new Animated.Value(0)).current;
+  const videoOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (!id) return;
 
-    // Check if ID looks like Firestore UID (for user-based story viewing)
-    // or a dummy story ID
     const dummy = DUMMY_STORIES.find((s) => s.id === id);
     if (dummy) {
       setDummyStory(dummy);
@@ -53,12 +56,10 @@ export default function StoryViewerScreen() {
       return;
     }
 
-    // Try as Firestore user UID
     const unsub = subscribeUserStories(id, (stories) => {
       if (stories.length > 0) {
         setFsStories(stories);
         setIsFirestore(true);
-        // 스토리 조회 기록
         if (user) {
           stories.forEach((s) => {
             if (!s.viewers?.includes(user.uid)) {
@@ -82,7 +83,7 @@ export default function StoryViewerScreen() {
 
   const isCurrentVideo = isFirestore && fsStories[currentIndex]?.mediaType === 'video';
   const storyVideoPlayer = useVideoPlayer(isCurrentVideo ? (currentImage ?? null) : null, (p) => {
-    p.loop = true;
+    p.loop = false;
   });
 
   useEffect(() => {
@@ -90,6 +91,37 @@ export default function StoryViewerScreen() {
       try { storyVideoPlayer.play(); } catch {}
     }
   }, [isCurrentVideo, storyVideoPlayer]);
+
+  // 동영상 duration 감지
+  useEffect(() => {
+    if (!isCurrentVideo || !storyVideoPlayer) { setVideoDuration(0); return; }
+    const interval = setInterval(() => {
+      try {
+        if (storyVideoPlayer.duration > 0) {
+          setVideoDuration(Math.round(storyVideoPlayer.duration * 1000));
+          clearInterval(interval);
+        }
+      } catch {}
+    }, 200);
+    return () => clearInterval(interval);
+  }, [isCurrentVideo, storyVideoPlayer]);
+
+  // 화면 이탈 시 동영상 정지
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        if (storyVideoPlayer) {
+          try { storyVideoPlayer.pause(); } catch {}
+        }
+      };
+    }, [storyVideoPlayer])
+  );
+
+  // 스토리 전환 시 opacity 리셋
+  useEffect(() => {
+    videoOpacity.setValue(0);
+    setVideoDuration(0);
+  }, [currentIndex]);
 
   const currentCaption = isFirestore
     ? fsStories[currentIndex]?.caption
@@ -106,6 +138,8 @@ export default function StoryViewerScreen() {
   const storyPhotoURL = isFirestore
     ? fsStories[0]?.photoURL
     : dummyStory?.photoURL;
+
+  const storyUid = isFirestore ? fsStories[0]?.uid : null;
 
   const storyTime = isFirestore
     ? timeAgo(fsStories[currentIndex]?.createdAt ?? 0)
@@ -132,19 +166,16 @@ export default function StoryViewerScreen() {
     return '어제';
   }
 
-  // 스토리 전환 시 videoReady 리셋
-  useEffect(() => {
-    setVideoReady(false);
-  }, [currentIndex]);
-
   // Progress animation
   useEffect(() => {
     if (totalItems === 0) return;
 
+    const duration = (isCurrentVideo && videoDuration > 0) ? videoDuration : PROGRESS_DURATION;
+
     progressAnim.setValue(0);
     const anim = Animated.timing(progressAnim, {
       toValue: 1,
-      duration: PROGRESS_DURATION,
+      duration,
       useNativeDriver: false,
     });
     anim.start(({ finished }) => {
@@ -152,7 +183,7 @@ export default function StoryViewerScreen() {
     });
 
     return () => anim.stop();
-  }, [currentIndex, totalItems]);
+  }, [currentIndex, totalItems, videoDuration]);
 
   function handleNext() {
     if (currentIndex < totalItems - 1) {
@@ -176,6 +207,27 @@ export default function StoryViewerScreen() {
     }
   }
 
+  // 답장 전송
+  async function handleSendReply() {
+    const text = replyText.trim();
+    if (!text || !user || !storyUid || storyUid === user.uid) return;
+    setSending(true);
+    try {
+      const roomId = await getOrCreateChatRoom(
+        user.uid, myName || '나', myAvatarImg || 1,
+        storyUid, storyName || '동창', storyAvatarImg || 1,
+        myPhotoURL, storyPhotoURL,
+      );
+      await sendMessage(roomId, user.uid, `[스토리 답장] ${text}`);
+      setReplyText('');
+      Alert.alert('전송 완료', '답장이 전송되었습니다.');
+    } catch {
+      Alert.alert('오류', '답장 전송에 실패했습니다.');
+    } finally {
+      setSending(false);
+    }
+  }
+
   if (totalItems === 0) {
     return (
       <View style={styles.container}>
@@ -184,7 +236,6 @@ export default function StoryViewerScreen() {
     );
   }
 
-  // Build progress items array
   const progressItems = isFirestore
     ? fsStories.map((_, i) => i)
     : (dummyStory?.images.map((_, i) => i) ?? []);
@@ -199,33 +250,31 @@ export default function StoryViewerScreen() {
         activeOpacity={1}
         onPress={(e) => handleTap(e.nativeEvent.locationX)}
       >
-        {isCurrentVideo && storyVideoPlayer ? (
-          <View style={{ flex: 1 }}>
+        {/* 바닥 레이어: 이미지 항상 표시 */}
+        <Image
+          key={`story-img-${currentIndex}`}
+          source={{ uri: currentImage }}
+          style={styles.storyImage}
+          resizeMode="cover"
+        />
+        {/* 위 레이어: 동영상 absolute 겹침 + fade-in */}
+        {isCurrentVideo && storyVideoPlayer && (
+          <Animated.View style={[styles.storyImage, { position: 'absolute', top: 0, left: 0, opacity: videoOpacity }]}>
             <VideoView
               player={storyVideoPlayer}
               style={styles.storyImage}
               contentFit="cover"
               nativeControls={false}
-              onFirstFrameRender={() => setVideoReady(true)}
+              onFirstFrameRender={() => {
+                Animated.timing(videoOpacity, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+              }}
             />
-            {!videoReady && (
-              <View style={[styles.storyImage, { position: 'absolute', top: 0, left: 0, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 40, backgroundColor: '#111' }]}>
-                <ActivityIndicator size="small" color="rgba(255,255,255,0.6)" />
-              </View>
-            )}
-          </View>
-        ) : (
-          <Image
-            key={`story-img-${currentIndex}`}
-            source={{ uri: currentImage }}
-            style={styles.storyImage}
-            resizeMode="cover"
-          />
+          </Animated.View>
         )}
 
         <View style={styles.topGradient} />
 
-        {/* Progress bars (clickable) */}
+        {/* Progress bars */}
         <View style={styles.progressContainer}>
           {progressItems.map((i) => (
             <TouchableOpacity
@@ -287,7 +336,8 @@ export default function StoryViewerScreen() {
         />
         <TouchableOpacity
           style={styles.replyBtn}
-          disabled={!replyText.trim()}
+          disabled={!replyText.trim() || sending}
+          onPress={handleSendReply}
         >
           <Ionicons
             name="send"

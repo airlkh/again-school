@@ -174,7 +174,7 @@ export default function TeacherApplyScreen() {
   }
 
   async function pickImage() {
-    if (attachments.length >= 5) { Alert.alert('알림', '최대 5개까지 첨부할 수 있습니다.'); return; }
+    if (existingDocUrls.length + attachments.length >= 5) { Alert.alert('알림', '최대 5개까지 첨부할 수 있습니다.'); return; }
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) { Alert.alert('권한 필요', '갤러리 접근 권한을 허용해주세요.'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'] as ImagePicker.MediaType[], quality: 0.8 });
@@ -184,7 +184,7 @@ export default function TeacherApplyScreen() {
   }
 
   async function pickDocument() {
-    if (attachments.length >= 5) { Alert.alert('알림', '최대 5개까지 첨부할 수 있습니다.'); return; }
+    if (existingDocUrls.length + attachments.length >= 5) { Alert.alert('알림', '최대 5개까지 첨부할 수 있습니다.'); return; }
     const result = await DocumentPicker.getDocumentAsync({ type: 'application/pdf' });
     if (!result.canceled && result.assets?.[0]) {
       setAttachments((prev) => [...prev, { uri: result.assets[0].uri, name: result.assets[0].name || 'document.pdf', type: 'pdf' }]);
@@ -384,8 +384,17 @@ export default function TeacherApplyScreen() {
               <View style={{ gap: 6, marginBottom: 8 }}>
                 {existingDocUrls.map((url, i) => (
                   <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 8, backgroundColor: colors.card, borderRadius: 8 }}>
-                    <Ionicons name={url.includes('.pdf') ? 'document-outline' : 'image-outline'} size={16} color={colors.primary} />
+                    {url.includes('.pdf') || url.includes('application%2Fpdf') ? (
+                      <View style={{ width: 40, height: 40, borderRadius: 6, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="document-text" size={20} color={colors.primary} />
+                      </View>
+                    ) : (
+                      <Image source={{ uri: url }} style={{ width: 40, height: 40, borderRadius: 6 }} />
+                    )}
                     <Text style={{ flex: 1, fontSize: 12, color: colors.textSecondary }} numberOfLines={1}>기존 첨부파일 {i + 1}</Text>
+                    <TouchableOpacity onPress={() => setExistingDocUrls((prev) => prev.filter((_, idx) => idx !== i))}>
+                      <Ionicons name="close-circle" size={20} color={colors.inactive} />
+                    </TouchableOpacity>
                   </View>
                 ))}
               </View>
@@ -405,7 +414,7 @@ export default function TeacherApplyScreen() {
                 </TouchableOpacity>
               </View>
             ))}
-            {attachments.length < 5 && (
+            {(existingDocUrls.length + attachments.length) < 5 && (
               <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
                 <TouchableOpacity
                   style={[styles.addBtn, { borderColor: '#7C3AED', flex: 1 }]}

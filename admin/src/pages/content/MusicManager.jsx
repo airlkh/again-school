@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../../firebase';
 import { collection, query, orderBy, getDocs, addDoc, updateDoc, deleteDoc, doc, Timestamp } from 'firebase/firestore';
 
-const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dpmnx06ni/upload';
+const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dpmnx06ni/video/upload';
 const CLOUDINARY_PRESET = 'again_school_uploads';
 
 const s = {
@@ -47,6 +47,8 @@ export default function MusicManager() {
   const [uploading, setUploading] = useState(false);
   const [playingId, setPlayingId] = useState(null);
   const [categoryFilter, setCategoryFilter] = useState('전체');
+  const [batchUpdating, setBatchUpdating] = useState(false);
+  const [batchProgress, setBatchProgress] = useState('');
   const audioRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -75,10 +77,11 @@ export default function MusicManager() {
       formData.append('resource_type', 'video');
       const res = await fetch(CLOUDINARY_UPLOAD_URL, { method: 'POST', body: formData });
       const data = await res.json();
+      console.log('[MusicManager] Cloudinary 응답:', data);
       setForm((p) => ({
         ...p,
         url: data.secure_url,
-        duration: data.duration ? Math.round(data.duration) : '',
+        duration: Math.round(data.duration || data.video?.duration || data.audio?.duration || 0) || '',
         title: p.title || file.name.replace(/\.[^/.]+$/, ''),
       }));
     } catch { alert('업로드 실패'); }
@@ -142,15 +145,55 @@ export default function MusicManager() {
     return `${m}:${String(sv).padStart(2, '0')}`;
   };
 
+  const handleBatchDuration = async () => {
+    const needsUpdate = tracks.filter((t) => !t.duration || t.duration <= 0);
+    if (needsUpdate.length === 0) { alert('모든 음악에 duration이 있습니다.'); return; }
+    if (!window.confirm(`${needsUpdate.length}개 음악의 duration을 업데이트하시겠습니까?`)) return;
+    setBatchUpdating(true);
+    let updated = 0;
+    for (const track of needsUpdate) {
+      setBatchProgress(`${updated + 1} / ${needsUpdate.length} 처리 중...`);
+      try {
+        const dur = await new Promise((resolve) => {
+          const audio = new Audio(track.url);
+          const timeout = setTimeout(() => resolve(0), 10000);
+          audio.addEventListener('loadedmetadata', () => {
+            clearTimeout(timeout);
+            resolve(Math.round(audio.duration) || 0);
+            audio.src = '';
+          });
+          audio.addEventListener('error', () => { clearTimeout(timeout); resolve(0); });
+        });
+        if (dur > 0) {
+          await updateDoc(doc(db, 'music', track.id), { duration: dur });
+          updated++;
+        }
+      } catch {}
+    }
+    setBatchUpdating(false);
+    setBatchProgress('');
+    alert(`완료: ${updated}개 업데이트됨`);
+    fetchTracks();
+  };
+
   return (
     <div style={s.container}>
       <audio ref={audioRef} onEnded={() => setPlayingId(null)} style={{ display: 'none' }} />
 
       <div style={s.header}>
         <h1 style={s.title}>음악 관리</h1>
-        <button style={{ ...s.btn, ...s.btnPrimary }} onClick={() => { setEditId(null); setForm({ ...emptyForm }); setShowModal(true); }}>
-          + 음악 추가
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            style={{ ...s.btn, ...s.btnSuccess, ...s.btnSmall, opacity: batchUpdating ? 0.6 : 1 }}
+            onClick={handleBatchDuration}
+            disabled={batchUpdating}
+          >
+            {batchUpdating ? batchProgress : `⏱ Duration 업데이트 (${tracks.filter((t) => !t.duration || t.duration <= 0).length}개)`}
+          </button>
+          <button style={{ ...s.btn, ...s.btnPrimary }} onClick={() => { setEditId(null); setForm({ ...emptyForm }); setShowModal(true); }}>
+            + 음악 추가
+          </button>
+        </div>
       </div>
 
       <div style={s.statsRow}>

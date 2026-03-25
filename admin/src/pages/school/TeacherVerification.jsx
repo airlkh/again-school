@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { db } from '../../firebase';
+import { db, app } from '../../firebase';
 import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 const s = {
   container: { padding: '24px 32px', backgroundColor: '#f5f5f8', minHeight: '100vh' },
@@ -56,6 +57,12 @@ export default function TeacherVerification() {
         ? { teacherVerified: true, teacherRejected: false, teacherRejectedReason: '' }
         : { teacherVerified: false, teacherRejected: true, teacherRejectedReason: prompt('거절 사유를 입력하세요:') || '' };
       await updateDoc(doc(db, 'users', uid), updateData);
+      // 푸시 알림 발송
+      try {
+        const functions = getFunctions(app, 'asia-northeast3');
+        const sendPush = httpsCallable(functions, 'sendTeacherVerificationPush');
+        await sendPush({ toUid: uid, approved: approve, reason: updateData.teacherRejectedReason || '' });
+      } catch (e) { console.warn('푸시 알림 발송 실패:', e); }
       fetchRequests();
     } catch { alert('처리 실패'); }
   };
@@ -111,6 +118,9 @@ export default function TeacherVerification() {
             </div>
 
             {/* 첨부파일 */}
+            {(!r.teacherDocUrls || r.teacherDocUrls.length === 0) && (
+              <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>📎 첨부파일 없음</div>
+            )}
             {r.teacherDocUrls?.length > 0 && (
               <div style={s.docsRow}>
                 {r.teacherDocUrls.map((url, i) => {

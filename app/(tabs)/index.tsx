@@ -203,7 +203,7 @@ function getVideoThumbnail(post: { thumbnailUrl?: string | null; imageUrl?: stri
 }
 
 // ─── 게시물 카드 ───────────────────────────────────────────────────
-function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, videoMuted: videoMutedProp, toggleVideoMute: toggleVideoMuteProp }: { post: DummyPost | FirestorePost; isFirestore: boolean; onHide?: (id: string) => void; isVisible?: boolean; inlinePlayer?: VideoPlayer | null; videoMuted?: boolean; toggleVideoMute?: () => void }) {
+const PostCard = React.memo(function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, videoMuted: videoMutedProp, toggleVideoMute: toggleVideoMuteProp }: { post: DummyPost | FirestorePost; isFirestore: boolean; onHide?: (id: string) => void; isVisible?: boolean; inlinePlayer?: VideoPlayer | null; videoMuted?: boolean; toggleVideoMute?: () => void }) {
   const { user } = useAuth();
   const { colors } = useTheme();
   const { isMuted: musicMuted, toggleMute: toggleMusicMute } = useMusic();
@@ -578,6 +578,11 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
           <Animated.View pointerEvents="none" style={[styles.heartOverlay, { opacity: heartOpacity, transform: [{ scale: heartScale }] }]}>
             <Ionicons name="heart" size={80} color={heartColor} style={{ textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 10 }} />
           </Animated.View>
+          {hasAudio && (
+            <View style={styles.muteBtn} pointerEvents="none">
+              <Ionicons name={musicMuted ? 'volume-mute' : 'volume-high'} size={18} color="#fff" />
+            </View>
+          )}
         </View>
       ) : isVideoPost && (videoUrl || imageUrl) ? (
         <TouchableOpacity activeOpacity={1} onPress={handleTap}>
@@ -886,7 +891,12 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
       )}
     </View>
   );
-}
+}, (prev, next) =>
+  prev.post.id === next.post.id &&
+  prev.isVisible === next.isVisible &&
+  prev.videoMuted === next.videoMuted &&
+  prev.inlinePlayer === next.inlinePlayer
+);
 
 // ─── 추천 동창 카드 ────────────────────────────────────────────────
 function ClassmateRecommendCard() {
@@ -1077,7 +1087,7 @@ export default function HomeScreen() {
       console.warn('[HomeScreen] 채팅 onSnapshot 오류:', error);
     });
   }, [currentUser]);
-  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 30 }).current;
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 20 }).current;
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: Array<{ key: string }> }) => {
     const postItems = viewableItems.filter((v) => v.key !== 'stories' && !v.key.startsWith('recommend-') && !v.key.startsWith('banner-'));
     setVisiblePostId(postItems.length > 0 ? postItems[0].key : null);
@@ -1444,6 +1454,7 @@ export default function HomeScreen() {
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
         contentContainerStyle={styles.feedContainer}
         windowSize={3}
         initialNumToRender={3}

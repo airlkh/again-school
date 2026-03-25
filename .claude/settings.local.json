@@ -33,7 +33,8 @@
       "Bash(find:*)",
       "Bash(git add:*)",
       "Bash(firebase deploy:*)",
-      "Bash(gh workflow:*)"
+      "Bash(gh workflow:*)",
+      "Bash(npm run:*)"
     ]
   }
 }

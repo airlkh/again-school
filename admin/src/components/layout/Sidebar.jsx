@@ -45,6 +45,7 @@ const menuData = [
       { label: '인증 완료', path: '/school/verified' },
       { label: '학교 데이터', path: '/school/data' },
       { label: '인증 통계', path: '/school/stats' },
+      { label: '선생님 인증', path: '/school/teacher' },
     ],
   },
   {
