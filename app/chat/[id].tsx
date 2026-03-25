@@ -28,6 +28,8 @@ import { useGoBack } from '../../src/hooks/useGoBack';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Video as VideoCompressor } from 'react-native-compressor';
+import * as VideoThumbnails from 'expo-video-thumbnails';
+import { getAuth } from 'firebase/auth';
 import {
   getOrCreateChatRoom,
   sendMessage,
@@ -54,6 +56,7 @@ interface DisplayMessage {
   text: string;
   imageUrl?: string;
   originalVideoUrl?: string;
+  thumbnailUrl?: string;
   mediaType?: 'image' | 'video';
   time: string;
   date: string;
@@ -184,6 +187,7 @@ export default function ChatRoomScreen() {
       text: m.text,
       imageUrl: m.imageUrl,
       originalVideoUrl: (m as any).originalVideoUrl,
+      thumbnailUrl: (m as any).thumbnailUrl,
       mediaType: m.mediaType,
       time: formatMsgTime(m.createdAt),
       date: formatMsgDate(m.createdAt),
@@ -408,14 +412,65 @@ export default function ChatRoomScreen() {
         console.warn('[Chat] 동영상 압축 실패, 원본 사용:', e);
       }
 
-      // 업로드
+      // 썸네일 추출 + 업로드
+      let thumbnailUrl: string | undefined;
+      try {
+        const { uri: thumbUri } = await VideoThumbnails.getThumbnailAsync(originalUri, { time: 1000 });
+        if (thumbUri) {
+          const auth = getAuth();
+          const token = await auth.currentUser?.getIdToken();
+          if (token) {
+            const ts2 = Date.now();
+            const thumbPath = `thumbnails/chat/${roomId || 'unknown'}/${ts2}.jpg`;
+            const encodedPath = encodeURIComponent(thumbPath);
+            const bucket = 'again-school-bfea8.firebasestorage.app';
+            const thumbUploadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o?uploadType=media&name=${encodedPath}`;
+            const thumbResult = await FileSystem.uploadAsync(thumbUploadUrl, thumbUri, {
+              httpMethod: 'POST',
+              uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+              headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'image/jpeg' },
+            });
+            if (thumbResult.status === 200) {
+              const data = JSON.parse(thumbResult.body);
+              const dlToken = data.downloadTokens;
+              thumbnailUrl = dlToken
+                ? `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(data.name)}?alt=media&token=${dlToken}`
+                : `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedPath}?alt=media`;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[Chat] 썸네일 처리 실패:', e);
+      }
+
+      // 동영상 업로드
       setUploadStatus('업로드 중...');
       const ts = Date.now();
       const path = `videos/chat/${roomId || 'unknown'}/${ts}.mp4`;
       const url = await uploadVideoToStorage(uploadUri, path, (pct) => setUploadProgress(pct));
 
       if (roomId && user) {
-        await sendMessage(roomId, user.uid, '', url, 'video');
+        // 메시지 전송 (thumbnailUrl 포함)
+        const messagesRef = (await import('firebase/firestore')).collection((await import('../../src/config/firebase')).db, 'chatRooms', roomId, 'messages');
+        const { addDoc } = await import('firebase/firestore');
+        await addDoc(messagesRef, {
+          senderUid: user.uid,
+          text: '',
+          imageUrl: url,
+          mediaType: 'video',
+          thumbnailUrl: thumbnailUrl ?? null,
+          createdAt: Date.now(),
+          read: false,
+          readBy: [user.uid],
+        });
+        // chatRoom lastMessage 업데이트
+        const { doc, updateDoc } = await import('firebase/firestore');
+        const roomRef = doc((await import('../../src/config/firebase')).db, 'chatRooms', roomId);
+        await updateDoc(roomRef, {
+          lastMessage: '동영상을 보냈습니다',
+          lastMessageAt: Date.now(),
+          lastSenderUid: user.uid,
+        });
       }
     } catch (err: any) {
       console.error('채팅 동영상 업로드 실패:', err);
@@ -533,17 +588,24 @@ export default function ChatRoomScreen() {
     const imgH = getImageHeight(url);
 
     if (isVideo) {
+      const thumb = item.thumbnailUrl;
       return (
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={() => setPreviewMedia({ url, type: 'video' })}
           onLongPress={() => handleVideoLongPress(item)}
         >
-          <View style={[styles.mediaBubble, { width: MAX_BUBBLE_IMAGE_WIDTH, height: 180, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' }]}>
-            <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="play" size={28} color="#fff" style={{ marginLeft: 3 }} />
+          <View style={[styles.mediaBubble, { width: MAX_BUBBLE_IMAGE_WIDTH, height: 180 }]}>
+            {thumb ? (
+              <Image source={{ uri: thumb }} style={{ width: MAX_BUBBLE_IMAGE_WIDTH, height: 180, borderRadius: 16 }} resizeMode="cover" />
+            ) : (
+              <View style={{ width: MAX_BUBBLE_IMAGE_WIDTH, height: 180, backgroundColor: colors.card, borderRadius: 16 }} />
+            )}
+            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="play" size={24} color="#fff" style={{ marginLeft: 2 }} />
+              </View>
             </View>
-            <Text style={{ color: colors.inactive, fontSize: 11, marginTop: 8 }}>동영상</Text>
           </View>
         </TouchableOpacity>
       );

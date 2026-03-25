@@ -32,7 +32,8 @@
       "Bash(cd:*)",
       "Bash(find:*)",
       "Bash(git add:*)",
-      "Bash(firebase deploy:*)"
+      "Bash(firebase deploy:*)",
+      "Bash(gh workflow:*)"
     ]
   }
 }

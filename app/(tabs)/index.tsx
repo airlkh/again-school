@@ -221,12 +221,11 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
   const [imgHeight, setImgHeight] = useState(SCREEN_WIDTH);
   const [multiImgHeights, setMultiImgHeights] = useState<Record<number, number>>({});
   const [imgLoadFailed, setImgLoadFailed] = useState(false);
-  const [videoReady, setVideoReady] = useState(false);
+  const videoOpacity = useRef(new Animated.Value(0)).current;
 
-  // 보이지 않는 상태로 전환 시 videoReady 리셋
   useEffect(() => {
-    if (!isVisible) setVideoReady(false);
-  }, [isVisible]);
+    videoOpacity.setValue(0);
+  }, [post.id]);
 
   // 음악 제목 marquee + 음표 bounce
   const marqueeAnim = useRef(new Animated.Value(0)).current;
@@ -582,51 +581,37 @@ function PostCard({ post, isFirestore, onHide, isVisible = false, inlinePlayer, 
         </View>
       ) : isVideoPost && (videoUrl || imageUrl) ? (
         <TouchableOpacity activeOpacity={1} onPress={handleTap}>
-          <View style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH, backgroundColor: '#000' }}>
-            {isVisible && inlinePlayer ? (
-              <View style={{ position: 'relative' }}>
+          <View style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH }}>
+            {/* 1. 썸네일 항상 바닥에 표시 */}
+            {(() => {
+              const thumb = getVideoThumbnail({ thumbnailUrl, imageUrl, videoUrl });
+              return thumb ? (
+                <Image source={{ uri: thumb }} style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH }} resizeMode="cover" />
+              ) : (
+                <View style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000' }}>
+                  <Ionicons name="videocam" size={48} color="rgba(255,255,255,0.5)" />
+                </View>
+              );
+            })()}
+            {/* 2. VideoView를 위에 absolute로 겹침 (fade-in) */}
+            {isVisible && inlinePlayer && (
+              <Animated.View style={{ position: 'absolute', top: 0, left: 0, width: SCREEN_WIDTH, height: SCREEN_WIDTH, opacity: videoOpacity }}>
                 <VideoView
                   player={inlinePlayer}
                   style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH }}
                   contentFit="cover"
                   nativeControls={false}
-                  onFirstFrameRender={() => setVideoReady(true)}
-                />
-                {/* 로드 전 썸네일 오버레이 또는 로딩 스피너 */}
-                {!videoReady && (() => {
-                  const thumb = getVideoThumbnail({ thumbnailUrl, imageUrl, videoUrl });
-                  return thumb ? (
-                    <Image source={{ uri: thumb }} style={{ position: 'absolute', top: 0, left: 0, width: SCREEN_WIDTH, height: SCREEN_WIDTH }} resizeMode="cover" />
-                  ) : (
-                    <View style={{ position: 'absolute', top: 0, left: 0, width: SCREEN_WIDTH, height: SCREEN_WIDTH, justifyContent: 'flex-end', alignItems: 'center', paddingBottom: 16, backgroundColor: colors.background }}>
-                      <ActivityIndicator size="small" color={colors.primary} />
-                    </View>
-                  );
-                })()}
-                <TouchableOpacity
-                  style={{
-                    position: 'absolute',
-                    top: 0, left: 0, right: 0, bottom: 0,
-                    backgroundColor: 'transparent',
+                  onFirstFrameRender={() => {
+                    Animated.timing(videoOpacity, { toValue: 1, duration: 200, useNativeDriver: true }).start();
                   }}
-                  onPress={handleTap}
-                  activeOpacity={1}
                 />
-              </View>
-            ) : (
-              <>
-                {(() => {
-                  const thumb = getVideoThumbnail({ thumbnailUrl, imageUrl, videoUrl });
-                  return thumb ? (
-                    <Image source={{ uri: thumb }} style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH }} resizeMode="cover" />
-                  ) : (
-                    <View style={{ width: SCREEN_WIDTH, height: SCREEN_WIDTH, alignItems: 'center', justifyContent: 'center' }}>
-                      <Ionicons name="videocam" size={48} color="rgba(255,255,255,0.5)" />
-                    </View>
-                  );
-                })()}
-              </>
+              </Animated.View>
             )}
+            <TouchableOpacity
+              style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'transparent' }}
+              onPress={handleTap}
+              activeOpacity={1}
+            />
             <View style={styles.videoBadge}>
               <Ionicons name="play" size={10} color="#fff" />
               <Text style={styles.videoBadgeText}>동영상</Text>
@@ -1449,9 +1434,10 @@ export default function HomeScreen() {
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.feedContainer}
-        windowSize={5}
+        windowSize={3}
         initialNumToRender={3}
-        maxToRenderPerBatch={3}
+        maxToRenderPerBatch={2}
+        updateCellsBatchingPeriod={50}
         removeClippedSubviews={true}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}

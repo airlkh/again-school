@@ -80,6 +80,7 @@ export interface ChatMessage {
   text: string;
   imageUrl?: string;
   originalVideoUrl?: string;
+  thumbnailUrl?: string;
   mediaType?: 'image' | 'video';
   createdAt: number;
   read: boolean;
