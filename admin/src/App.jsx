@@ -25,6 +25,7 @@ import VerificationReview from './pages/school/VerificationReview';
 import VerifiedMembers from './pages/school/VerifiedMembers';
 import SchoolData from './pages/school/SchoolData';
 import VerificationStats from './pages/school/VerificationStats';
+import TeacherVerification from './pages/school/TeacherVerification';
 
 // Community
 import PostManagement from './pages/community/PostManagement';
@@ -162,6 +163,7 @@ function App() {
           <Route path="school/verified" element={<VerifiedMembers />} />
           <Route path="school/data" element={<SchoolData />} />
           <Route path="school/stats" element={<VerificationStats />} />
+          <Route path="school/teacher" element={<TeacherVerification />} />
 
           <Route path="community/posts" element={<PostManagement />} />
           <Route path="community/comments" element={<CommentManagement />} />

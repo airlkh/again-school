@@ -1,12 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
-  Alert, ActivityIndicator, ScrollView,
+  Alert, ActivityIndicator, ScrollView, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../src/config/firebase';
+import { getAuth } from 'firebase/auth';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useGoBack } from '../../src/hooks/useGoBack';
@@ -119,6 +123,8 @@ export default function TeacherApplyScreen() {
   const [rejectedReason, setRejectedReason] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
+  const [attachments, setAttachments] = useState<{ uri: string; name: string; type: 'image' | 'pdf' }[]>([]);
+  const [existingDocUrls, setExistingDocUrls] = useState<string[]>([]);
 
   useFocusEffect(
     useCallback(() => {
@@ -135,6 +141,7 @@ export default function TeacherApplyScreen() {
             setRejectedReason(data.teacherRejectedReason || '');
             if (data.teacherHistory?.length) setHistory(data.teacherHistory);
             if (data.teacherMessage) setMessage(data.teacherMessage);
+            if (data.teacherDocUrls?.length) setExistingDocUrls(data.teacherDocUrls);
           }
         } catch {}
         finally {
@@ -166,6 +173,61 @@ export default function TeacherApplyScreen() {
     ]);
   }
 
+  async function pickImage() {
+    if (attachments.length >= 5) { Alert.alert('알림', '최대 5개까지 첨부할 수 있습니다.'); return; }
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) { Alert.alert('권한 필요', '갤러리 접근 권한을 허용해주세요.'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'] as ImagePicker.MediaType[], quality: 0.8 });
+    if (!result.canceled && result.assets[0]) {
+      setAttachments((prev) => [...prev, { uri: result.assets[0].uri, name: `image_${Date.now()}.jpg`, type: 'image' }]);
+    }
+  }
+
+  async function pickDocument() {
+    if (attachments.length >= 5) { Alert.alert('알림', '최대 5개까지 첨부할 수 있습니다.'); return; }
+    const result = await DocumentPicker.getDocumentAsync({ type: 'application/pdf' });
+    if (!result.canceled && result.assets?.[0]) {
+      setAttachments((prev) => [...prev, { uri: result.assets[0].uri, name: result.assets[0].name || 'document.pdf', type: 'pdf' }]);
+    }
+  }
+
+  function removeAttachment(index: number) {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function uploadAttachments(): Promise<string[]> {
+    if (attachments.length === 0) return existingDocUrls;
+    const auth = getAuth();
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) return existingDocUrls;
+    const bucket = 'again-school-bfea8.firebasestorage.app';
+    const urls: string[] = [...existingDocUrls];
+    for (const att of attachments) {
+      try {
+        const path = `teacher-docs/${user!.uid}/${Date.now()}_${att.name}`;
+        const encodedPath = encodeURIComponent(path);
+        const uploadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o?uploadType=media&name=${encodedPath}`;
+        const contentType = att.type === 'pdf' ? 'application/pdf' : 'image/jpeg';
+        const res = await FileSystem.uploadAsync(uploadUrl, att.uri, {
+          httpMethod: 'POST',
+          uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': contentType },
+        });
+        if (res.status === 200) {
+          const data = JSON.parse(res.body);
+          const dlToken = data.downloadTokens;
+          const url = dlToken
+            ? `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(data.name)}?alt=media&token=${dlToken}`
+            : `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedPath}?alt=media`;
+          urls.push(url);
+        }
+      } catch (e) {
+        console.warn('[TeacherApply] 파일 업로드 실패:', e);
+      }
+    }
+    return urls;
+  }
+
   async function handleApply() {
     if (!user) return;
     const invalid = history.find((h) => !h.schoolName.trim() || !h.subject.trim() || !h.startYear);
@@ -179,6 +241,7 @@ export default function TeacherApplyScreen() {
     }
     setIsLoading(true);
     try {
+      const docUrls = await uploadAttachments();
       const currentHistory = history.find((h) => h.isCurrent);
       await updateDoc(doc(db, 'users', user.uid), {
         isTeacher: true,
@@ -189,6 +252,7 @@ export default function TeacherApplyScreen() {
         teacherSchoolName: currentHistory?.schoolName ?? history[0].schoolName,
         teacherSubject: currentHistory?.subject ?? history[0].subject,
         teacherMessage: message.trim(),
+        teacherDocUrls: docUrls,
         teacherAppliedAt: serverTimestamp(),
       });
       setAlreadyApplied(true);
@@ -313,6 +377,52 @@ export default function TeacherApplyScreen() {
               <Ionicons name="add-circle-outline" size={18} color="#7C3AED" />
               <Text style={[styles.addBtnText, { color: '#7C3AED' }]}>재직 이력 추가</Text>
             </TouchableOpacity>
+
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>증빙서류 첨부 (선택)</Text>
+            <Text style={{ fontSize: 12, color: colors.inactive, marginBottom: 8 }}>재직증명서, 사원증 사진 등 (최대 5개)</Text>
+            {existingDocUrls.length > 0 && (
+              <View style={{ gap: 6, marginBottom: 8 }}>
+                {existingDocUrls.map((url, i) => (
+                  <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 8, backgroundColor: colors.card, borderRadius: 8 }}>
+                    <Ionicons name={url.includes('.pdf') ? 'document-outline' : 'image-outline'} size={16} color={colors.primary} />
+                    <Text style={{ flex: 1, fontSize: 12, color: colors.textSecondary }} numberOfLines={1}>기존 첨부파일 {i + 1}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+            {attachments.map((att, i) => (
+              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 8, marginBottom: 6, backgroundColor: colors.card, borderRadius: 8 }}>
+                {att.type === 'image' ? (
+                  <Image source={{ uri: att.uri }} style={{ width: 40, height: 40, borderRadius: 6 }} />
+                ) : (
+                  <View style={{ width: 40, height: 40, borderRadius: 6, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="document-text" size={20} color={colors.primary} />
+                  </View>
+                )}
+                <Text style={{ flex: 1, fontSize: 13, color: colors.text }} numberOfLines={1}>{att.name}</Text>
+                <TouchableOpacity onPress={() => removeAttachment(i)}>
+                  <Ionicons name="close-circle" size={20} color={colors.inactive} />
+                </TouchableOpacity>
+              </View>
+            ))}
+            {attachments.length < 5 && (
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                <TouchableOpacity
+                  style={[styles.addBtn, { borderColor: '#7C3AED', flex: 1 }]}
+                  onPress={pickImage}
+                >
+                  <Ionicons name="camera-outline" size={16} color="#7C3AED" />
+                  <Text style={[styles.addBtnText, { color: '#7C3AED' }]}>사진 첨부</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.addBtn, { borderColor: '#7C3AED', flex: 1 }]}
+                  onPress={pickDocument}
+                >
+                  <Ionicons name="document-outline" size={16} color="#7C3AED" />
+                  <Text style={[styles.addBtnText, { color: '#7C3AED' }]}>PDF 첨부</Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             <Text style={[styles.label, { color: colors.text }]}>추가 메시지 (선택)</Text>
             <TextInput

@@ -1180,7 +1180,18 @@ export default function HomeScreen() {
     // Merge Firestore meetups with dummy meetups (Firestore에 있는 ID는 더미에서 제외)
     const fsIds = new Set((fsMeetups || []).map((m) => m.id));
     const allMeetups = [
-      ...(fsMeetups || []).filter((m) => m && m.status === 'recruiting'),
+      ...(fsMeetups || []).filter((m) => {
+        if (!m || m.status !== 'recruiting') return false;
+        const v = (m as any).visibility;
+        if (!v || v === 'public') return true;
+        if (v === 'private') return (m as any).hostUid === currentUser?.uid;
+        if (v === 'alumni' || v === 'grade') {
+          if ((m as any).hostUid === currentUser?.uid) return true;
+          const mSchool = (m as any).schoolName?.toLowerCase?.() ?? '';
+          return mSchool ? mySchoolNames.includes(mSchool) : true;
+        }
+        return true;
+      }),
       ...DUMMY_MEETUPS.filter((m) => m.status === 'recruiting' && !fsIds.has(m.id)),
     ];
 

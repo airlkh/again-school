@@ -18,6 +18,7 @@ const pageTitleMap = {
   '/school/verified': '인증 완료 목록',
   '/school/data': '학교 데이터',
   '/school/stats': '인증 통계',
+  '/school/teacher': '선생님 인증',
   '/community/posts': '게시글 관리',
   '/community/comments': '댓글 관리',
   '/community/popular': '인기 게시글',

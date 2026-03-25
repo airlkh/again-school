@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  Alert, ActivityIndicator, Image,
+  Alert, ActivityIndicator, Image, Modal, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,6 +26,7 @@ interface TeacherRequest {
   teacherMessage?: string;
   teacherVerified: boolean;
   teacherAppliedAt: number;
+  teacherDocUrls?: string[];
 }
 
 export default function TeacherRequestsScreen() {
@@ -35,6 +36,7 @@ export default function TeacherRequestsScreen() {
   const [requests, setRequests] = useState<TeacherRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingUid, setProcessingUid] = useState<string | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const isAdmin = user ? ADMIN_UIDS.includes(user.uid) : false;
 
@@ -52,6 +54,7 @@ export default function TeacherRequestsScreen() {
         teacherMessage: d.data().teacherMessage ?? '',
         teacherVerified: d.data().teacherVerified === true,
         teacherAppliedAt: d.data().teacherAppliedAt?.toMillis?.() ?? 0,
+        teacherDocUrls: d.data().teacherDocUrls ?? [],
       }));
       items.sort((a, b) => (a.teacherVerified ? 1 : -1) - (b.teacherVerified ? 1 : -1));
       setRequests(items);
@@ -148,6 +151,24 @@ export default function TeacherRequestsScreen() {
                 </View>
               </TouchableOpacity>
 
+              {item.teacherDocUrls && item.teacherDocUrls.length > 0 && (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+                  {item.teacherDocUrls.map((url, i) => {
+                    const isPdf = url.includes('.pdf') || url.includes('application%2Fpdf');
+                    return isPdf ? (
+                      <TouchableOpacity key={i} onPress={() => Linking.openURL(url)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, padding: 6, backgroundColor: colors.background, borderRadius: 6 }}>
+                        <Ionicons name="document-text" size={14} color={colors.primary} />
+                        <Text style={{ fontSize: 11, color: colors.primary }}>PDF {i + 1}</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity key={i} onPress={() => setPreviewImage(url)}>
+                        <Image source={{ uri: url }} style={{ width: 56, height: 56, borderRadius: 8, backgroundColor: colors.background }} />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+
               {!item.teacherVerified && (
                 <View style={styles.actions}>
                   <TouchableOpacity
@@ -190,6 +211,15 @@ export default function TeacherRequestsScreen() {
           )}
         />
       )}
+
+      <Modal visible={!!previewImage} transparent animationType="fade" onRequestClose={() => setPreviewImage(null)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' }}>
+          <TouchableOpacity style={{ position: 'absolute', top: 50, right: 20, zIndex: 10 }} onPress={() => setPreviewImage(null)}>
+            <Ionicons name="close" size={28} color="#fff" />
+          </TouchableOpacity>
+          {previewImage && <Image source={{ uri: previewImage }} style={{ width: '90%', height: '70%' }} resizeMode="contain" />}
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

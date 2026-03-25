@@ -34,6 +34,7 @@ export default function JobCreateScreen() {
   const [salary, setSalary] = useState('');
   const [contact, setContact] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [visibility, setVisibility] = useState<'public' | 'alumni' | 'private'>('alumni');
 
   function validate(): boolean {
     if (!title.trim()) { Alert.alert('알림', '제목을 입력해주세요.'); return false; }
@@ -63,7 +64,8 @@ export default function JobCreateScreen() {
         authorName: displayName || '사용자',
         authorAvatarImg: 1,
         authorPhotoURL: photoURL ?? null,
-      });
+        visibility,
+      } as any);
       Alert.alert('완료', '글이 등록되었습니다!', [
         { text: '확인', onPress: () => goBack() },
       ]);
@@ -183,6 +185,32 @@ export default function JobCreateScreen() {
             value={contact}
             onChangeText={setContact}
           />
+
+          {/* 공개 설정 */}
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>공개 설정</Text>
+          <View style={{ gap: 8, marginBottom: 16 }}>
+            {([
+              { key: 'public' as const, label: '🌍 전체 공개', desc: '모든 사용자에게 표시' },
+              { key: 'alumni' as const, label: '🏫 동창 공개', desc: '같은 학교 동창에게만 표시' },
+              { key: 'private' as const, label: '🔒 비공개', desc: '본인만 표시' },
+            ]).map((opt) => (
+              <TouchableOpacity
+                key={opt.key}
+                onPress={() => setVisibility(opt.key)}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: visibility === opt.key ? (isDark ? colors.surface : '#fef2f2') : colors.surface,
+                    borderColor: visibility === opt.key ? colors.primary : colors.border,
+                    flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 0,
+                  },
+                ]}
+              >
+                <Text style={{ fontSize: 14, flex: 1, color: colors.text }}>{opt.label}</Text>
+                {visibility === opt.key && <Ionicons name="checkmark" size={18} color={colors.primary} />}
+              </TouchableOpacity>
+            ))}
+          </View>
 
           {/* 안내 */}
           <View style={[styles.notice, { backgroundColor: isDark ? colors.surface2 : '#fffbeb', borderColor: isDark ? colors.border : '#fde68a' }]}>

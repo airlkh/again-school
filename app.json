@@ -37,7 +37,7 @@
           "data": [
             {
               "scheme": "again-school",
-              "path": "oauth2redirect/google"
+              "path": "/oauth2redirect/google"
             }
           ],
           "category": [

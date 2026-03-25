@@ -11,6 +11,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { useAuth } from '../../src/contexts/AuthContext';
+import { useCurrentUser } from '../../src/hooks/useCurrentUser';
 import { subscribeJobs } from '../../src/services/jobService';
 import { JobPost, JobType } from '../../src/types/auth';
 import { getAvatarSource } from '../../src/utils/avatar';
@@ -20,6 +22,8 @@ type FilterType = '전체' | '구인' | '구직';
 
 export default function JobsScreen() {
   const { colors, isDark } = useTheme();
+  const { user } = useAuth();
+  const { profile: myProfile } = useCurrentUser();
   const [filter, setFilter] = useState<FilterType>('전체');
   const [jobs, setJobs] = useState<JobPost[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -34,9 +38,21 @@ export default function JobsScreen() {
     setTimeout(() => setRefreshing(false), 1000);
   }, []);
 
+  const mySchoolNames = (myProfile?.schools ?? []).map((s: any) => s?.schoolName?.toLowerCase?.() ?? '').filter(Boolean);
+  const visibleJobs = jobs.filter((j) => {
+    const v = (j as any).visibility;
+    if (!v || v === 'public') return true;
+    if (v === 'private') return j.authorUid === user?.uid;
+    if (v === 'alumni') {
+      if (j.authorUid === user?.uid) return true;
+      const jLocation = j.location?.toLowerCase?.() ?? '';
+      return mySchoolNames.length > 0;
+    }
+    return true;
+  });
   const filtered = filter === '전체'
-    ? jobs
-    : jobs.filter((j) => j.type === filter);
+    ? visibleJobs
+    : visibleJobs.filter((j) => j.type === filter);
 
   function timeAgo(ts: number): string {
     const diff = Date.now() - ts;
