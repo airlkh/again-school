@@ -685,7 +685,7 @@ export default function ChatRoomScreen() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 46 : 0}
       >
       {/* 메시지 목록 */}
-      {isInitialLoading && roomId ? (
+      {isInitialLoading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator size="small" color={colors.primary} />
         </View>
