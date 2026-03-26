@@ -41,6 +41,7 @@ import { createPost, PostVisibility, VisibilitySchool } from '../../src/services
 import { CLOUDINARY_CONFIG } from '../../src/config/cloudinary';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import * as VideoThumbnails from 'expo-video-thumbnails';
+import * as ImageManipulator from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system/legacy';
 import { getAuth } from 'firebase/auth';
 import { Video as VideoCompressor } from 'react-native-compressor';
@@ -409,8 +410,15 @@ export default function UploadScreen() {
     let thumbnailCloudinaryUrl: string | undefined;
     if (isVideo) {
       try {
-        const { uri: thumbUri } = await VideoThumbnails.getThumbnailAsync(uri, { time: 1000 });
-        console.log('[uploadMedia] 썸네일 추출:', thumbUri);
+        const { uri: rawThumbUri } = await VideoThumbnails.getThumbnailAsync(uri, { time: 1000 });
+        // 썸네일 압축 (800px, quality 0.7)
+        const compressed = await ImageManipulator.manipulateAsync(
+          rawThumbUri,
+          [{ resize: { width: 800 } }],
+          { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG },
+        );
+        const thumbUri = compressed.uri;
+        console.log('[uploadMedia] 썸네일 추출+압축:', thumbUri);
 
         // Cloudinary 업로드 시도
         const thumbForm = new FormData();
@@ -472,6 +480,7 @@ export default function UploadScreen() {
       } catch (e) {
         console.warn('[uploadMedia] 동영상 압축 실패, 원본 사용:', e);
       }
+      onProgress?.(1); // 압축 완료 신호
 
       mediaUrl = await new Promise((resolve, reject) => {
         const formData = new FormData();
@@ -584,11 +593,12 @@ export default function UploadScreen() {
           }
         }
 
-        setUploadStatus('업로드 중...');
+        setUploadStatus(isVideo ? '동영상 압축 중...' : '업로드 중...');
         const { url, thumbnailUrl: thumbUrl } = await uploadMedia(
           uriToUpload,
           isVideo ? 'video' : 'image',
           (pct) => {
+            if (isVideo && pct > 0) setUploadStatus('업로드 중...');
             const total =
               (i / selectedMedia.length) * 100 + pct / selectedMedia.length;
             setProgress(Math.round(total));
@@ -656,7 +666,8 @@ export default function UploadScreen() {
             caption: caption || '',
             visibility,
             visibilitySchools,
-          });
+            thumbnailUrl: item.thumbnailUrl,
+          } as any);
         }
       }
 

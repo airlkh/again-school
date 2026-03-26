@@ -965,7 +965,7 @@ function ClassmateRecommendCard() {
 }
 
 // ─── 모임 이벤트 카드 ──────────────────────────────────────────────
-function MeetupEventCard({ meetup }: { meetup: Meetup }) {
+const MeetupEventCard = React.memo(function MeetupEventCard({ meetup }: { meetup: Meetup }) {
   const dateParts = (meetup.date || '').split('-');
   const m = dateParts[1] || '1';
   const d = dateParts[2] || '1';
@@ -1013,10 +1013,10 @@ function MeetupEventCard({ meetup }: { meetup: Meetup }) {
       </View>
     </TouchableOpacity>
   );
-}
+}, (prev, next) => prev.meetup.id === next.meetup.id);
 
 // ─── 메인 화면 ─────────────────────────────────────────────────────
-function BannerCard({ banner }: { banner: BannerItem }) {
+const BannerCard = React.memo(function BannerCard({ banner }: { banner: BannerItem }) {
   const { colors } = useTheme();
   const handlePress = async () => {
     if (!banner.linkUrl) return;
@@ -1042,7 +1042,7 @@ function BannerCard({ banner }: { banner: BannerItem }) {
       )}
     </TouchableOpacity>
   );
-}
+}, (prev, next) => prev.banner.id === next.banner.id);
 
 export default function HomeScreen() {
   const { colors } = useTheme();
@@ -1335,6 +1335,7 @@ export default function HomeScreen() {
       if (music?.url && visiblePostId) playMusic(visiblePostId, music);
       return () => {
         // 탭 벗어날 때 동영상 + 음악 정지 + 음소거
+        try { inlinePlayer.muted = true; } catch {}
         try { inlinePlayer.pause(); } catch {}
         stopMusic();
         if (!musicMutedGlobal) toggleMusicMuteGlobal();

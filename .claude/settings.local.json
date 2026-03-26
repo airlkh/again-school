@@ -34,7 +34,9 @@
       "Bash(git add:*)",
       "Bash(firebase deploy:*)",
       "Bash(gh workflow:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(npm ls:*)"
     ]
   }
 }

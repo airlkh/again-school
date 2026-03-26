@@ -11,6 +11,7 @@ import {
   Platform,
   KeyboardAvoidingView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -117,9 +118,9 @@ export default function StoryViewerScreen() {
     }, [storyVideoPlayer])
   );
 
-  // 스토리 전환 시 opacity 리셋
+  // 동영상 스토리 전환 시에만 opacity 리셋
   useEffect(() => {
-    videoOpacity.setValue(0);
+    if (isCurrentVideo) videoOpacity.setValue(0);
     setVideoDuration(0);
   }, [currentIndex]);
 
@@ -250,13 +251,25 @@ export default function StoryViewerScreen() {
         activeOpacity={1}
         onPress={(e) => handleTap(e.nativeEvent.locationX)}
       >
-        {/* 바닥 레이어: 이미지 항상 표시 */}
-        <Image
-          key={`story-img-${currentIndex}`}
-          source={{ uri: currentImage }}
-          style={styles.storyImage}
-          resizeMode="cover"
-        />
+        {/* 바닥 레이어 */}
+        {isCurrentVideo ? (
+          (() => {
+            const thumb = isFirestore ? (fsStories[currentIndex] as any)?.thumbnailUrl : null;
+            return thumb ? (
+              <Image source={{ uri: thumb }} style={styles.storyImage} resizeMode="cover" />
+            ) : (
+              <View style={[styles.storyImage, { alignItems: 'center', justifyContent: 'center' }]}>
+                <ActivityIndicator size="small" color="rgba(255,255,255,0.6)" />
+              </View>
+            );
+          })()
+        ) : (
+          <Image
+            source={{ uri: currentImage }}
+            style={styles.storyImage}
+            resizeMode="cover"
+          />
+        )}
         {/* 위 레이어: 동영상 absolute 겹침 + fade-in */}
         {isCurrentVideo && storyVideoPlayer && (
           <Animated.View style={[styles.storyImage, { position: 'absolute', top: 0, left: 0, opacity: videoOpacity }]}>

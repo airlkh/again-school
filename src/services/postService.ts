@@ -12,6 +12,7 @@ import {
   arrayUnion,
   arrayRemove,
   getDoc,
+  limit,
   Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -138,7 +139,7 @@ export function subscribePosts(
   callback: (posts: FirestorePost[]) => void,
 ): Unsubscribe {
   const colRef = collection(db, 'posts');
-  const q = query(colRef, orderBy('createdAt', 'desc'));
+  const q = query(colRef, orderBy('createdAt', 'desc'), limit(50));
 
   return onSnapshot(q, (snapshot) => {
     const results: FirestorePost[] = [];
