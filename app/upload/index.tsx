@@ -96,15 +96,6 @@ export default function UploadScreen() {
 
   // 편집
   const [editIndex, setEditIndex] = useState(0);
-  const [overlayText, setOverlayText] = useState('');
-  const [textColor, setTextColor] = useState('#ffffff');
-  const [textSize, setTextSize] = useState(24);
-  const [showTextInput, setShowTextInput] = useState(false);
-  const [bgStyle, setBgStyle] = useState<'none' | 'semi' | 'solid'>('none');
-
-  // 텍스트 드래그 (PanGestureHandler + Animated)
-  const pan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
-  const lastPan = useRef({ x: 0, y: 0 });
   const videoPlayerSource = useMemo(() => {
     if (step !== 'edit') return null;
     const cm = selectedMedia[editIndex] ?? selectedMedia[0];
@@ -135,21 +126,6 @@ export default function UploadScreen() {
       galleryVideoPlayer.play();
     }
   }, [galleryVideoSource]);
-
-  const onTextGestureEvent = Animated.event(
-    [{ nativeEvent: { translationX: pan.x, translationY: pan.y } }],
-    { useNativeDriver: true },
-  ) as any;
-
-  const onTextHandlerStateChange = (e: any) => {
-    if (e.nativeEvent.oldState === State.ACTIVE) {
-      lastPan.current.x += e.nativeEvent.translationX;
-      lastPan.current.y += e.nativeEvent.translationY;
-      pan.x.setOffset(lastPan.current.x);
-      pan.y.setOffset(lastPan.current.y);
-      pan.setValue({ x: 0, y: 0 });
-    }
-  };
 
   // 크롭 큐
   const [cropQueue, setCropQueue] = useState<string[]>([]);
@@ -357,22 +333,10 @@ export default function UploadScreen() {
     }
   };
 
-  // 텍스트 배경 스타일
-  const getTextBg = () => {
-    if (bgStyle === 'solid') return 'rgba(0,0,0,0.75)';
-    if (bgStyle === 'semi') return 'rgba(0,0,0,0.4)';
-    return 'transparent';
-  };
-
-  // ViewShot으로 이미지+텍스트 합성 (edit 단계에서 호출)
+  // ViewShot으로 이미지 합성 (edit 단계에서 호출)
   const captureComposite = async (): Promise<string> => {
-    if (!overlayText.trim()) {
-      return selectedMedia[0]?.uri || '';
-    }
+    return selectedMedia[0]?.uri || '';
     try {
-      // Animated offset을 flatten해서 네이티브에 반영
-      pan.x.flattenOffset();
-      pan.y.flattenOffset();
       const uri = await viewShotRef.current?.capture?.();
       if (uri) {
         console.log('캡처 성공:', uri);
@@ -581,17 +545,6 @@ export default function UploadScreen() {
         const isVideo = media.type === 'video';
 
         let uriToUpload = media.uri;
-        if (!isVideo && overlayText.trim()) {
-          try {
-            pan.x.flattenOffset();
-            pan.y.flattenOffset();
-            const ref = viewShotRefs.current[i];
-            const captured = await ref?.capture?.();
-            if (captured) uriToUpload = captured;
-          } catch (e) {
-            console.warn(`[handleShare] 이미지 ${i} 캡처 실패:`, e);
-          }
-        }
 
         setUploadStatus(isVideo ? '동영상 압축 중...' : '업로드 중...');
         const { url, thumbnailUrl: thumbUrl } = await uploadMedia(
@@ -617,7 +570,6 @@ export default function UploadScreen() {
         console.log('[upload] firstResult.url:', firstResult?.url);
         console.log('[upload] videoThumbnail:', videoThumbnail);
 
-        console.log('[handleShare] overlayText:', overlayText, 'trim:', overlayText.trim());
         await createPost({
           authorUid: uid,
           authorName: displayName || '사용자',
@@ -629,14 +581,6 @@ export default function UploadScreen() {
           thumbnailUrl: videoThumbnail,
           mediaItems: results.map((r) => r.url),
           caption: caption || '',
-          textOverlay: overlayText.trim() ? {
-            text: overlayText.trim(),
-            color: textColor,
-            fontSize: textSize,
-            bgStyle: bgStyle,
-            x: (pan.x as any)._value ?? 0,
-            y: (pan.y as any)._value ?? 0,
-          } : undefined,
           schoolName: profile?.schools?.[0]?.schoolName || undefined,
           visibility,
           visibilitySchools,
@@ -666,7 +610,7 @@ export default function UploadScreen() {
             caption: caption || '',
             visibility,
             visibilitySchools,
-            thumbnailUrl: item.thumbnailUrl,
+            thumbnailUrl: item.thumbnailUrl ?? null,
           } as any);
         }
       }
@@ -958,12 +902,11 @@ export default function UploadScreen() {
     const currentMedia = selectedMedia[editIndex] ?? selectedMedia[0];
     const isVideo = currentMedia?.type === 'video';
     const VSLIDER_H = 200;
-    const sizeNorm = (textSize - 16) / 48; // 0~1
 
     return (
       <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#000' }}>
         {/* ── 헤더 (텍스트 입력 모드가 아닐 때) ── */}
-        {!showTextInput && (
+        {(
           <View
             style={{
               flexDirection: 'row',
@@ -1036,47 +979,6 @@ export default function UploadScreen() {
                   }}
                 />
 
-                {overlayText.trim().length > 0 && !showTextInput && (
-                  <PanGestureHandler
-                    onGestureEvent={onTextGestureEvent}
-                    onHandlerStateChange={onTextHandlerStateChange}
-                  >
-                    <Animated.View
-                      style={{
-                        position: 'absolute',
-                        alignSelf: 'center',
-                        left: SW / 2 - 60,
-                        top: imageHeight / 2 - textSize / 2,
-                        maxWidth: SW * 0.85,
-                        zIndex: 10,
-                        transform: pan.getTranslateTransform(),
-                      }}
-                    >
-                      <View
-                        style={{
-                          backgroundColor: getTextBg(),
-                          borderRadius: 6,
-                          paddingHorizontal: bgStyle !== 'none' ? 10 : 0,
-                          paddingVertical: bgStyle !== 'none' ? 4 : 0,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: textColor,
-                            fontSize: textSize,
-                            fontWeight: '700',
-                            textAlign: 'center',
-                            textShadowColor: 'rgba(0,0,0,0.6)',
-                            textShadowOffset: { width: 1, height: 1 },
-                            textShadowRadius: 3,
-                          }}
-                        >
-                          {overlayText}
-                        </Text>
-                      </View>
-                    </Animated.View>
-                  </PanGestureHandler>
-                )}
               </ViewShot>
             )
           ) : (
@@ -1116,47 +1018,6 @@ export default function UploadScreen() {
                           }}
                         />
 
-                        {overlayText.trim().length > 0 && !showTextInput && (
-                          <PanGestureHandler
-                            onGestureEvent={onTextGestureEvent}
-                            onHandlerStateChange={onTextHandlerStateChange}
-                          >
-                            <Animated.View
-                              style={{
-                                position: 'absolute',
-                                alignSelf: 'center',
-                                left: SW / 2 - 60,
-                                top: imageHeight / 2 - textSize / 2,
-                                maxWidth: SW * 0.85,
-                                zIndex: 10,
-                                transform: pan.getTranslateTransform(),
-                              }}
-                            >
-                              <View
-                                style={{
-                                  backgroundColor: getTextBg(),
-                                  borderRadius: 6,
-                                  paddingHorizontal: bgStyle !== 'none' ? 10 : 0,
-                                  paddingVertical: bgStyle !== 'none' ? 4 : 0,
-                                }}
-                              >
-                                <Text
-                                  style={{
-                                    color: textColor,
-                                    fontSize: textSize,
-                                    fontWeight: '700',
-                                    textAlign: 'center',
-                                    textShadowColor: 'rgba(0,0,0,0.6)',
-                                    textShadowOffset: { width: 1, height: 1 },
-                                    textShadowRadius: 3,
-                                  }}
-                                >
-                                  {overlayText}
-                                </Text>
-                              </View>
-                            </Animated.View>
-                          </PanGestureHandler>
-                        )}
                       </ViewShot>
                     )}
                   </View>
@@ -1181,7 +1042,7 @@ export default function UploadScreen() {
         </View>
 
         {/* ── 편집 도구 (텍스트 모드 아닐 때) ── */}
-        {!showTextInput && (
+        {(
           <View style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
             {/* 음악 추가 버튼 (항상 표시) */}
             <TouchableOpacity
@@ -1214,257 +1075,9 @@ export default function UploadScreen() {
               )}
             </TouchableOpacity>
             {/* 텍스트 추가 (이미지만) */}
-            {!isVideo && (
-              <TouchableOpacity
-                onPress={() => setShowTextInput(true)}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 8,
-                padding: 14,
-                borderTopWidth: 0.5,
-                borderTopColor: '#333',
-              }}
-            >
-              <Text style={{ color: '#fff', fontSize: 20 }}>Aa</Text>
-              <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>
-                텍스트 추가
-              </Text>
-              {overlayText.trim().length > 0 && (
-                <View
-                  style={{
-                    backgroundColor: '#FF3124',
-                    borderRadius: 10,
-                    paddingHorizontal: 8,
-                    paddingVertical: 2,
-                  }}
-                >
-                  <Text style={{ color: '#fff', fontSize: 11 }}>입력됨</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-            )}
           </View>
         )}
 
-        {/* ━━━ 텍스트 입력 모드 오버레이 ━━━ */}
-        {showTextInput && (
-          <>
-            {/* 검정 반투명 배경 (전체 화면) */}
-            <View
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: 'rgba(0,0,0,0.7)',
-                zIndex: 99,
-              }}
-            />
-
-            {/* 컨텐츠 (키보드 위 영역) */}
-            <View
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: keyboardH,
-                zIndex: 100,
-              }}
-            >
-              {/* 상단: 완료 버튼 */}
-              <View
-                style={{
-                  paddingTop: insets.top + 12,
-                  paddingRight: 16,
-                  alignItems: 'flex-end',
-                }}
-              >
-                <TouchableOpacity
-                  onPress={() => setShowTextInput(false)}
-                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                >
-                  <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>
-                    완료
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* 중앙: 좌측 슬라이더 + 텍스트 입력 */}
-              <View style={{ flex: 1, flexDirection: 'row' }}>
-                {/* 좌측 세로 슬라이더 */}
-                <View
-                  style={{
-                    width: 48,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                  }}
-                >
-                  <View style={{ height: VSLIDER_H, width: 36, alignItems: 'center' }}>
-                    {/* 트랙 */}
-                    <View
-                      style={{
-                        position: 'absolute',
-                        width: 3,
-                        height: '100%',
-                        backgroundColor: 'rgba(255,255,255,0.3)',
-                        borderRadius: 2,
-                        left: 16.5,
-                      }}
-                    />
-                    {/* 핸들 */}
-                    <View
-                      style={{
-                        position: 'absolute',
-                        width: 24,
-                        height: 24,
-                        borderRadius: 12,
-                        backgroundColor: '#fff',
-                        top: (1 - sizeNorm) * (VSLIDER_H - 24),
-                        left: 6,
-                        shadowColor: '#000',
-                        shadowOffset: { width: 0, height: 2 },
-                        shadowOpacity: 0.3,
-                        shadowRadius: 3,
-                        elevation: 4,
-                      }}
-                    />
-                    {/* PanResponder 영역 */}
-                    <View
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                      }}
-                      {...PanResponder.create({
-                        onStartShouldSetPanResponder: () => true,
-                        onMoveShouldSetPanResponder: () => true,
-                        onPanResponderGrant: (e) => {
-                          const pct = 1 - Math.min(1, Math.max(0, e.nativeEvent.locationY / VSLIDER_H));
-                          setTextSize(Math.round(16 + pct * 48));
-                        },
-                        onPanResponderMove: (e) => {
-                          const pct = 1 - Math.min(1, Math.max(0, e.nativeEvent.locationY / VSLIDER_H));
-                          setTextSize(Math.round(16 + pct * 48));
-                        },
-                      }).panHandlers}
-                    />
-                  </View>
-                </View>
-
-                {/* 중앙 텍스트 입력 */}
-                <View
-                  style={{
-                    flex: 1,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    paddingRight: 16,
-                  }}
-                >
-                  <TextInput
-                    value={overlayText}
-                    onChangeText={setOverlayText}
-                    placeholder="텍스트 입력"
-                    placeholderTextColor="rgba(255,255,255,0.5)"
-                    style={{
-                      color: textColor,
-                      fontSize: textSize,
-                      textAlign: 'center',
-                      fontWeight: '700',
-                      textShadowColor: 'rgba(0,0,0,0.6)',
-                      textShadowOffset: { width: 1, height: 1 },
-                      textShadowRadius: 3,
-                      maxWidth: SW - 100,
-                      minWidth: 100,
-                      padding: 0,
-                    }}
-                    multiline
-                    autoFocus
-                    maxLength={100}
-                  />
-                </View>
-              </View>
-
-              {/* 하단 툴바 (키보드 바로 위) */}
-              <View
-                style={{
-                  backgroundColor: '#1a1a1a',
-                  paddingTop: 10,
-                  paddingBottom: keyboardH > 0 ? 4 : Math.max(insets.bottom, 8),
-                }}
-              >
-                {/* 색상 선택 */}
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={{ paddingHorizontal: 16, marginBottom: 8 }}
-                >
-                  <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-                    {['#ffffff', '#000000', '#FF3124', '#FFD700', '#00C851', '#2196F3', '#FF69B4', '#FF8C00'].map(
-                      (c) => (
-                        <TouchableOpacity
-                          key={c}
-                          onPress={() => setTextColor(c)}
-                          style={{
-                            width: 28,
-                            height: 28,
-                            borderRadius: 14,
-                            backgroundColor: c,
-                            borderWidth: textColor === c ? 3 : 1,
-                            borderColor: textColor === c ? '#fff' : 'rgba(255,255,255,0.2)',
-                          }}
-                        />
-                      ),
-                    )}
-                  </View>
-                </ScrollView>
-
-                {/* 아이콘 바 */}
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    justifyContent: 'space-around',
-                    alignItems: 'center',
-                    paddingHorizontal: 20,
-                    paddingVertical: 6,
-                  }}
-                >
-                  <TouchableOpacity onPress={() => Keyboard.dismiss()}>
-                    <Ionicons name="keypad-outline" size={22} color="#fff" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() =>
-                      setBgStyle(
-                        bgStyle === 'none' ? 'semi' : bgStyle === 'semi' ? 'solid' : 'none',
-                      )
-                    }
-                  >
-                    <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700' }}>Aa</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => Alert.alert('준비 중', '팔레트 기능 준비 중')}>
-                    <Ionicons name="color-palette-outline" size={22} color="#fff" />
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => Alert.alert('준비 중', '정렬 기능 준비 중')}>
-                    <Text style={{ color: '#fff', fontSize: 16 }}>//A</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => Alert.alert('준비 중', '글꼴 기능 준비 중')}>
-                    <Ionicons name="text-outline" size={22} color="#fff" />
-                  </TouchableOpacity>
-                  <TouchableOpacity>
-                    <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700' }}>A</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => Alert.alert('준비 중', '정렬 기능 준비 중')}>
-                    <Ionicons name="menu-outline" size={22} color="#fff" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </>
-        )}
       {/* 음악 파형 선택 모달 */}
       <MusicTrimmer
         visible={showMusicWave}

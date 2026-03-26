@@ -19,15 +19,6 @@ import { db } from '../config/firebase';
 import { sendPushNotification } from './notificationService';
 import { saveNotification } from './notificationStoreService';
 
-export interface TextOverlay {
-  text: string;
-  x: number;
-  y: number;
-  fontSize: number;
-  color: string;
-  bgStyle?: 'none' | 'semi' | 'solid';
-}
-
 export interface PostMusic {
   id?: string;
   name: string;
@@ -60,15 +51,6 @@ export interface FirestorePost {
   videoUrl?: string;
   thumbnailUrl?: string;
   mediaItems?: string[];
-  textOverlays?: TextOverlay[];
-  textOverlay?: {
-    text: string;
-    color: string;
-    fontSize: number;
-    bgStyle: 'none' | 'semi' | 'solid';
-    x: number;
-    y: number;
-  };
   music?: PostMusic;
   caption: string;
   yearTag?: number;
@@ -119,7 +101,7 @@ export async function createPost(
 /** 게시물 수정 */
 export async function updatePost(
   postId: string,
-  data: Partial<Pick<FirestorePost, 'caption' | 'yearTag' | 'memoryTag' | 'textOverlays' | 'music' | 'taggedUsers' | 'location'>>,
+  data: Partial<Pick<FirestorePost, 'caption' | 'yearTag' | 'memoryTag' | 'music' | 'taggedUsers' | 'location'>>,
 ): Promise<void> {
   const docRef = doc(db, 'posts', postId);
   const cleanData = Object.fromEntries(

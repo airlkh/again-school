@@ -358,8 +358,10 @@ export const CropEditor: React.FC<CropEditorProps> = ({
       if (originX + cropW > imageSize.width) cropW = imageSize.width - originX;
       if (originY + cropH > imageSize.height) cropH = imageSize.height - originY;
       // 최종 안전장치
-      cropW = Math.max(1, cropW);
-      cropH = Math.max(1, cropH);
+      originX = Math.min(originX, Math.max(0, imageSize.width - 1));
+      originY = Math.min(originY, Math.max(0, imageSize.height - 1));
+      cropW = Math.max(1, Math.min(cropW, imageSize.width - originX));
+      cropH = Math.max(1, Math.min(cropH, imageSize.height - originY));
 
       const result = await ImageManipulator.manipulateAsync(
         imageUri,

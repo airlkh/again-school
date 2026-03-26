@@ -347,7 +347,6 @@ const PostCard = React.memo(function PostCard({ post, isFirestore, onHide, isVis
 
   const isVideoPost = isVideoMedia(videoUrl || imageUrl, mediaType) || imgLoadFailed;
   const hasAudio = !!(isFirestore && (fsPost as any)?.music?.url);
-  const textOverlay = isFirestore ? (fsPost as any)?.textOverlay : undefined;
   const taggedUsers = isFirestore ? (fsPost?.taggedUsers ?? []) : [];
   const postLocation = isFirestore ? fsPost?.location : undefined;
   const handleTap = useCallback(() => {
@@ -527,38 +526,6 @@ const PostCard = React.memo(function PostCard({ post, isFirestore, onHide, isVis
                         setMultiImgHeights((prev) => ({ ...prev, [idx]: calculated }));
                       }}
                     />
-                    {textOverlay && textOverlay.text ? (
-                      <View
-                        pointerEvents="none"
-                        style={{
-                          position: 'absolute',
-                          left: SCREEN_WIDTH / 2 - 60,
-                          top: (multiImgHeights[idx] || SCREEN_WIDTH) / 2,
-                          backgroundColor:
-                            textOverlay.bgStyle === 'solid'
-                              ? 'rgba(0,0,0,0.7)'
-                              : textOverlay.bgStyle === 'semi'
-                              ? 'rgba(0,0,0,0.4)'
-                              : 'transparent',
-                          paddingHorizontal: 8,
-                          paddingVertical: 4,
-                          borderRadius: 4,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: textOverlay.color || '#fff',
-                            fontSize: textOverlay.fontSize || 16,
-                            fontWeight: 'bold',
-                            textShadowColor: 'rgba(0,0,0,0.8)',
-                            textShadowOffset: { width: 1, height: 1 },
-                            textShadowRadius: 3,
-                          }}
-                        >
-                          {textOverlay.text}
-                        </Text>
-                      </View>
-                    ) : null}
                   </View>
                 )}
               </TouchableOpacity>
@@ -626,28 +593,6 @@ const PostCard = React.memo(function PostCard({ post, isFirestore, onHide, isVis
                 <Ionicons name={videoMuted ? 'volume-mute' : 'volume-high'} size={18} color="#fff" />
               </TouchableOpacity>
             )}
-            {textOverlay?.text && (
-              <View style={{
-                position: 'absolute',
-                left: SCREEN_WIDTH / 2 - 60,
-                top: SCREEN_WIDTH / 2,
-                zIndex: 10,
-                backgroundColor: textOverlay.bgStyle === 'solid' ? 'rgba(0,0,0,0.8)' : textOverlay.bgStyle === 'semi' ? 'rgba(0,0,0,0.4)' : 'transparent',
-                borderRadius: 6,
-                paddingHorizontal: textOverlay.bgStyle !== 'none' ? 10 : 0,
-                paddingVertical: textOverlay.bgStyle !== 'none' ? 4 : 0,
-              }}>
-                <Text style={{
-                  color: textOverlay.color ?? '#ffffff',
-                  fontSize: textOverlay.fontSize ?? 24,
-                  fontWeight: '700',
-                  textAlign: 'center',
-                  textShadowColor: 'rgba(0,0,0,0.6)',
-                  textShadowOffset: { width: 1, height: 1 },
-                  textShadowRadius: 3,
-                }}>{textOverlay.text}</Text>
-              </View>
-            )}
             {yearTag && (
               <View style={styles.yearBadge}>
                 <Text style={styles.yearBadgeText}>{yearTag}년</Text>
@@ -677,28 +622,6 @@ const PostCard = React.memo(function PostCard({ post, isFirestore, onHide, isVis
                 }
               }}
             />
-            {textOverlay?.text && (
-              <View style={{
-                position: 'absolute',
-                left: SCREEN_WIDTH / 2 - 60,
-                top: imgHeight / 2,
-                zIndex: 10,
-                backgroundColor: textOverlay.bgStyle === 'solid' ? 'rgba(0,0,0,0.8)' : textOverlay.bgStyle === 'semi' ? 'rgba(0,0,0,0.4)' : 'transparent',
-                borderRadius: 6,
-                paddingHorizontal: textOverlay.bgStyle !== 'none' ? 10 : 0,
-                paddingVertical: textOverlay.bgStyle !== 'none' ? 4 : 0,
-              }}>
-                <Text style={{
-                  color: textOverlay.color ?? '#ffffff',
-                  fontSize: textOverlay.fontSize ?? 24,
-                  fontWeight: '700',
-                  textAlign: 'center',
-                  textShadowColor: 'rgba(0,0,0,0.6)',
-                  textShadowOffset: { width: 1, height: 1 },
-                  textShadowRadius: 3,
-                }}>{textOverlay.text}</Text>
-              </View>
-            )}
             {yearTag && (
               <View style={styles.yearBadge}>
                 <Text style={styles.yearBadgeText}>{yearTag}년</Text>

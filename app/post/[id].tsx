@@ -406,13 +406,6 @@ export default function PostDetailScreen() {
                       <Image source={{ uri: mediaItem.url }} style={[styles.postImage, { backgroundColor: colors.card }]} />
                     </Pressable>
                   )}
-                  {imgIdx === 0 && isFirestore && (fsPost as FirestorePost).textOverlays?.map((overlay, oi) => (
-                    <View key={oi} style={[styles.overlayPos, { left: `${overlay.x}%`, top: `${overlay.y}%` }]}>
-                      <Text style={{ fontSize: overlay.fontSize, color: overlay.color, fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}>
-                        {overlay.text}
-                      </Text>
-                    </View>
-                  ))}
                 </View>
               )}
             />
@@ -739,7 +732,6 @@ const styles = StyleSheet.create({
   dotItem: { width: 6, height: 6, borderRadius: 3 },
 
   // Overlay
-  overlayPos: { position: 'absolute' },
 
   // Music bar
   musicBar: {
