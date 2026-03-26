@@ -1,4 +1,4 @@
-package com.againschool.app
+package kr.againschool.app
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

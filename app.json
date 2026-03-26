@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.againschool.app",
+      "bundleIdentifier": "kr.againschool.app",
       "buildNumber": "1",
       "usesAppleSignIn": true,
       "infoPlist": {
@@ -22,7 +22,7 @@
       }
     },
     "android": {
-      "package": "com.againschool.app",
+      "package": "kr.againschool.app",
       "versionCode": 1,
       "softwareKeyboardLayoutMode": "adjustResize",
       "adaptiveIcon": {

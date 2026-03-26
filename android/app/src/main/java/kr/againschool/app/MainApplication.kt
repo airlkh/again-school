@@ -1,4 +1,4 @@
-package com.againschool.app
+package kr.againschool.app
 
 import android.app.Application
 import android.content.res.Configuration
