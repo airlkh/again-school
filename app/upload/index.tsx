@@ -611,6 +611,14 @@ export default function UploadScreen() {
             visibility,
             visibilitySchools,
             thumbnailUrl: item.thumbnailUrl ?? null,
+            music: selectedMusic ? {
+              name: selectedMusic.title,
+              url: selectedMusic.url,
+              volume: selectedMusic.volume,
+              startTime: selectedMusic.startTime ?? 0,
+              duration: selectedMusic.duration ?? 30,
+              videoVolume: selectedMusic.videoVolume ?? 1,
+            } : null,
           } as any);
         }
       }

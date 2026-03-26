@@ -24,6 +24,14 @@ export interface FirestoreStory {
   caption: string;
   visibility?: string;
   visibilitySchools?: any[];
+  music?: {
+    name: string;
+    url: string;
+    volume: number;
+    startTime: number;
+    duration: number;
+    videoVolume: number;
+  } | null;
   viewers: string[];
   createdAt: number;
   expiresAt: number; // 24시간 후 자동 만료

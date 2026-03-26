@@ -1014,6 +1014,18 @@ export default function HomeScreen() {
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: Array<{ key: string }> }) => {
     const postItems = viewableItems.filter((v) => v.key !== 'stories' && !v.key.startsWith('recommend-') && !v.key.startsWith('banner-'));
     setVisiblePostId(postItems.length > 0 ? postItems[0].key : null);
+    // 다음 2~3개 게시물 이미지 prefetch
+    if (postItems.length > 0) {
+      const currentIdx = feedItemsRef.current.findIndex((f) => f.id === postItems[0].key);
+      if (currentIdx >= 0) {
+        for (let i = 1; i <= 3; i++) {
+          const next = feedItemsRef.current[currentIdx + i];
+          if (next?.type === 'photo_post' && next.data?.imageUrl) {
+            try { Image.prefetch(next.data.imageUrl); } catch {}
+          }
+        }
+      }
+    }
   }).current;
 
   useEffect(() => {
