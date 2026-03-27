@@ -356,9 +356,7 @@ export default function UploadScreen() {
   };
 
   function optimizeCloudinaryUrl(url: string): string {
-    if (!url.includes('cloudinary.com')) return url;
-    // /upload/ 뒤에 변환 파라미터 삽입
-    return url.replace('/upload/', '/upload/q_auto:best,f_auto,w_1440,c_limit/');
+    return url;
   }
 
   // 업로드 함수
