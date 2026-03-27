@@ -1,9 +1,7 @@
 import { Alert } from 'react-native';
 import { CLOUDINARY_CONFIG } from '../config/cloudinary';
-import { ref, uploadString, getDownloadURL } from 'firebase/storage';
-import { storage } from '../config/firebase';
-import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { uploadFileToStorage } from './firebaseStorageUpload';
 import { getThumbnailAsync } from 'expo-video-thumbnails';
 
 export type MediaType = 'image' | 'video';
@@ -45,16 +43,8 @@ export async function uploadImage(
   } catch {
     compressedUri = uri;
   }
-  const filename = `${Date.now()}_image.jpg`;
-  const storageRef = ref(storage, `posts/images/${filename}`);
-  const base64 = await FileSystem.readAsStringAsync(compressedUri, {
-    encoding: 'base64' as any,
-  });
-  onProgress?.(30);
-  await uploadString(storageRef, base64, 'base64', { contentType: 'image/jpeg' });
-  onProgress?.(90);
-  const url = await getDownloadURL(storageRef);
-  onProgress?.(100);
+  const path = `posts/images/${Date.now()}_image.jpg`;
+  const url = await uploadFileToStorage(compressedUri, path, 'image/jpeg', onProgress);
   return { url, type: 'image' };
 }
 

@@ -1,7 +1,5 @@
 import { CLOUDINARY_CONFIG } from '../config/cloudinary';
-import { ref, uploadString, getDownloadURL } from 'firebase/storage';
-import { storage } from '../config/firebase';
-import * as FileSystem from 'expo-file-system/legacy';
+import { uploadFileToStorage } from './firebaseStorageUpload';
 
 export const uploadToCloudinary = async (
   uri: string,
@@ -48,16 +46,8 @@ export const uploadToCloudinary = async (
     });
   }
 
-  console.log('이미지 업로드 시작 (Firebase Storage):', uri.substring(0, 80));
-  const filename = `${Date.now()}_chat.jpg`;
-  const storageRef = ref(storage, `chat/images/${filename}`);
-  const base64 = await FileSystem.readAsStringAsync(uri, {
-    encoding: 'base64' as any,
-  });
-  onProgress?.(50);
-  await uploadString(storageRef, base64, 'base64', { contentType: 'image/jpeg' });
-  onProgress?.(100);
-  return await getDownloadURL(storageRef);
+  const path = `chat/images/${Date.now()}_chat.jpg`;
+  return await uploadFileToStorage(uri, path, 'image/jpeg', onProgress);
 };
 
 export const uploadMedia = uploadToCloudinary;

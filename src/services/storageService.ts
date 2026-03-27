@@ -1,7 +1,5 @@
-import { ref, uploadString, getDownloadURL } from 'firebase/storage';
-import { storage } from '../config/firebase';
 import * as ImageManipulator from 'expo-image-manipulator';
-import * as FileSystem from 'expo-file-system/legacy';
+import { uploadFileToStorage } from './firebaseStorageUpload';
 
 async function compressProfileImage(uri: string): Promise<string> {
   try {
@@ -22,13 +20,8 @@ export async function uploadProfileImage(
 ): Promise<string> {
   console.log('[uploadProfileImage] 시작');
   const compressedUri = await compressProfileImage(uri);
-  const filename = `${Date.now()}_profile.jpg`;
-  const storageRef = ref(storage, `profiles/${uid}/${filename}`);
-  const base64 = await FileSystem.readAsStringAsync(compressedUri, {
-    encoding: 'base64' as any,
-  });
-  await uploadString(storageRef, base64, 'base64', { contentType: 'image/jpeg' });
-  const downloadURL = await getDownloadURL(storageRef);
-  console.log('[uploadProfileImage] 완료:', downloadURL?.substring(0, 80));
-  return downloadURL;
+  const path = `profiles/${uid}/${Date.now()}_profile.jpg`;
+  const url = await uploadFileToStorage(compressedUri, path);
+  console.log('[uploadProfileImage] 완료:', url?.substring(0, 80));
+  return url;
 }

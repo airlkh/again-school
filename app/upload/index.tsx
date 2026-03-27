@@ -45,8 +45,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system/legacy';
 import { getAuth } from 'firebase/auth';
 import { Video as VideoCompressor } from 'react-native-compressor';
-import { ref, uploadString, getDownloadURL } from 'firebase/storage';
-import { storage } from '../../src/config/firebase';
+import { uploadFileToStorage } from '../../src/services/firebaseStorageUpload';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 
@@ -385,12 +384,8 @@ export default function UploadScreen() {
         console.log('[uploadMedia] 썸네일 추출+압축:', thumbUri);
 
         // Firebase Storage에 썸네일 업로드
-        const thumbStorageRef = ref(storage, `thumbnails/${uid}/${Date.now()}.jpg`);
-        const thumbBase64 = await FileSystem.readAsStringAsync(thumbUri, {
-          encoding: 'base64' as any,
-        });
-        await uploadString(thumbStorageRef, thumbBase64, 'base64', { contentType: 'image/jpeg' });
-        thumbnailCloudinaryUrl = await getDownloadURL(thumbStorageRef);
+        const thumbPath = `thumbnails/${uid}/${Date.now()}.jpg`;
+        thumbnailCloudinaryUrl = await uploadFileToStorage(thumbUri, thumbPath, 'image/jpeg');
         console.log('[uploadMedia] Firebase 썸네일 업로드 완료:', thumbnailCloudinaryUrl?.substring(0, 80));
         console.log('[uploadMedia] 최종 썸네일 URL:', thumbnailCloudinaryUrl);
       } catch (e) {
@@ -453,17 +448,8 @@ export default function UploadScreen() {
       });
     } else {
       // 이미지: Firebase Storage 업로드
-      onProgress?.(10);
-      const imageStorageRef = ref(storage, `posts/${uid}/${Date.now()}.jpg`);
-      const imageBase64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: 'base64' as any,
-      });
-      onProgress?.(50);
-      await uploadString(imageStorageRef, imageBase64, 'base64', { contentType: 'image/jpeg' });
-      onProgress?.(90);
-      mediaUrl = await getDownloadURL(imageStorageRef);
-      onProgress?.(100);
-      console.log('[uploadMedia] Firebase 이미지 업로드 완료:', mediaUrl?.substring(0, 80));
+      const imagePath = `posts/${uid}/${Date.now()}.jpg`;
+      mediaUrl = await uploadFileToStorage(uri, imagePath, 'image/jpeg', onProgress);
     }
 
     return { url: mediaUrl, thumbnailUrl: thumbnailCloudinaryUrl };
