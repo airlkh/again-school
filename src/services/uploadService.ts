@@ -1,5 +1,5 @@
 import { CLOUDINARY_CONFIG } from '../config/cloudinary';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { storage } from '../config/firebase';
 import * as FileSystem from 'expo-file-system/legacy';
 
@@ -52,11 +52,10 @@ export const uploadToCloudinary = async (
   const filename = `${Date.now()}_chat.jpg`;
   const storageRef = ref(storage, `chat/images/${filename}`);
   const base64 = await FileSystem.readAsStringAsync(uri, {
-    encoding: FileSystem.EncodingType.Base64,
+    encoding: 'base64' as any,
   });
-  const byteArray = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
   onProgress?.(50);
-  await uploadBytes(storageRef, byteArray, { contentType: 'image/jpeg' });
+  await uploadString(storageRef, base64, 'base64', { contentType: 'image/jpeg' });
   onProgress?.(100);
   return await getDownloadURL(storageRef);
 };

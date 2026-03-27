@@ -1,6 +1,6 @@
 import { Alert } from 'react-native';
 import { CLOUDINARY_CONFIG } from '../config/cloudinary';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { storage } from '../config/firebase';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -48,11 +48,10 @@ export async function uploadImage(
   const filename = `${Date.now()}_image.jpg`;
   const storageRef = ref(storage, `posts/images/${filename}`);
   const base64 = await FileSystem.readAsStringAsync(compressedUri, {
-    encoding: FileSystem.EncodingType.Base64,
+    encoding: 'base64' as any,
   });
-  const byteArray = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
   onProgress?.(30);
-  await uploadBytes(storageRef, byteArray, { contentType: 'image/jpeg' });
+  await uploadString(storageRef, base64, 'base64', { contentType: 'image/jpeg' });
   onProgress?.(90);
   const url = await getDownloadURL(storageRef);
   onProgress?.(100);

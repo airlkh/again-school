@@ -45,7 +45,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system/legacy';
 import { getAuth } from 'firebase/auth';
 import { Video as VideoCompressor } from 'react-native-compressor';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { storage } from '../../src/config/firebase';
 
 const { width: SW, height: SH } = Dimensions.get('window');
@@ -387,10 +387,9 @@ export default function UploadScreen() {
         // Firebase Storage에 썸네일 업로드
         const thumbStorageRef = ref(storage, `thumbnails/${uid}/${Date.now()}.jpg`);
         const thumbBase64 = await FileSystem.readAsStringAsync(thumbUri, {
-          encoding: FileSystem.EncodingType.Base64,
+          encoding: 'base64' as any,
         });
-        const thumbByteArray = Uint8Array.from(atob(thumbBase64), c => c.charCodeAt(0));
-        await uploadBytes(thumbStorageRef, thumbByteArray, { contentType: 'image/jpeg' });
+        await uploadString(thumbStorageRef, thumbBase64, 'base64', { contentType: 'image/jpeg' });
         thumbnailCloudinaryUrl = await getDownloadURL(thumbStorageRef);
         console.log('[uploadMedia] Firebase 썸네일 업로드 완료:', thumbnailCloudinaryUrl?.substring(0, 80));
         console.log('[uploadMedia] 최종 썸네일 URL:', thumbnailCloudinaryUrl);
@@ -457,11 +456,10 @@ export default function UploadScreen() {
       onProgress?.(10);
       const imageStorageRef = ref(storage, `posts/${uid}/${Date.now()}.jpg`);
       const imageBase64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
+        encoding: 'base64' as any,
       });
-      const imageByteArray = Uint8Array.from(atob(imageBase64), c => c.charCodeAt(0));
       onProgress?.(50);
-      await uploadBytes(imageStorageRef, imageByteArray, { contentType: 'image/jpeg' });
+      await uploadString(imageStorageRef, imageBase64, 'base64', { contentType: 'image/jpeg' });
       onProgress?.(90);
       mediaUrl = await getDownloadURL(imageStorageRef);
       onProgress?.(100);

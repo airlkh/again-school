@@ -1,4 +1,4 @@
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { storage } from '../config/firebase';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -25,10 +25,9 @@ export async function uploadProfileImage(
   const filename = `${Date.now()}_profile.jpg`;
   const storageRef = ref(storage, `profiles/${uid}/${filename}`);
   const base64 = await FileSystem.readAsStringAsync(compressedUri, {
-    encoding: FileSystem.EncodingType.Base64,
+    encoding: 'base64' as any,
   });
-  const byteArray = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-  await uploadBytes(storageRef, byteArray, { contentType: 'image/jpeg' });
+  await uploadString(storageRef, base64, 'base64', { contentType: 'image/jpeg' });
   const downloadURL = await getDownloadURL(storageRef);
   console.log('[uploadProfileImage] 완료:', downloadURL?.substring(0, 80));
   return downloadURL;
