@@ -45,6 +45,8 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system/legacy';
 import { getAuth } from 'firebase/auth';
 import { Video as VideoCompressor } from 'react-native-compressor';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '../../src/config/firebase';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 
@@ -382,44 +384,13 @@ export default function UploadScreen() {
         const thumbUri = compressed.uri;
         console.log('[uploadMedia] 썸네일 추출+압축:', thumbUri);
 
-        // Cloudinary 업로드 시도
-        const thumbForm = new FormData();
-        thumbForm.append('file', { uri: thumbUri, type: 'image/jpeg', name: 'thumb.jpg' } as any);
-        thumbForm.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
-        const thumbRes = await fetch(CLOUDINARY_CONFIG.imageUploadUrl, {
-          method: 'POST',
-          body: thumbForm,
-        });
-        console.log('[uploadMedia] Cloudinary 썸네일 응답:', thumbRes.status);
-        const thumbData = await thumbRes.json();
-        console.log('[uploadMedia] Cloudinary 썸네일 데이터:', JSON.stringify(thumbData).substring(0, 200));
-
-        if (thumbRes.ok && thumbData.secure_url) {
-          thumbnailCloudinaryUrl = thumbData.secure_url;
-        } else {
-          console.warn('[uploadMedia] Cloudinary 썸네일 업로드 실패, Firebase Storage fallback');
-          // Firebase Storage에 썸네일 업로드 (fallback)
-          const auth = getAuth();
-          const token = await auth.currentUser?.getIdToken();
-          if (token) {
-            const thumbPath = `thumbnails/${uid}/${Date.now()}.jpg`;
-            const encodedPath = encodeURIComponent(thumbPath);
-            const bucket = 'again-school-bfea8.firebasestorage.app';
-            const uploadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o?uploadType=media&name=${encodedPath}`;
-            const result = await FileSystem.uploadAsync(uploadUrl, thumbUri, {
-              httpMethod: 'POST',
-              uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-              headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'image/jpeg' },
-            });
-            if (result.status === 200) {
-              const data = JSON.parse(result.body);
-              const dlToken = data.downloadTokens;
-              thumbnailCloudinaryUrl = dlToken
-                ? `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(data.name)}?alt=media&token=${dlToken}`
-                : `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedPath}?alt=media`;
-            }
-          }
-        }
+        // Firebase Storage에 썸네일 업로드
+        const thumbStorageRef = ref(storage, `thumbnails/${uid}/${Date.now()}.jpg`);
+        const thumbResponse = await fetch(thumbUri);
+        const thumbBlob = await thumbResponse.blob();
+        await uploadBytes(thumbStorageRef, thumbBlob, { contentType: 'image/jpeg' });
+        thumbnailCloudinaryUrl = await getDownloadURL(thumbStorageRef);
+        console.log('[uploadMedia] Firebase 썸네일 업로드 완료:', thumbnailCloudinaryUrl?.substring(0, 80));
         console.log('[uploadMedia] 최종 썸네일 URL:', thumbnailCloudinaryUrl);
       } catch (e) {
         console.warn('[uploadMedia] 썸네일 처리 실패:', e);
@@ -480,41 +451,17 @@ export default function UploadScreen() {
         xhr.send(formData);
       });
     } else {
-      // 이미지: Cloudinary 업로드 (기존 유지)
-      mediaUrl = await new Promise((resolve, reject) => {
-        const formData = new FormData();
-        formData.append('file', {
-          uri: uri,
-          type: 'image/jpeg',
-          name: `image_${Date.now()}.jpg`,
-        } as any);
-        formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
-
-        const xhr = new XMLHttpRequest();
-        xhr.timeout = 600000;
-
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) {
-            onProgress?.(Math.round((e.loaded / e.total) * 100));
-          }
-        };
-
-        xhr.onload = () => {
-          if (xhr.status === 200) {
-            const res = JSON.parse(xhr.responseText);
-            resolve(optimizeCloudinaryUrl(res.secure_url));
-          } else {
-            console.error('Cloudinary 오류:', xhr.status, xhr.responseText);
-            reject(new Error(`업로드 실패: ${xhr.status}`));
-          }
-        };
-
-        xhr.onerror = () => reject(new Error('네트워크 오류'));
-        xhr.ontimeout = () => reject(new Error('시간 초과'));
-
-        xhr.open('POST', CLOUDINARY_CONFIG.imageUploadUrl);
-        xhr.send(formData);
-      });
+      // 이미지: Firebase Storage 업로드
+      onProgress?.(10);
+      const imageStorageRef = ref(storage, `posts/${uid}/${Date.now()}.jpg`);
+      const imageResponse = await fetch(uri);
+      const imageBlob = await imageResponse.blob();
+      onProgress?.(50);
+      await uploadBytes(imageStorageRef, imageBlob, { contentType: 'image/jpeg' });
+      onProgress?.(90);
+      mediaUrl = await getDownloadURL(imageStorageRef);
+      onProgress?.(100);
+      console.log('[uploadMedia] Firebase 이미지 업로드 완료:', mediaUrl?.substring(0, 80));
     }
 
     return { url: mediaUrl, thumbnailUrl: thumbnailCloudinaryUrl };

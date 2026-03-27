@@ -1,5 +1,7 @@
 import { Alert } from 'react-native';
 import { CLOUDINARY_CONFIG } from '../config/cloudinary';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '../config/firebase';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { getThumbnailAsync } from 'expo-video-thumbnails';
 
@@ -42,54 +44,16 @@ export async function uploadImage(
   } catch {
     compressedUri = uri;
   }
-
-  return new Promise((resolve, reject) => {
-    const formData = new FormData();
-    formData.append('file', {
-      uri: compressedUri,
-      name: `image_${Date.now()}.jpg`,
-      type: 'image/jpeg',
-    } as any);
-    formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
-    formData.append('resource_type', 'image');
-    formData.append('cloud_name', CLOUDINARY_CONFIG.cloudName);
-
-    const xhr = new XMLHttpRequest();
-
-    xhr.upload.addEventListener('progress', (event) => {
-      if (event.lengthComputable && onProgress) {
-        const progress = Math.min(Math.round((event.loaded / event.total) * 100), 100);
-        onProgress(progress);
-      }
-    });
-
-    xhr.addEventListener('load', () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const data = JSON.parse(xhr.responseText);
-          resolve({ url: data.secure_url, type: 'image' });
-        } catch {
-          reject(new Error('서버 응답을 처리할 수 없습니다.'));
-        }
-      } else {
-        let errorMsg = '이미지 업로드에 실패했습니다.';
-        try {
-          const errData = JSON.parse(xhr.responseText);
-          if (errData?.error?.message) {
-            errorMsg = `업로드 실패: ${errData.error.message}`;
-          }
-        } catch {}
-        reject(new Error(errorMsg));
-      }
-    });
-
-    xhr.addEventListener('error', () => reject(new Error('네트워크 오류가 발생했습니다. 인터넷 연결을 확인해주세요.')));
-    xhr.addEventListener('timeout', () => reject(new Error('업로드 시간이 초과되었습니다. 다시 시도해주세요.')));
-
-    xhr.timeout = 60000;
-    xhr.open('POST', CLOUDINARY_CONFIG.imageUploadUrl);
-    xhr.send(formData);
-  });
+  const filename = `${Date.now()}_image.jpg`;
+  const storageRef = ref(storage, `posts/images/${filename}`);
+  const response = await fetch(compressedUri);
+  const blob = await response.blob();
+  onProgress?.(30);
+  await uploadBytes(storageRef, blob, { contentType: 'image/jpeg' });
+  onProgress?.(90);
+  const url = await getDownloadURL(storageRef);
+  onProgress?.(100);
+  return { url, type: 'image' };
 }
 
 function xhrUploadVideo(uri: string, onProgress?: (progress: number) => void): Promise<string> {

@@ -81,17 +81,6 @@ const getVideoThumbnail = (post: any): string | null => {
     return post.imageUrl as string;
   }
 
-  // 4순위: Cloudinary 동영상 URL → 썸네일 변환
-  const vUrl: string | undefined = post.videoUrl || post.imageUrl;
-  if (vUrl && vUrl.includes('res.cloudinary.com')) {
-    if (vUrl.includes('/video/upload/')) {
-      const base = vUrl.replace(/\/video\/upload\/[^\/]*\//, '/video/upload/');
-      return base
-        .replace('/video/upload/', '/video/upload/f_jpg,q_70,w_600/')
-        .replace(/\.(mp4|mov|avi|webm)(\?.*)?$/i, '.jpg');
-    }
-  }
-
   return null;
 };
 

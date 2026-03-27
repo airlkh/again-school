@@ -35,13 +35,6 @@ const getThumbnail = (post: any) => {
   if (post.imageUrl && !isVideoUrl(post.imageUrl)) return post.imageUrl;
   const videoUrl = post.videoUrl || post.imageUrl;
   if (videoUrl) {
-    // Cloudinary URL만 변환 시도
-    if (videoUrl.includes('cloudinary.com')) {
-      return videoUrl
-        .replace('/video/upload/', '/video/upload/so_0,w_600/')
-        .replace(/\.(mp4|mov)(\?|$)/i, '.jpg$2');
-    }
-    // Cloudinary 아닌 경우 null 반환 → fallback 아이콘 표시
     return null;
   }
   return null;
