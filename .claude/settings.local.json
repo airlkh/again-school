@@ -36,7 +36,8 @@
       "Bash(gh workflow:*)",
       "Bash(npm run:*)",
       "Bash(npm uninstall:*)",
-      "Bash(npm ls:*)"
+      "Bash(npm ls:*)",
+      "Bash(eas:*)"
     ]
   }
 }
