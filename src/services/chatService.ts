@@ -131,7 +131,7 @@ export async function sendMessage(
             otherUid: senderUid,
             otherName: senderName,
           });
-          saveNotification(uid, { type: 'chat', fromUid: senderUid, fromName: senderName, chatRoomId: roomId });
+          saveNotification(uid, { type: 'chat', fromUid: senderUid, fromName: senderName, fromPhotoURL: senderSnap.data()?.photoURL ?? null, chatRoomId: roomId });
         }
       });
     });
