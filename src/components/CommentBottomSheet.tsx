@@ -73,6 +73,7 @@ export function CommentBottomSheet({ visible, postId, postAuthorUid, onClose }: 
   const [submitting, setSubmitting] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [replyTo, setReplyTo] = useState<{ uid: string; name: string } | null>(null);
   const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
@@ -107,6 +108,7 @@ export function CommentBottomSheet({ visible, postId, postAuthorUid, onClose }: 
       setInputText('');
       setShowEmoji(false);
       setEditingId(null);
+      setReplyTo(null);
     }
   }, [visible]);
 
@@ -218,6 +220,7 @@ export function CommentBottomSheet({ visible, postId, postAuthorUid, onClose }: 
         text,
       });
       setInputText('');
+      setReplyTo(null);
 
       // 댓글 푸시 알림 (본인 게시물 제외)
       try {
@@ -336,7 +339,11 @@ export function CommentBottomSheet({ visible, postId, postAuthorUid, onClose }: 
                       <Text style={{ fontSize: 11, color: colors.inactive }}> (수정됨)</Text>
                     ) : null}
                   </Text>
-                  <TouchableOpacity style={styles.replyTouchable}>
+                  <TouchableOpacity style={styles.replyTouchable} onPress={() => {
+                    setReplyTo({ uid: item.uid, name: item.name });
+                    setInputText(`@${item.name} `);
+                    setTimeout(() => inputRef.current?.focus(), 100);
+                  }}>
                     <Text style={[styles.replyBtn, { color: colors.inactive }]}>답글 달기</Text>
                   </TouchableOpacity>
                 </View>
@@ -375,6 +382,16 @@ export function CommentBottomSheet({ visible, postId, postAuthorUid, onClose }: 
             <Text style={{ flex: 1, fontSize: 12, color: colors.primary }}>댓글 수정 중...</Text>
             <TouchableOpacity onPress={() => { setEditingId(null); setInputText(''); }}>
               <Text style={{ fontSize: 12, color: colors.inactive }}>취소</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* 답글 표시 */}
+        {replyTo && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 6, backgroundColor: colors.surface, borderTopWidth: 0.5, borderTopColor: colors.border }}>
+            <Text style={{ flex: 1, fontSize: 12, color: colors.primary }}>↩ @{replyTo.name} 에게 답글 달기</Text>
+            <TouchableOpacity onPress={() => { setReplyTo(null); setInputText(''); }}>
+              <Ionicons name="close" size={16} color={colors.inactive} />
             </TouchableOpacity>
           </View>
         )}

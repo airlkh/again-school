@@ -27,7 +27,8 @@ export async function registerPushToken(uid: string): Promise<void> {
   }
 
   try {
-    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? '2e100b46-a979-4a95-ac98-58236ff530f2';
+    console.log('[Push] projectId:', projectId);
     const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
 
     // Firestore에 토큰 저장
@@ -127,7 +128,8 @@ export async function sendPushNotification(
     const pushToken = userSnap.data()?.pushToken;
     if (!pushToken) return;
 
-    await fetch('https://exp.host/--/api/v2/push/send', {
+    console.log('[Push] 발송 시도:', { toUid, pushToken: pushToken?.substring(0, 30), title, body: body?.substring(0, 30) });
+    const res = await fetch('https://exp.host/--/api/v2/push/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -137,6 +139,7 @@ export async function sendPushNotification(
         data: data ?? {},
       }),
     });
+    try { const result = await res.json(); console.log('[Push] Expo API 응답:', JSON.stringify(result)); } catch {}
   } catch (e) {
     console.warn('[Push] 알림 발송 실패:', e);
   }
