@@ -226,12 +226,21 @@ export function CommentBottomSheet({ visible, postId, postAuthorUid, onClose }: 
       try {
         const postSnap = await getDoc(doc(db, 'posts', postId));
         const authorUid = postSnap.data()?.authorUid;
+        const senderName = displayName || '사용자';
+        const bodyText = text.length > 20 ? text.slice(0, 20) + '...' : text;
         if (authorUid && authorUid !== user.uid) {
-          const senderName = displayName || '사용자';
-          const bodyText = text.length > 20 ? text.slice(0, 20) + '...' : text;
           sendPushNotification(
             authorUid,
             `${senderName}님이 댓글을 남겼어요`,
+            bodyText,
+            { type: 'comment', postId },
+          ).catch(() => {});
+        }
+        // 답글일 때 원댓글 작성자에게도 알림 (게시물 작성자와 다르고, 본인이 아닌 경우)
+        if (replyTo && replyTo.uid !== user.uid && replyTo.uid !== authorUid) {
+          sendPushNotification(
+            replyTo.uid,
+            `${senderName}님이 회원님의 댓글에 답글을 달았습니다`,
             bodyText,
             { type: 'comment', postId },
           ).catch(() => {});

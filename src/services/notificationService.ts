@@ -72,8 +72,9 @@ export function setupNotificationHandlers(): () => void {
         pathname: '/chat/[id]',
         params: {
           id: data.otherUid as string,
-          name: (data.otherName as string) || '',
+          name: (data.otherName as string) || '동창',
           avatar: (data.otherAvatar as string) || '1',
+          online: '0',
         },
       });
     } else if (data?.postId) {
