@@ -101,8 +101,16 @@ export default function NotificationsScreen() {
       }
       if ((item.type === 'like' || item.type === 'comment') && item.postId) {
         router.push(`/post/${item.postId}` as any);
-      } else if (item.type === 'chat' && item.chatRoomId) {
-        router.push(`/chat/${item.chatRoomId}` as any);
+      } else if (item.type === 'chat' && item.fromUid) {
+        router.push({
+          pathname: '/chat/[id]',
+          params: {
+            id: item.fromUid,
+            name: item.fromName || '동창',
+            avatar: '1',
+            online: '0',
+          },
+        } as any);
       } else if (item.type === 'connection') {
         router.push(`/profile/${item.fromUid}` as any);
       }
