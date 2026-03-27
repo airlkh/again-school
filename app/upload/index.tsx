@@ -386,9 +386,11 @@ export default function UploadScreen() {
 
         // Firebase Storage에 썸네일 업로드
         const thumbStorageRef = ref(storage, `thumbnails/${uid}/${Date.now()}.jpg`);
-        const thumbResponse = await fetch(thumbUri);
-        const thumbBlob = await thumbResponse.blob();
-        await uploadBytes(thumbStorageRef, thumbBlob, { contentType: 'image/jpeg' });
+        const thumbBase64 = await FileSystem.readAsStringAsync(thumbUri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        const thumbByteArray = Uint8Array.from(atob(thumbBase64), c => c.charCodeAt(0));
+        await uploadBytes(thumbStorageRef, thumbByteArray, { contentType: 'image/jpeg' });
         thumbnailCloudinaryUrl = await getDownloadURL(thumbStorageRef);
         console.log('[uploadMedia] Firebase 썸네일 업로드 완료:', thumbnailCloudinaryUrl?.substring(0, 80));
         console.log('[uploadMedia] 최종 썸네일 URL:', thumbnailCloudinaryUrl);
@@ -454,10 +456,12 @@ export default function UploadScreen() {
       // 이미지: Firebase Storage 업로드
       onProgress?.(10);
       const imageStorageRef = ref(storage, `posts/${uid}/${Date.now()}.jpg`);
-      const imageResponse = await fetch(uri);
-      const imageBlob = await imageResponse.blob();
+      const imageBase64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      const imageByteArray = Uint8Array.from(atob(imageBase64), c => c.charCodeAt(0));
       onProgress?.(50);
-      await uploadBytes(imageStorageRef, imageBlob, { contentType: 'image/jpeg' });
+      await uploadBytes(imageStorageRef, imageByteArray, { contentType: 'image/jpeg' });
       onProgress?.(90);
       mediaUrl = await getDownloadURL(imageStorageRef);
       onProgress?.(100);
