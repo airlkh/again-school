@@ -70,43 +70,6 @@
           ]
         }
       }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:414642537109:android:4647511aa956c08a23d19c",
-        "android_client_info": {
-          "package_name": "kr.againschool.app"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "414642537109-2oct8d0r1lhk64t0tep8htmmjtqrlhng.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "kr.againschool.app",
-            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
-          }
-        },
-        {
-          "client_id": "414642537109-4hc2a5k1m3hqrultrdav3r19q36b377o.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyCEZSTbUfz0Ca1W2cOKPwR2e4p4qTXXPIQ"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "414642537109-4hc2a5k1m3hqrultrdav3r19q36b377o.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
-        }
-      }
     }
   ],
   "configuration_version": "1"
