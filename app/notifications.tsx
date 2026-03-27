@@ -10,6 +10,7 @@ import {
   StatusBar,
   Platform,
   Image,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
@@ -21,6 +22,7 @@ import {
   updateDoc,
   writeBatch,
   getDocs,
+  deleteDoc,
 } from 'firebase/firestore';
 import { db, auth } from '../src/config/firebase';
 import { useCurrentUser } from '../src/hooks/useCurrentUser';
@@ -129,10 +131,37 @@ export default function NotificationsScreen() {
     await batch.commit();
   }, [uid]);
 
+  const deleteOneNotification = useCallback(async (itemId: string) => {
+    if (!uid) return;
+    Alert.alert('알림 삭제', '이 알림을 삭제하시겠습니까?', [
+      { text: '취소', style: 'cancel' },
+      { text: '삭제', style: 'destructive', onPress: async () => {
+        try { await deleteDoc(doc(db, 'notifications', uid, 'items', itemId)); } catch {}
+      }},
+    ]);
+  }, [uid]);
+
+  const deleteAllNotifications = useCallback(async () => {
+    if (!uid) return;
+    Alert.alert('전체 삭제', '모든 알림을 삭제하시겠습니까?', [
+      { text: '취소', style: 'cancel' },
+      { text: '전체 삭제', style: 'destructive', onPress: async () => {
+        try {
+          const colRef = collection(db, 'notifications', uid, 'items');
+          const snap = await getDocs(colRef);
+          const batch = writeBatch(db);
+          snap.docs.forEach((d) => batch.delete(d.ref));
+          await batch.commit();
+        } catch {}
+      }},
+    ]);
+  }, [uid]);
+
   const renderItem = ({ item }: { item: NotificationItem }) => (
     <TouchableOpacity
       style={[styles.item, item.read ? styles.itemRead : styles.itemUnread]}
       onPress={() => markRead(item)}
+      onLongPress={() => deleteOneNotification(item.id)}
       activeOpacity={0.75}
     >
       {/* 프로필 사진 */}
@@ -179,9 +208,14 @@ export default function NotificationsScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>알림</Text>
-        <TouchableOpacity onPress={markAllRead}>
-          <Text style={styles.markAll}>모두 읽음</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <TouchableOpacity onPress={markAllRead}>
+            <Text style={styles.markAll}>모두 읽음</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={deleteAllNotifications}>
+            <Text style={[styles.markAll, { color: '#e94560' }]}>전체 삭제</Text>
+          </TouchableOpacity>
+        </View>
       </View>
       {loading ? (
         <ActivityIndicator style={styles.loader} size="large" color="#FF6B6B" />
